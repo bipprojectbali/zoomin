@@ -17,6 +17,7 @@ Environment=DB_PATH=/var/lib/zoomin/zoomin.sqlite
 Environment=BUN_RUNTIME_TRANSPILER_CACHE_PATH=0
 # Secret (LIVEKIT_API_KEY/SECRET, SESSION_SECRET, ADMIN_PASSWORD) + PORT, URL, TRUST_PROXY=true. Mode 640 root:zoomin.
 EnvironmentFile=/etc/zoomin/zoomin.env
+# Butuh dist/web (bun run build, ikut di tarball rilis); tanpanya start gagal dan systemd mengulang (Restart=on-failure).
 ExecStart=/usr/local/bin/bun src/server/main.ts
 Restart=on-failure
 RestartSec=3

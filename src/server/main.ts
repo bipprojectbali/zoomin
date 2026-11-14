@@ -6,27 +6,31 @@ import { createApi } from "./api";
 import { CLIENT_IP_HEADER } from "./auth.ratelimit";
 import { loadConfig } from "./config";
 import { openDb } from "./db";
+import { staticRoutes, WEB_DIST_DIR } from "./static.serve";
 
 /**
  * Satu Bun.serve untuk SPA + API.
- * Pola (docs bun.com/docs/bundler/fullstack): `routes` menerima HTML import (di-bundle Bun, plugin Tailwind dari
- * bunfig.toml `[serve.static]`) dan handler `(req) => Response`. Elysia dipasang sebagai handler `/api/*` lewat
- * `api.fetch`; route yang lebih spesifik menang atas wildcard `/*`, jadi `/*` → index untuk client-side routing.
+ * Dev: `routes` menerima HTML import (di-bundle Bun saat diminta + HMR, plugin Tailwind dari bunfig.toml
+ * `[serve.static]`, docs bun.com/docs/bundler/fullstack). Produksi: prebuild statis dari `bun run build`
+ * (code splitting + hash, static.serve.ts); HTML import hanya manifest lazy, jadi tidak di-bundle saat runtime.
+ * Elysia dipasang sebagai handler `/api/*` lewat `api.fetch`; route yang lebih spesifik menang atas wildcard `/*`.
  */
-export function createServer(deps: ApiDeps, port: number) {
+export function createServer(deps: ApiDeps, port: number, webDir: string = WEB_DIST_DIR) {
   const api = createApi(deps);
+  const isProd = deps.config.nodeEnv === "production";
+  const web: Record<string, Bun.HTMLBundle | ((req: Request) => Response)> = isProd ? staticRoutes(webDir) : { "/*": index };
   return Bun.serve({
     port,
     hostname: deps.config.host,
     tls: loadTls(deps.config.tls),
-    development: deps.config.nodeEnv !== "production",
+    development: !isProd,
     routes: {
       "/api/*": (req, server) => {
         // Selalu timpa: header internal ini sumber IP peer untuk rate limit (auth.ratelimit.ts), klien tak boleh mengisinya.
         req.headers.set(CLIENT_IP_HEADER, server.requestIP(req)?.address ?? "");
         return api.fetch(req);
       },
-      "/*": index,
+      ...web,
     },
   });
 }

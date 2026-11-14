@@ -154,7 +154,8 @@ Dari mesin dev (hanya file yang dibutuhkan runtime; `.env`, `data/`, `node_modul
 
 ```bash
 VER=0.1.0   # = version di package.json / CHANGELOG
-tar -czf zoomin-$VER.tgz package.json bun.lock bunfig.toml tsconfig.json migrations src
+bun install --frozen-lockfile && bun run build   # → dist/web (SPA prebuild; wajib, server produksi menolak start tanpanya)
+tar -czf zoomin-$VER.tgz --exclude='*.map' package.json bun.lock bunfig.toml tsconfig.json migrations src dist
 # salin ke server (scp/rsync), lalu di server:
 sudo mkdir -p /opt/zoomin/releases/$VER && sudo tar -xzf zoomin-$VER.tgz -C /opt/zoomin/releases/$VER
 cd /opt/zoomin/releases/$VER && sudo bun install --production --frozen-lockfile
@@ -165,8 +166,13 @@ journalctl -u zoomin -n 20   # "zoomin: http://localhost:3000/ (... env producti
 sudo systemctl reload caddy
 ```
 
-Migrasi SQL jalan otomatis saat start (idempotent). Bundle SPA dibuat Bun saat start (production, chunk ber-hash,
-tanpa inline script), jadi tidak ada langkah build terpisah.
+Migrasi SQL jalan otomatis saat start (idempotent). SPA disajikan dari `dist/web` hasil `bun run build`
+(`scripts/build.web.ts`: code splitting, minify, Tailwind, nama file ber-hash). Sourcemap `*.map` dibuat external
+(tanpa komentar `sourceMappingURL`), tetap di `dist/web` lokal untuk debugging, di-exclude dari tarball rilis, dan
+server tidak pernah merutekannya (404). Asset ber-hash dikirim
+dengan `Cache-Control: public, max-age=31536000, immutable`, `index.html` dengan `no-cache`; kompresi oleh Caddy
+`encode`. Tanpa `dist/web/index.html`, `NODE_ENV=production` gagal start dengan pesan "jalankan `bun run build`".
+Build dilakukan di mesin dev agar server tidak perlu menjalankan bundler; `bun run dev` tetap memakai HTML import + HMR.
 
 ## Backup SQLite
 
