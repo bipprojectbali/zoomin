@@ -9,7 +9,9 @@ import tailwind from "bun-plugin-tailwind";
  * Out dir bisa diganti `--outdir <dir>` atau env `WEB_OUT_DIR` (e2e: folder sementara, pasangan WEB_DIST_DIR server)
  * agar build tidak menimpa dist/web milik server produksi yang sedang jalan. Hanya out dir itu yang dibersihkan.
  */
-const { values } = parseArgs({ args: Bun.argv.slice(2), options: { outdir: { type: "string" } } });
+// Argv hanya dibaca saat dijalankan langsung: build.binary.ts meng-import skrip ini dalam proses yang sama, dan flag
+// miliknya (--target/--outdir) bukan untuk build web (--outdir binary akan jadi out dir SPA, --target membuat parseArgs throw).
+const { values } = parseArgs({ args: import.meta.main ? Bun.argv.slice(2) : [], options: { outdir: { type: "string" } } });
 const OUT_DIR = values.outdir?.trim() || process.env.WEB_OUT_DIR?.trim() || "dist/web";
 
 rmSync(OUT_DIR, { recursive: true, force: true });

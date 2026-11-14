@@ -14,7 +14,8 @@ import { parseArgs } from "node:util";
  * Pakai: `bun scripts/build.binary.ts [--target bun-linux-x64 ...] [--all] [--outdir bin]`
  */
 const ROOT = join(import.meta.dir, "..");
-const WEB_DIR = "dist/web";
+// Sama dengan out dir build.web.ts (env WEB_OUT_DIR): test binary membangun SPA ke tmpdir agar dist/web tidak ditimpa.
+const WEB_DIR = process.env.WEB_OUT_DIR?.trim() || "dist/web";
 const EMBED_DIR = "dist/embed/web";
 const ALL_TARGETS = ["bun-linux-x64", "bun-linux-arm64", "bun-darwin-arm64", "bun-darwin-x64", "bun-windows-x64"];
 

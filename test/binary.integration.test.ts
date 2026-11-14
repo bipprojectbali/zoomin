@@ -22,7 +22,12 @@ const SECRETS = {
 const BASE_ENV = { PATH: process.env.PATH ?? "", HOME: cwd, NO_COLOR: "1" };
 
 beforeAll(() => {
-  const build = Bun.spawnSync([process.execPath, "scripts/build.binary.ts", "--outdir", outdir], { cwd: ROOT, stdout: "pipe", stderr: "pipe" });
+  const build = Bun.spawnSync([process.execPath, "scripts/build.binary.ts", "--outdir", outdir], {
+    cwd: ROOT,
+    env: { ...process.env, WEB_OUT_DIR: join(work, "web") },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   if (build.exitCode !== 0) throw new Error(`build.binary gagal (exit ${build.exitCode}): ${build.stderr.toString()}`);
   mkdirSync(cwd);
 }, 180_000);
