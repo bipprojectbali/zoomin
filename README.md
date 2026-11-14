@@ -93,9 +93,9 @@ bun run start   # mode production, menyajikan dist/web
 
 Buka http://localhost:3000 dan masuk dengan Google.
 
-Mode production menolak start bila `dist/web/index.html` belum ada (lokasi bisa diganti env `WEB_DIST_DIR`). Daftar
-file SPA dibaca sekali saat start, jadi **restart server setelah `bun run build`**; tanpa itu halaman kosong karena
-chunk lama 404. Untuk kerja lokal pakai `bun run dev`. `bun run build` menghasilkan aset ber-hash yang
+Mode production menolak start bila `dist/web/index.html` belum ada (lokasi bisa diganti env `WEB_DIST_DIR`). File
+SPA dibaca per request, jadi `bun run build` saat server jalan langsung terpakai tanpa restart (tab yang masih memuat
+build lama perlu reload). Untuk kerja lokal pakai `bun run dev`. `bun run build` menghasilkan aset ber-hash yang
 diperkecil dan dipecah per halaman (`scripts/build.web.ts`); sourcemap dibuat terpisah dan tidak disajikan server.
 
 ### Single binary

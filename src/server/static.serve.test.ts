@@ -88,7 +88,7 @@ describe("produksi: SPA statis dari dist", () => {
     expect(await res.text()).not.toContain("secret.tsx");
   });
 
-  test("path traversal tidak pernah membaca file di luar whitelist dist", async () => {
+  test("path traversal tidak pernah membaca file di luar dist", async () => {
     // Raw request lewat socket: fetch() menormalisasi ".." sebelum dikirim. Bun juga menormalisasi path di server,
     // jadi hasilnya 404 (segmen berekstensi) atau index.html SPA, tidak pernah isi file /etc/passwd.
     for (const path of ["/../../etc/passwd", "/%2e%2e/%2e%2e/etc/passwd", "/sub/..%2f..%2fetc%2fpasswd", "/../../etc/hosts.txt"]) {
@@ -101,6 +101,53 @@ describe("produksi: SPA statis dari dist", () => {
   test("/api tetap ke Elysia", async () => {
     expect((await get("/api/health")).status).toBe(200);
     expect((await get("/api/tidak-ada")).status).toBe(404);
+  });
+});
+
+describe("aset di-resolve per request (rebuild saat server jalan)", () => {
+  // Layout test-only: <tmp>/web = dist, <tmp>/secret.txt + <tmp>/web-evil/x.js di luar dist.
+  const tmp = mkdtempSync(join(tmpdir(), "zoomin-rebuild-"));
+  const web = join(tmp, "web");
+  mkdirSync(web);
+  mkdirSync(join(tmp, "web-evil"));
+  writeFileSync(join(web, "index.html"), '<div id="root"></div>');
+  writeFileSync(join(tmp, "secret.txt"), "TOP-SECRET");
+  writeFileSync(join(tmp, "web-evil", "x.js"), "TOP-SECRET");
+  const handler = staticRoutes(web)["/*"]!;
+  const call = (path: string, init?: RequestInit) => handler(new Request(`http://localhost${path}`, init));
+  afterAll(() => rmSync(tmp, { recursive: true, force: true }));
+
+  test("file yang ditambah SETELAH handler dibuat → 200 immutable; yang dihapus → 404", async () => {
+    expect(call("/index-new999.js").status).toBe(404);
+    writeFileSync(join(web, "index-new999.js"), "console.log('new')");
+    const res = call("/index-new999.js");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    expect(await res.text()).toBe("console.log('new')");
+    rmSync(join(web, "index-new999.js"));
+    expect(call("/index-new999.js").status).toBe(404);
+  });
+
+  test("index.html yang ditulis ulang langsung tersaji", async () => {
+    writeFileSync(join(web, "index.html"), '<div id="root">v2</div>');
+    expect(await call("/", NAV).text()).toContain("v2");
+  });
+
+  test("traversal / encoded / di luar dist → tidak pernah membaca file luar", async () => {
+    for (const path of ["/../secret.txt", "/%2e%2e/secret.txt", "/..%2fsecret.txt", "/sub/..%2f..%2fsecret.txt", "/%2e%2e%2fsecret.txt", "/..%5csecret.txt", "/../web-evil/x.js", "/%2e%2e/web-evil/x.js", "/x%00.js", "/%E0%A4%A.js"]) {
+      for (const init of [undefined, NAV]) {
+        const res = call(path, init);
+        const body = await res.text();
+        expect(body).not.toContain("TOP-SECRET");
+        if (!init && path.endsWith(".js")) expect(res.status).toBe(404);
+      }
+    }
+  });
+
+  test("direktori dan index.html bukan aset", async () => {
+    mkdirSync(join(web, "dir.js"));
+    expect(call("/dir.js").status).toBe(404);
+    expect(call("/index.html").headers.get("cache-control")).toBe("no-cache");
   });
 });
 
