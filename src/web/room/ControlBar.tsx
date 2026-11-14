@@ -1,5 +1,6 @@
 /** Control bar bawah tinggi tetap (UX-02): Mic · Kamera | Layar | Peserta · Undang | Keluar; mobile: overflow "Lainnya" (UX-20). */
 import type { Room } from "livekit-client";
+import type { RoomSummary } from "../../shared/api.types";
 import { Ellipsis, PhoneOff, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import {
@@ -30,6 +31,10 @@ export type ControlBarProps = {
   canPublish: boolean;
   /** Host room: tampilkan Undang. */
   canInvite: boolean;
+  /** Info room (visibility menentukan isi Undang); null = belum dimuat. */
+  summary: RoomSummary | null;
+  onSummaryChanged: (room: RoomSummary) => void;
+  onRoomDeleted: () => void;
   participantCount: number;
   onOpenParticipants: () => void;
   onLeave: () => void;
@@ -64,7 +69,16 @@ export function ControlBar(p: ControlBarProps) {
           </Button>
         </ControlTooltip>
         {/* Dialog di-portal: tetap tampil di mobile meski pemicunya tersembunyi. */}
-        {p.canInvite && <InviteDialog roomId={p.roomId} open={inviteOpen} onOpenChange={setInviteOpen} />}
+        {p.canInvite && (
+          <InviteDialog
+            roomId={p.roomId}
+            summary={p.summary}
+            open={inviteOpen}
+            onOpenChange={setInviteOpen}
+            onSummaryChanged={p.onSummaryChanged}
+            onRoomDeleted={p.onRoomDeleted}
+          />
+        )}
       </div>
 
       <DropdownMenu>

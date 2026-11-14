@@ -69,7 +69,22 @@ function RoomView({ roomId }: { roomId: string }) {
     const kind = status === "left" || status === "disconnected" ? status : "error";
     body = <RoomStatusScreen kind={kind} error={conn.error ?? summaryError} onRejoin={summaryError && !choices ? () => setSummaryAttempt((n) => n + 1) : conn.retry} onLobby={toLobby} />;
   } else if (room && (status === "connected" || status === "reconnecting")) {
-    body = <ConnectedRoom room={room} roomId={roomId} title={title} role={role} status={status} onLeave={() => void conn.leave()} />;
+    body = (
+      <ConnectedRoom
+        room={room}
+        roomId={roomId}
+        title={title}
+        role={role}
+        status={status}
+        summary={summary}
+        onSummaryChanged={setSummary}
+        onLeave={() => void conn.leave()}
+        onRoomDeleted={() => {
+          void conn.leave();
+          toLobby();
+        }}
+      />
+    );
   } else if (!choices && summary) {
     body = (
       <PreJoin
@@ -94,13 +109,16 @@ function RoomView({ roomId }: { roomId: string }) {
   );
 }
 
-function ConnectedRoom({ room, roomId, title, role, status, onLeave }: {
+function ConnectedRoom({ room, roomId, title, role, status, summary, onSummaryChanged, onLeave, onRoomDeleted }: {
   room: Room;
   roomId: string;
   title: string;
   role: RoomRole | null;
   status: ConnectionStatus;
+  summary: RoomSummary | null;
+  onSummaryChanged: (room: RoomSummary) => void;
   onLeave: () => void;
+  onRoomDeleted: () => void;
 }) {
   const { layout, commit, error } = useLayoutSync(room, roomId);
   const [participantsOpen, setParticipantsOpen] = useState(false);
@@ -130,6 +148,9 @@ function ConnectedRoom({ room, roomId, title, role, status, onLeave }: {
         enabled={enabled}
         canPublish={canPublishFor(role)}
         canInvite={role === "host"}
+        summary={summary}
+        onSummaryChanged={onSummaryChanged}
+        onRoomDeleted={onRoomDeleted}
         participantCount={participantCount}
         onOpenParticipants={() => setParticipantsOpen(true)}
         onLeave={onLeave}
