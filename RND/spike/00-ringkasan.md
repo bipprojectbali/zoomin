@@ -3,6 +3,8 @@
 Status kode spike `lk-bun/`: `bun test` **56 pass, 0 fail, 8 file** (dijalankan ulang 2026-11-14, LiveKit dev
 server lokal aktif). `bun run typecheck` bersih. Runtime Bun 1.4.2.
 
+Catatan: temuan spike ini sudah dipakai di implementasi M1–M3 (branch `feature/m1-m3-core`), termasuk penghapusan `roomAdmin` dan role dari DB.
+
 Legenda: ✅ terbukti runtime · 📚 terbukti lewat riset docs/source (belum runtime) · ⏳ belum diuji · ❌ gagal/tidak terbukti.
 
 ## Tabel spike
