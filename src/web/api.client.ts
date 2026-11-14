@@ -1,6 +1,7 @@
 import type {
   AcceptInviteBody,
   AcceptInviteResponse,
+  AddRoomMemberBody,
   AdminRoomSummary,
   AdminUser,
   ApiError,
@@ -21,10 +22,13 @@ import type {
   ProfileUpdateBody,
   PutLayoutBody,
   PutLayoutResponse,
+  RoomMemberItem,
   RoomSummary,
   SetRoleBody,
   SystemHealth,
   TokenResponse,
+  UpdateRoomBody,
+  UpdateRoomMemberBody,
   UserResponse,
 } from "../shared/api.types";
 
@@ -172,6 +176,32 @@ export const createRoom = (body: CreateRoomBody) => request<RoomSummary>("POST",
 
 /** GET /api/rooms/:roomId: detail satu room (member / admin global). */
 export const getRoom = (roomId: string) => request<RoomSummary>("GET", roomPath(roomId));
+
+/** PATCH /api/rooms/:roomId (pengelola): judul, tipe, aktif, kadaluarsa. */
+export const updateRoom = (roomId: string, body: UpdateRoomBody) => request<RoomSummary>("PATCH", roomPath(roomId), body);
+
+/** DELETE /api/rooms/:roomId (pengelola). */
+export const deleteRoom = (roomId: string) => request<void>("DELETE", roomPath(roomId));
+
+/** GET /api/rooms/:roomId/members (pengelola): member dulu, lalu pending. */
+export const listRoomMembers = (roomId: string, query: { limit?: number; cursor?: string } = {}) =>
+  request<Page<RoomMemberItem>>("GET", `${roomPath(roomId)}/members${queryString(query)}`);
+
+/** POST /api/rooms/:roomId/members: tambah/ubah role per email (akun ada → member, belum → pending). */
+export const addRoomMember = (roomId: string, body: AddRoomMemberBody) =>
+  request<RoomMemberItem>("POST", `${roomPath(roomId)}/members`, body);
+
+/** PATCH /api/rooms/:roomId/members/:userId (409 last_host). */
+export const updateRoomMember = (roomId: string, userId: string, body: UpdateRoomMemberBody) =>
+  request<RoomMemberItem>("PATCH", `${roomPath(roomId)}/members/${encodeURIComponent(userId)}`, body);
+
+/** DELETE /api/rooms/:roomId/members/:userId (409 last_host). */
+export const removeRoomMember = (roomId: string, userId: string) =>
+  request<void>("DELETE", `${roomPath(roomId)}/members/${encodeURIComponent(userId)}`);
+
+/** DELETE /api/rooms/:roomId/invitations/:email: batalkan undangan pending. */
+export const cancelRoomInvitation = (roomId: string, email: string) =>
+  request<void>("DELETE", `${roomPath(roomId)}/invitations/${encodeURIComponent(email)}`);
 
 /** POST /api/rooms/:roomId/token: role & identity ditentukan server dari sesi. */
 export const getRoomToken = (roomId: string) => request<TokenResponse>("POST", `${roomPath(roomId)}/token`);

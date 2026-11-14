@@ -24,10 +24,12 @@ type Props = {
   loading: boolean;
   hasMore: boolean;
   onLoadMore: () => void;
+  onChanged: (room: RoomSummary) => void;
+  onDeleted: (roomId: string) => void;
 };
 
 /** Daftar room lobby: skeleton saat load awal, state kosong, kartu room, tombol Muat lagi. */
-export function RoomList({ canCreate, rooms, loading, hasMore, onLoadMore }: Props) {
+export function RoomList({ canCreate, rooms, loading, hasMore, onLoadMore, onChanged, onDeleted }: Props) {
   const initialLoading = loading && rooms.length === 0;
   return (
     <section className="flex flex-col gap-3" aria-labelledby="room-list-heading" aria-busy={loading}>
@@ -59,7 +61,7 @@ export function RoomList({ canCreate, rooms, loading, hasMore, onLoadMore }: Pro
       {rooms.length > 0 && (
         <ul className="flex flex-col gap-3">
           {rooms.map((room) => (
-            <RoomCard key={room.id} room={room} canInvite={canCreate || room.role === "host"} />
+            <RoomCard key={room.id} room={room} onChanged={onChanged} onDeleted={onDeleted} />
           ))}
         </ul>
       )}

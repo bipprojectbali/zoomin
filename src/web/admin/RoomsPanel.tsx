@@ -1,4 +1,4 @@
-import { ExternalLink, MoreHorizontal, Trash2, Video } from "lucide-react";
+import { ExternalLink, Globe, Lock, MoreHorizontal, Settings, Trash2, Video } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -9,7 +9,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { errorMessage } from "@/error.message";
 import { ROLE_LABEL } from "@/role.label";
-import type { AdminRoomSummary } from "../../shared/api.types";
+import { ROOM_SETTINGS_TEXT, STATUS_TEXT, VISIBILITY_TEXT } from "@/room-settings/room-settings.labels";
+import { RoomSettingsDialog } from "@/room-settings/RoomSettingsDialog";
+import type { AdminRoomSummary, RoomSummary } from "../../shared/api.types";
 import { ListEmpty, ListError, ListSkeleton, LoadMoreButton } from "./AdminListStates";
 import { ADMIN_PAGE_SIZE } from "./admin.filters";
 import { formatDate } from "./admin.format";
@@ -27,6 +29,9 @@ export function RoomsPanel() {
   const list = useCursorList<AdminRoomSummary>(fetchPage, "rooms");
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const [pending, setPending] = useState<AdminRoomSummary | null>(null);
+  const [settingsId, setSettingsId] = useState<string | null>(null);
+  const settingsRoom = list.items.find((r) => r.id === settingsId);
+  const onChanged = (room: RoomSummary) => list.setItems((prev) => prev.map((r) => (r.id === room.id ? { ...r, ...room } : r)));
 
   async function remove(room: AdminRoomSummary) {
     const index = list.items.findIndex((r) => r.id === room.id);
@@ -60,7 +65,9 @@ export function RoomsPanel() {
                 <TableHead className="pl-4">{TEXT.colRoom}</TableHead>
                 <TableHead>{TEXT.colHost}</TableHead>
                 <TableHead className="text-right">{TEXT.colMembers}</TableHead>
+                <TableHead>{ROOM_SETTINGS_TEXT.colType}</TableHead>
                 <TableHead>{TEXT.colStatus}</TableHead>
+                <TableHead>{ROOM_SETTINGS_TEXT.colLive}</TableHead>
                 <TableHead>{TEXT.colCreated}</TableHead>
                 <TableHead className="w-12 pr-4">
                   <span className="sr-only">{TEXT.colActions}</span>
@@ -76,11 +83,17 @@ export function RoomsPanel() {
                   <TableCell className="text-muted-foreground">{r.role ? ROLE_LABEL[r.role] : TEXT.notMember}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.members}</TableCell>
                   <TableCell>
+                    <RoomType room={r} />
+                  </TableCell>
+                  <TableCell>
+                    <RoomAccessStatus room={r} />
+                  </TableCell>
+                  <TableCell>
                     <RoomStatus room={r} />
                   </TableCell>
                   <TableCell className="text-muted-foreground tabular-nums">{formatDate(r.createdAt)}</TableCell>
                   <TableCell className="pr-4 text-right">
-                    <RoomActions room={r} onDelete={() => setPending(r)} />
+                    <RoomActions room={r} onSettings={() => setSettingsId(r.id)} onDelete={() => setPending(r)} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -93,9 +106,11 @@ export function RoomsPanel() {
             <li key={r.id} className="flex flex-col gap-2 p-3" data-testid="room-admin-row" data-room-id={r.id}>
               <div className="flex items-start justify-between gap-2">
                 <RoomIdentity room={r} />
-                <RoomActions room={r} onDelete={() => setPending(r)} />
+                <RoomActions room={r} onSettings={() => setSettingsId(r.id)} onDelete={() => setPending(r)} />
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <RoomType room={r} />
+                <RoomAccessStatus room={r} />
                 <RoomStatus room={r} />
                 <span>{TEXT.members(r.members)}</span>
                 <span>{formatDate(r.createdAt)}</span>
@@ -107,6 +122,16 @@ export function RoomsPanel() {
 
       {list.error && list.items.length > 0 && <p className="text-center text-sm text-destructive" role="alert">{list.error}</p>}
       {list.hasMore && list.items.length > 0 && <LoadMoreButton loading={list.loading} onClick={list.loadMore} />}
+
+      {settingsRoom && (
+        <RoomSettingsDialog
+          room={settingsRoom}
+          open
+          onOpenChange={(o) => !o && setSettingsId(null)}
+          onChanged={onChanged}
+          onDeleted={(id) => list.setItems((prev) => prev.filter((r) => r.id !== id))}
+        />
+      )}
 
       {pending && (
         <ConfirmDeleteDialog
@@ -133,8 +158,26 @@ function RoomIdentity({ room }: { room: AdminRoomSummary }) {
   );
 }
 
+function RoomType({ room }: { room: AdminRoomSummary }) {
+  const Icon = room.visibility === "private" ? Lock : Globe;
+  return (
+    <span className="flex items-center gap-1 text-sm" data-testid="room-admin-type" data-value={room.visibility}>
+      <Icon className="size-3.5 text-muted-foreground" aria-hidden="true" />
+      {VISIBILITY_TEXT[room.visibility].label}
+    </span>
+  );
+}
+
+function RoomAccessStatus({ room }: { room: AdminRoomSummary }) {
+  return (
+    <Badge variant={room.status === "active" ? "secondary" : "outline"} data-testid="room-admin-status" data-status={room.status}>
+      {STATUS_TEXT[room.status].label}
+    </Badge>
+  );
+}
+
 function RoomStatus({ room }: { room: AdminRoomSummary }) {
-  if (!room.live) return <span className="text-sm text-muted-foreground">{TEXT.roomInactive}</span>;
+  if (!room.live) return <span className="text-sm text-muted-foreground">{ROOM_SETTINGS_TEXT.notLive}</span>;
   return (
     <Badge variant="outline" className="gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
       <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden="true" />
@@ -143,7 +186,7 @@ function RoomStatus({ room }: { room: AdminRoomSummary }) {
   );
 }
 
-function RoomActions({ room, onDelete }: { room: AdminRoomSummary; onDelete: () => void }) {
+function RoomActions({ room, onSettings, onDelete }: { room: AdminRoomSummary; onSettings: () => void; onDelete: () => void }) {
   const navigate = useNavigate();
   return (
     <DropdownMenu modal={false}>
@@ -156,6 +199,10 @@ function RoomActions({ room, onDelete }: { room: AdminRoomSummary; onDelete: () 
         <DropdownMenuItem onSelect={() => navigate(roomHref(room.id))}>
           <ExternalLink />
           {TEXT.openRoom}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onSettings} data-testid="room-settings">
+          <Settings />
+          {ROOM_SETTINGS_TEXT.menuSettings}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onSelect={onDelete} data-testid="delete-room">

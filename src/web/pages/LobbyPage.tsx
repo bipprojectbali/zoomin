@@ -53,6 +53,9 @@ function Lobby() {
     setRooms((prev) => [room, ...prev.filter((r) => r.id !== room.id)]);
   }
 
+  const onChanged = (room: RoomSummary) => setRooms((prev) => prev.map((r) => (r.id === room.id ? room : r)));
+  const onDeleted = (roomId: string) => setRooms((prev) => prev.filter((r) => r.id !== roomId));
+
   return (
     <AppShell title={TEXT.title}>
       <p className="-mt-4 text-sm text-muted-foreground">{canCreate ? TEXT.subtitleAdmin : TEXT.subtitleUser}</p>
@@ -65,7 +68,10 @@ function Lobby() {
         </p>
       )}
 
-      <RoomList canCreate={canCreate} rooms={rooms} loading={loading} hasMore={cursor !== null} onLoadMore={() => void load(cursor ?? undefined)} />
+      <RoomList canCreate={canCreate} rooms={rooms} loading={loading} hasMore={cursor !== null} onLoadMore={() => void load(cursor ?? undefined)}
+        onChanged={onChanged}
+        onDeleted={onDeleted}
+      />
     </AppShell>
   );
 }
