@@ -1,0 +1,32 @@
+# livekit-server 1.13.11 config produksi (single node, tanpa Redis). TANPA secret: API key ada di key_file.
+# Render: `set -a; . /etc/zoomin/domains.env; set +a; envsubst < livekit.yaml.example > /etc/livekit/livekit.yaml`
+# Referensi key: https://github.com/livekit/livekit/blob/v1.13.11/config-sample.yaml
+port: 7880 # signaling + Twirp; JANGAN dibuka di firewall, hanya lewat Caddy (wss://${LK_DOMAIN}) dan app lokal
+log_level: info
+
+rtc:
+  tcp_port: 7881 # ICE/TCP fallback; tidak boleh di belakang proxy/TLS, buka di firewall
+  port_range_start: 50000 # ICE/UDP, 2 port per participant
+  port_range_end: 60000
+  # true = cari IP publik via STUN (server ber-IP publik, K1=b). false = iklankan IP interface lokal,
+  # termasuk 100.64.0.8 (K1=a, semua klien di tailnet).
+  use_external_ip: ${LK_USE_EXTERNAL_IP}
+
+# File "<api_key>: <api_secret>" per baris. Wajib mode tanpa akses others (mis. 640 root:livekit),
+# kalau tidak server menolak start (ErrKeyFileIncorrectPermission).
+key_file: /etc/livekit/keys.yaml
+
+room:
+  empty_timeout: 300 # detik room dibiarkan terbuka bila belum ada yang join
+  departure_timeout: 20 # detik setelah semua keluar; layout dipulihkan dari SQLite (R14)
+
+turn:
+  enabled: true
+  domain: ${TURN_DOMAIN} # harus sama dengan sertifikat yang dipegang Caddy
+  # LiveKit SELALU mengiklankan turns:<domain>:443 (pkg/service/roommanager.go). Caddy (layer4) menerima 443,
+  # terminate TLS untuk SNI ${TURN_DOMAIN}, lalu meneruskan TCP polos + PROXY v2 ke port ini (loopback).
+  tls_port: 5349
+  external_tls: true
+  proxy_protocol: true # tanpa ini TURN melaporkan alamat 127.0.0.1 ke klien; Firefox menolak alokasinya
+  # proxy_protocol_trusted_cidrs default loopback, cocok karena Caddy di host yang sama.
+  udp_port: 3478 # TURN/UDP + STUN. Bukan 443: UDP 443 dipakai HTTP/3 Caddy.

@@ -1,0 +1,27 @@
+# /etc/systemd/system/livekit.service — livekit-server binary resmi (linux_amd64/arm64) dengan config YAML.
+[Unit]
+Description=LiveKit SFU
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=livekit
+Group=livekit
+# Versi binary di path bernomor + symlink, agar rollback cukup mengganti symlink (README §Rollback).
+ExecStart=/usr/local/bin/livekit-server --config /etc/livekit/livekit.yaml
+Restart=on-failure
+RestartSec=3
+# SIGTERM = draining (room aktif dibiarkan selesai). Single node: jangan menunggu selamanya, SIGKILL setelah 60 dtk.
+TimeoutStopSec=60
+# Banyak socket UDP/TCP per participant.
+LimitNOFILE=500000
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,65 @@
+# Caddy 2.11.x + plugin github.com/mholt/caddy-l4 (WAJIB untuk berbagi 443 dengan TURN/TLS; lihat README §Caddy).
+# Domain dari env (/etc/zoomin/domains.env via systemd drop-in). Pasang di /etc/caddy/Caddyfile.
+# Validasi: `caddy validate --config /etc/caddy/Caddyfile` (env yang sama harus ter-load).
+{
+	email {$ACME_EMAIL}
+
+	servers :443 {
+		listener_wrappers {
+			# Koneksi TLS dengan SNI TURN dibelokkan SEBELUM server HTTP: Caddy terminate TLS (sertifikat dari site
+			# block TURN di bawah) lalu kirim TCP polos + PROXY v2 ke TURN LiveKit di loopback.
+			layer4 {
+				@turn tls sni {$TURN_DOMAIN}
+				route @turn {
+					tls
+					proxy {
+						proxy_protocol v2
+						upstream tcp/127.0.0.1:5349
+					}
+				}
+			}
+			# Sisa trafik lanjut ke HTTPS biasa.
+			tls
+		}
+	}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		# Kamera/mic/layar hanya untuk origin sendiri; fitur lain mati.
+		Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=(), usb=()"
+		# SPA Bun: script/style dari chunk /chunk-*.js|css (tanpa inline script, dicek NODE_ENV=production).
+		# style 'unsafe-inline': sonner/radix menyisipkan <style> saat runtime.
+		# connect-src: signaling wss + fetch https (/rtc/validate) ke LiveKit. Media (srcObject) tidak diatur CSP.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self' wss://{$LK_DOMAIN} https://{$LK_DOMAIN}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
+}
+
+{$APP_DOMAIN} {
+	import security_headers
+	encode zstd gzip
+	# Caddy mengabaikan X-Forwarded-For dari klien (tanpa trusted_proxies) dan menulis IP klien asli; app
+	# (TRUST_PROXY=true) membaca entri paling kanan. Port 3000 tidak boleh terjangkau langsung (README §Firewall).
+	reverse_proxy 127.0.0.1:3000
+}
+
+{$LK_DOMAIN} {
+	# WebSocket di-upgrade otomatis. Reload Caddy memutus wss aktif: klien LiveKit reconnect sendiri.
+	reverse_proxy 127.0.0.1:7880
+}
+
+# Site ini hanya agar Caddy menerbitkan + memperbarui sertifikat TURN (dipakai handler tls layer4 di atas).
+# TLS-ALPN dimatikan karena handshake 443 dengan SNI ini sudah dibelokkan layer4; HTTP-01 lewat :80 tetap jalan.
+{$TURN_DOMAIN} {
+	tls {
+		issuer acme {
+			disable_tlsalpn_challenge
+		}
+	}
+	respond 404
+}
