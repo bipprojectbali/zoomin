@@ -7,6 +7,7 @@ import { errorMessage } from "@/error.message";
 import { CAMERA_TRACK, MIC_TRACK } from "../../shared/track.naming";
 import { ControlTooltip } from "./ControlTooltip";
 import { DeviceMenu } from "./DeviceMenu";
+import { logMediaFailure } from "./room.connection";
 import { ROOM_LABELS, toggleState } from "./room.labels";
 import { IS_MAC, shortcutLabel, useRoomShortcuts } from "./room.shortcuts";
 
@@ -52,7 +53,7 @@ export function MediaControls({ room, disabled }: { room: Room; disabled: boolea
       if (device === "camera") await lp.setCameraEnabled(next, undefined, { name: CAMERA_TRACK });
       else await lp.setMicrophoneEnabled(next, undefined, { name: MIC_TRACK });
     } catch (err) {
-      console.error(`media: toggle ${device} → ${next} gagal`, err);
+      logMediaFailure(`media: toggle ${device} → ${next} gagal`, err);
       toast.error(`${device === "camera" ? ROOM_LABELS.camera : ROOM_LABELS.mic}: ${errorMessage(err)}`);
     } finally {
       setPending(null);

@@ -10,12 +10,13 @@ const TEXT = {
     disconnected: "Anda terputus dari room",
     error: "Tidak dapat bergabung ke room",
   } satisfies Record<RoomStatusKind, string>,
+  duplicateTitle: "Room dibuka di tab lain",
   leftHint: "Tidak sengaja keluar? Anda bisa bergabung lagi.",
-  duplicateHint: "Bergabung di sini akan mengeluarkan room dari tab/perangkat lain.",
-  noRetryHint: "Kembali ke daftar room untuk memilih room lain.",
+  duplicateHint: "Menggunakan room di tab ini akan menutupnya di tab atau perangkat lain.",
+  noRetryHint: "Kembali ke lobby untuk memilih room lain.",
   rejoin: "Gabung lagi",
   reconnect: "Sambung ulang",
-  useHere: "Pakai di tab ini",
+  useHere: "Gunakan di tab ini",
   retry: "Coba lagi",
   lobby: "Ke lobby",
 };
@@ -39,10 +40,11 @@ function rejoinLabel(kind: RoomStatusKind, error: ConnectionError | null): strin
 export function RoomStatusScreen({ kind, error = null, onRejoin, onLobby }: Props) {
   const Icon = ICON[kind];
   const retryable = kind === "left" || canRetry(error);
+  const duplicate = kind !== "left" && error?.kind === "duplicate_session";
   const hint =
     kind === "left"
       ? TEXT.leftHint
-      : error?.kind === "duplicate_session"
+      : duplicate
         ? TEXT.duplicateHint
         : retryable
           ? null
@@ -56,7 +58,7 @@ export function RoomStatusScreen({ kind, error = null, onRejoin, onLobby }: Prop
       className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center"
     >
       <Icon className="size-10 text-muted-foreground" aria-hidden="true" />
-      <h2 className="text-xl font-semibold">{TEXT.title[kind]}</h2>
+      <h2 className="text-xl font-semibold">{duplicate ? TEXT.duplicateTitle : TEXT.title[kind]}</h2>
       {kind !== "left" && error && <p className="max-w-md text-muted-foreground">{error.message}</p>}
       {hint && <p className="max-w-md text-sm text-muted-foreground">{hint}</p>}
       <div className="flex flex-wrap justify-center gap-2">

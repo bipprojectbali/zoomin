@@ -72,8 +72,8 @@ describe("presenceToastText", () => {
 
 describe("screenToastText", () => {
   test("screen-N → teks bernomor; track lain → null", () => {
-    expect(screenToastText("Budi", "screen-2", true)).toBe("Budi mulai membagikan layar 2");
-    expect(screenToastText("Budi", "screen-2", false)).toBe("Budi berhenti membagikan layar 2");
+    expect(screenToastText("Budi", "screen-2", true)).toBe("Budi mulai membagikan Layar 2");
+    expect(screenToastText("Budi", "screen-2", false)).toBe("Budi berhenti membagikan Layar 2");
     expect(screenToastText("Budi", "screen-2-audio", true)).toBeNull();
     expect(screenToastText("Budi", "camera", true)).toBeNull();
   });

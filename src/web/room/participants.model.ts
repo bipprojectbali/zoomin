@@ -63,5 +63,5 @@ export function presenceToastText(names: readonly string[], kind: "join" | "leav
 export function screenToastText(name: string, trackName: string, started: boolean): string | null {
   const parsed = parseTrackName(trackName);
   if (parsed?.kind !== "screen") return null;
-  return `${name} ${started ? "mulai" : "berhenti"} membagikan layar ${parsed.index}`;
+  return `${name} ${started ? "mulai" : "berhenti"} membagikan Layar ${parsed.index}`;
 }

@@ -6,6 +6,7 @@ import { CAMERA_TRACK, MIC_TRACK } from "../../shared/track.naming";
 import { ApiRequestError, getRoomToken } from "../api.client";
 import { errorMessage } from "../error.message";
 import type { PreJoinChoices } from "../prejoin/prejoin.types";
+import { cappedReconnectPolicy } from "./room.network";
 
 /** Status koneksi room untuk UI. `left` = keluar sukarela; `idle` = belum ada pilihan pre-join. */
 export type ConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected" | "left" | "error";
@@ -28,7 +29,7 @@ const TEXT = {
   notFound: "Room tidak ditemukan atau sudah dihapus",
   server: "Server sedang bermasalah, coba beberapa saat lagi",
   mediaServer: "Gagal terhubung ke server media",
-  duplicate: "Anda membuka room ini di tab/perangkat lain",
+  duplicate: "Anda bergabung dari tab atau perangkat lain dengan akun yang sama. Hanya satu sesi yang bisa aktif.",
   removed: "Anda dikeluarkan dari room",
   roomDeleted: "Room sudah dihapus",
   roomClosed: "Room sudah ditutup",
@@ -72,6 +73,24 @@ export function joinErrorFor(err: unknown): ConnectionError {
   if (err instanceof TypeError) return { kind: "network", message: errorMessage(err) };
   if (err instanceof Error && err.name === "ConnectionError") return { kind: "network", message: TEXT.mediaServer };
   return { kind: "unknown", message: errorMessage(err) };
+}
+
+const EXPECTED_JOIN_ERRORS: readonly ConnectionErrorKind[] = ["unauthorized", "forbidden", "room_not_found"];
+
+/** Error join + log (QA-10): 4xx wajar (sesi habis, bukan anggota, room hilang) → warn tanpa stack; lainnya error lengkap. */
+export function logJoinFailure(context: string, err: unknown): ConnectionError {
+  const error = joinErrorFor(err);
+  if (EXPECTED_JOIN_ERRORS.includes(error.kind)) console.warn(`${context}: ${error.kind}`);
+  else console.error(context, err);
+  return error;
+}
+
+const EXPECTED_MEDIA_ERRORS = ["NotAllowedError", "NotReadableError", "NotFoundError", "OverconstrainedError"];
+
+/** Izin ditolak / perangkat dipakai aplikasi lain / tidak ada = kondisi user, bukan bug → cukup warn (QA-10). */
+export function logMediaFailure(context: string, err: unknown): void {
+  if (err instanceof Error && EXPECTED_MEDIA_ERRORS.includes(err.name)) console.warn(`${context}: ${err.name}`);
+  else console.error(context, err);
 }
 
 /** Pemetaan state LiveKit → status UI. */
@@ -130,7 +149,7 @@ async function applyChoices(room: Room, choices: PreJoinChoices, roomId: string)
   if (choices.audioEnabled) {
     tasks.push(
       lp.setMicrophoneEnabled(true, { deviceId: choices.audioDeviceId }, { name: MIC_TRACK }).catch((err: unknown) => {
-        console.error(`room ${roomId}: aktifkan mikrofon gagal`, err);
+        logMediaFailure(`room ${roomId}: aktifkan mikrofon gagal`, err);
         toast.error(TEXT.micFailed);
       }),
     );
@@ -138,7 +157,7 @@ async function applyChoices(room: Room, choices: PreJoinChoices, roomId: string)
   if (choices.videoEnabled) {
     tasks.push(
       lp.setCameraEnabled(true, { deviceId: choices.videoDeviceId }, { name: CAMERA_TRACK }).catch((err: unknown) => {
-        console.error(`room ${roomId}: aktifkan kamera gagal`, err);
+        logMediaFailure(`room ${roomId}: aktifkan kamera gagal`, err);
         toast.error(TEXT.cameraFailed);
       }),
     );
@@ -170,7 +189,8 @@ export function useRoomConnection(roomId: string, choices: PreJoinChoices | null
     let cancelled = false;
     let joined = false;
     leavingRef.current = false;
-    const room = new Room({ adaptiveStream: true, dynacast: true });
+    // reconnectPolicy: jeda default LiveKit, tapi menyerah setelah RECONNECT_GIVE_UP_MS (QA-05), bukan ±2 menit.
+    const room = new Room({ adaptiveStream: true, dynacast: true, reconnectPolicy: cappedReconnectPolicy() });
     roomRef.current = room;
     setState({ ...IDLE, status: "connecting" });
 
@@ -186,11 +206,12 @@ export function useRoomConnection(roomId: string, choices: PreJoinChoices | null
           return;
         }
         const error = disconnectErrorFor(reason);
-        console.warn(`room ${roomId}: terputus (reason=${reason})`);
+        // Sesi ganda / dikeluarkan / room dihapus = alur normal → info; putus jaringan → warn.
+        (error?.kind === "network" ? console.warn : console.info)(`room ${roomId}: terputus (reason=${reason})`);
         setState((prev) => ({ ...prev, status: "disconnected", error }));
       })
       .on(RoomEvent.MediaDevicesError, (err) => {
-        console.error(`room ${roomId}: media device`, err);
+        logMediaFailure(`room ${roomId}: media device`, err);
       });
 
     (async () => {
@@ -202,15 +223,15 @@ export function useRoomConnection(roomId: string, choices: PreJoinChoices | null
         const current = choicesRef.current;
         if (current && canPublishFor(role)) await applyChoices(room, current, roomId);
         // Klik "Gabung" adalah gesture user, jadi autoplay audio diizinkan; gagal → <StartAudio> jadi cadangan.
-        await room.startAudio().catch((err: unknown) => console.warn(`room ${roomId}: startAudio ditolak`, err));
+        // Autoplay diblokir itu wajar → info tanpa stack.
+        await room.startAudio().catch((err: unknown) => console.info(`room ${roomId}: startAudio ditolak (${errorMessage(err)})`));
         if (cancelled) return;
         joined = true;
         setState({ room, role, status: statusFromConnectionState(room.state), error: null });
       } catch (err) {
         // Unmount di tengah connect membatalkan connect: itu disengaja, bukan error untuk user.
         if (cancelled) return;
-        console.error(`room ${roomId}: join gagal`, err);
-        setState({ room: null, role: null, status: "error", error: joinErrorFor(err) });
+        setState({ room: null, role: null, status: "error", error: logJoinFailure(`room ${roomId}: join gagal`, err) });
       }
     })();
 

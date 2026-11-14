@@ -12,7 +12,7 @@ import type { PreJoinChoices } from "@/prejoin/prejoin.types";
 import { ConnectionBanner } from "@/room/ConnectionBanner";
 import { ControlBar } from "@/room/ControlBar";
 import { ParticipantsPanel, useParticipantCount } from "@/room/ParticipantsPanel";
-import { canPublishFor, controlsEnabled, joinErrorFor, useRoomConnection, type ConnectionError, type ConnectionStatus } from "@/room/room.connection";
+import { canPublishFor, controlsEnabled, logJoinFailure, useRoomConnection, type ConnectionError, type ConnectionStatus } from "@/room/room.connection";
 import { ROOM_LABELS } from "@/room/room.labels";
 import { useRoomToasts } from "@/room/room.toasts";
 import { RoomStatusScreen } from "@/room/RoomStatusScreen";
@@ -50,8 +50,8 @@ function RoomView({ roomId }: { roomId: string }) {
     getRoom(roomId)
       .then((s) => !cancelled && setSummary(s))
       .catch((err: unknown) => {
-        console.error(`room ${roomId}: muat info room gagal`, err);
-        if (!cancelled) setSummaryError(joinErrorFor(err));
+        const error = logJoinFailure(`room ${roomId}: muat info room gagal`, err);
+        if (!cancelled) setSummaryError(error);
       });
     return () => {
       cancelled = true;
@@ -114,7 +114,7 @@ function ConnectedRoom({ room, roomId, title, role, status, onLeave }: {
         <h1 className="min-w-0 flex-1 truncate font-semibold">{title}</h1>
         {role && <Badge variant="outline">{ROLE_LABEL[role]}</Badge>}
       </header>
-      <ConnectionBanner status={status} />
+      <ConnectionBanner room={room} status={status} />
       <main className="relative min-h-0 flex-1 overflow-hidden">
         <AudioBlockedBanner room={room} />
         {error && (
@@ -150,7 +150,8 @@ function AudioBlockedBanner({ room }: { room: Room }) {
         type="button"
         size="lg"
         className="rounded-full shadow-lg"
-        onClick={() => startAudio().catch((err: unknown) => console.error("room: startAudio gagal", err))}
+        // Masih diblokir walau sudah diklik = kebijakan browser, bukan bug → warn; banner tetap tampil.
+        onClick={() => startAudio().catch((err: unknown) => console.warn("room: startAudio ditolak", err))}
         data-testid="start-audio"
       >
         <VolumeX />

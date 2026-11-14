@@ -85,7 +85,7 @@ describe("disconnectErrorFor", () => {
   test("alasan dikenal → kind + teks khusus", () => {
     expect(disconnectErrorFor(DisconnectReason.DUPLICATE_IDENTITY)).toEqual({
       kind: "duplicate_session",
-      message: "Anda membuka room ini di tab/perangkat lain",
+      message: "Anda bergabung dari tab atau perangkat lain dengan akun yang sama. Hanya satu sesi yang bisa aktif.",
     });
     expect(disconnectErrorFor(DisconnectReason.PARTICIPANT_REMOVED)?.kind).toBe("forbidden");
     expect(disconnectErrorFor(DisconnectReason.ROOM_DELETED)?.kind).toBe("room_not_found");

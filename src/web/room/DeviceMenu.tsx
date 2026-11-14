@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { errorMessage } from "@/error.message";
+import { logMediaFailure } from "./room.connection";
 import { ROOM_LABELS, deviceLabel } from "./room.labels";
 
 type Group = { kind: MediaDeviceKind; title: string };
@@ -56,7 +57,7 @@ export function DeviceMenu({ room, label, groups, disabled, testId }: {
 
 function DeviceGroup({ room, kind, title }: Group & { room: Room }) {
   const onError = (err: Error) => {
-    console.error(`room: perangkat ${kind} gagal`, err);
+    logMediaFailure(`room: perangkat ${kind} gagal`, err);
     toast.error(`${ROOM_LABELS.deviceFailed}: ${errorMessage(err)}`);
   };
   // requestPermissions false: izin sudah diminta saat pre-join/publish; jangan munculkan prompt baru.

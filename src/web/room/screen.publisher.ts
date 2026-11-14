@@ -2,7 +2,7 @@
  * Multi screen share per koneksi: tiap addScreen = 1 picker getDisplayMedia = 1 track `screen-N`
  * (RND/spike/02-research.md §1 & §6). Jangan pakai setScreenShareEnabled (hanya 1 share).
  */
-import type { Room, TrackPublishOptions } from "livekit-client";
+import { ConnectionState, type Room, type TrackPublishOptions } from "livekit-client";
 import { createScreenNamer } from "../../shared/track.naming";
 import { applyContentHint, screenAudioPublishOptions, screenPublishOptions } from "./screen.encoding";
 
@@ -47,7 +47,11 @@ export class ScreenPublisher {
     this.deps = {
       getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
       publish: (t, o) => lp.publishTrack(t, o),
-      unpublish: (t) => lp.unpublishTrack(t, true),
+      // Setelah room putus LiveKit sudah melepas semua publikasi; unpublish lagi hanya memicu warning (QA-10).
+      unpublish: async (t) => {
+        if (room.state === ConnectionState.Disconnected) t.stop();
+        else await lp.unpublishTrack(t, true);
+      },
       ...deps,
     };
   }
