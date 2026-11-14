@@ -14,12 +14,15 @@
 | R8 | Dua admin menulis layout bersamaan (last-write-wins) | Perubahan hilang diam-diam | CAS `layout_version` di SQLite → 409. Client mengabaikan versi lebih kecil. | wkr-m3-server | `05` §Batas |
 | R9 | Viewer menekan publish, lalu menunggu timeout ~10 dtk | UX buruk | UI menyembunyikan kontrol berdasarkan role/permissions | wkr-m1-web | `03` temuan 2 |
 | R10 | VP9/AV1 untuk layar: freeze saat ganti layer, fps turun | Layar macet | Kunci VP8 + simulcast di `screen.encoding.ts`, dengan test | wkr-m2 | `02` §2 |
-| R11 | `@dnd-kit/react` masih 0.x, API bisa berubah | Upgrade merusak drag | Pin exact 0.5.3. Drag dibungkus satu modul `stage/admin`. | wkr-m3-admin | `02` §9 |
+| R11 | `@dnd-kit/react` masih 0.x, API bisa berubah | Upgrade merusak drag | Pin exact 0.5.3. Drag dibungkus satu modul `src/web/stage/`. | wkr-m3-admin | `02` §9 |
 | R12 | Tidak ada binary macOS resmi livekit-server | Dev di Mac butuh build Go/CGO | Dev pakai binary build-source (`.bin/`) atau Docker. Produksi pakai Linux resmi. | Orkestrator | `01` §Versi |
 | R13 | Layout merujuk `{identity, trackName}`. Identity yang tidak stabil atau dua tab satu user mengacaukan referensi. | Slot salah atau kosong | `identity = user.id`. Perilaku LiveKit untuk identity ganda (dua tab) diverifikasi di M1 dan diputuskan (tolak tab kedua atau suffix). | wkr-m1-server | Inferensi, belum diuji |
 | R14 | Room metadata hilang saat LiveKit menutup room kosong | Layout reset | Simpan `layout_json` di SQLite dan tulis ulang saat room dibuat ulang (M3) | wkr-m3-server | `01-arsitektur.md` §Layout |
 | R15 | Desktop: getDisplayMedia di Electrobun/CEF Alloy tidak terbukti (CEF #3667) | Desktop gagal | Ditunda ke M5, berbentuk spike. Cadangan Electron. | Orkestrator | `02` §7 |
 | R16 | Browser hanya di desktop. Audio layar hanya di Chromium. HTTPS wajib. | User mobile/Firefox terbatas | Sebutkan di UI dan README. HTTPS sejak M1 untuk uji dari device lain. | wkr-m1-web | `02` §6, `06` |
+| R17 | `POST /api/auth/admin-login` tanpa rate limit | Brute force password admin global | Throttle per IP di app atau rate limit di reverse proxy (Caddy), wajib sebelum M4 | wkr-m4-infra | `src/server/auth.route.ts` |
+| R18 | Link undangan HMAC tidak bisa dicabut (multi-pakai sampai kedaluwarsa, maks 720 jam) | Link bocor tetap berlaku | TTL pendek untuk role admin/participant. Bila perlu pencabutan: tabel `invites` (nonce + revoked) | Orkestrator | `src/server/auth.invite.ts` |
+| R19 | Urutan cek 401 → 404 → 403 membocorkan keberadaan room ke user yang sudah login | Rendah: enumerasi id room | Terima untuk MVP. Bila perlu, samakan 404 dan 403 untuk non-member | Orkestrator | `*.route.ts` |
 
 ## Keputusan terbuka untuk user
 
@@ -28,7 +31,7 @@ Urut dari yang paling memblokir.
 | # | Keputusan | Opsi | Rekomendasi | Memblokir |
 |---|---|---|---|---|
 | **K1** | **Model akses internet.** Server ada di IP Tailscale 100.64.0.8. | (a) Semua user wajib anggota tailnet, subdomain → IP Tailscale, sertifikat `tailscale cert` atau DNS-01. (b) VPS/IP publik untuk LiveKit + TURN, app boleh tetap di tailnet. (c) Relay/tunnel TCP saja (media lewat TURN/TLS, kualitas turun; dukungan UDP belum diverifikasi). | (a) bila user internal semua. (b) bila ada tamu luar tailnet. | M4, R5 |
-| **K2** | **Auth pengguna** | (a) Satu admin (password dari env) + link undangan bertanda tangan per role + nama tamu. (b) Email/password (mis. Better Auth). (c) Identitas Tailscale (header `tailscale serve`), hanya bila K1=a. (d) SSO/OIDC. | (a) untuk MVP internal: tabel minimal dan tanpa email. Naik ke (b)/(d) bila butuh akun permanen. | M1 |
+| **K2** ✅ | **Auth pengguna** — **Diputuskan (a):** admin global via `ADMIN_PASSWORD` + link undangan HMAC per room+role, multi-pakai sampai kedaluwarsa (default 72 jam, maks 720 jam), tidak bisa dicabut (R18). | (a) Satu admin (password dari env) + link undangan bertanda tangan per role + nama tamu. (b) Email/password (mis. Better Auth). (c) Identitas Tailscale (header `tailscale serve`), hanya bila K1=a. (d) SSO/OIDC. | (a) untuk MVP internal: tabel minimal dan tanpa email. Naik ke (b)/(d) bila butuh akun permanen. | M1 |
 | **K3** | **Domain + TLS** | Subdomain apa (`app.`, `lk.`, `turn.`)? CA: Let's Encrypt (butuh 80/443 publik atau DNS-01) vs `tailscale cert`. | Ikuti K1. TURN butuh domain + sertifikat sendiri (`01` §Deploy 3). | M4 |
 | **K4** | **Router** | React Router (rekomendasi user) vs TanStack Router | React Router declarative. Hanya ~3 rute, jadi type-safe search params tidak dibutuhkan. | M1 (ringan) |
 | **K5** | **Batas peserta & layar** per room | Contoh: maks N peserta, maks M layar per peserta, maks total share per room | Angka awal dari `07` (lokal): ≤ 12 share × 24 penonton masih bersih (loss 0.08%), 16 × 30 rusak. Usulan sementara maks ~8 share aktif per room (0% loss lokal), final setelah load test produksi + uji decode browser. Ditegakkan di backend (token/moderasi) sebagai konstanta bernama. | M2/M4, R3 |

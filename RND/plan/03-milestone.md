@@ -40,16 +40,19 @@ worker lain. Worker tidak boleh commit, push, atau ganti branch.
 
 ## M1 — Room, join, kamera + mic
 
+**Status:** diimplementasikan di `feature/m1-m3-core`, uji browser manual belum.
+
 **Scope:** fondasi repo (`02-stack.md`), migrasi SQLite, auth (metode menurut K2), buat/daftar room, keanggotaan
 + role, token dari sesi, halaman room dengan kamera dan mic, grid sederhana untuk semua track, viewer tanpa
-kontrol publish, dan HTTPS lokal untuk uji dari device lain.
+kontrol publish, dan HTTPS lokal untuk uji dari device lain. HTTPS lokal: opsional lewat `TLS_CERT_PATH` + `TLS_KEY_PATH` (README §HTTPS lokal), uji dari device lain belum.
 
 **Kriteria selesai:**
 - Dua user login, join room yang sama, saling melihat kamera dan mendengar mic. Diuji manual di 2 browser.
 - Viewer tidak melihat tombol kamera/mic/layar. Bila dipaksa publish, server menolak (timeout, `03`).
-- Token yang diterbitkan **tidak** berisi `roomAdmin` untuk role apa pun.
-- Server production gagal start bila `LIVEKIT_API_KEY`/`SECRET` tidak diset.
-- Versi React, React Router, Tailwind, dan shadcn sudah diverifikasi dan dicatat di `02-stack.md`.
+  Penolakan server terbukti di `test/join.integration.test.ts`; UI tersembunyi belum dicek di browser.
+- [x] Token yang diterbitkan **tidak** berisi `roomAdmin` untuk role apa pun.
+- [x] Server production gagal start bila `LIVEKIT_API_KEY`/`SECRET` tidak diset.
+- [x] Versi React, React Router, Tailwind, dan shadcn sudah diverifikasi dan dicatat di `02-stack.md`.
 
 **Test wajib (`bun test`):**
 - `token.service.test.ts`: grant per role. Assert eksplisit `roomAdmin` undefined untuk admin. Viewer punya
@@ -75,6 +78,8 @@ kontrol publish, dan HTTPS lokal untuk uji dari device lain.
 
 ## M2 — Multi screen share
 
+**Status:** diimplementasikan di `feature/m1-m3-core`, uji browser manual belum.
+
 **Scope:** tombol "Tambah layar" (getDisplayMedia berulang + `publishTrack`), konvensi nama track
 `screen-<n>`/`screen-<n>-audio` di `src/shared/track.naming.ts`, encoding VP8 + simulcast (`h1080fps15`, lalu
 `h720fps15` untuk share berikutnya, layer `h360fps3`, contentHint), stop per layar, event `ended`, adaptiveStream
@@ -84,7 +89,7 @@ kontrol publish, dan HTTPS lokal untuk uji dari device lain.
 - Checklist `06` langkah 5–12 lulus di aplikasi produk, bukan halaman spike.
 - 3 layar + kamera dari satu peserta dan A vs B dari dua peserta tampil bersamaan di penonton.
 - Tile kecil menerima layer rendah. Dicek lewat label resolusi atau stats WebRTC.
-- Nomor layar tidak dipakai ulang dalam satu koneksi.
+- [x] Nomor layar tidak dipakai ulang dalam satu koneksi (`screen.publisher.test.ts`, `track.naming.test.ts`).
 
 **Test wajib:**
 - `track.naming.test.ts`: generator nama monoton, parser `screen-<n>` ↔ `screen-<n>-audio`, dan nama asing
@@ -104,6 +109,8 @@ kontrol publish, dan HTTPS lokal untuk uji dari device lain.
 
 ## M3 — Layout admin + template
 
+**Status:** diimplementasikan di `feature/m1-m3-core`, uji browser manual belum.
+
 **Scope:** render `LayoutState` (side-by-side, grid, focus), admin drag-drop tukar slot (`@dnd-kit/react`),
 resize (`react-resizable-panels`), endpoint `PUT /api/rooms/:id/layout` dengan cek admin + `parseLayout` + CAS
 SQLite + `updateRoomMetadata`, restore layout saat room dibuat ulang, dan slot kosong untuk track yang tidak
@@ -111,9 +118,10 @@ ada.
 
 **Kriteria selesai:**
 - Admin mengubah template, men-swap slot, dan me-resize. Semua penonton (termasuk yang join belakangan)
-  melihat hasil yang sama.
-- Non-admin yang memanggil endpoint → 403. Layout invalid → 400 dengan path field. `baseVersion` usang → 409.
-- Tidak ada token browser yang bisa menulis metadata (Twirp → 401, pola test `05`).
+  melihat hasil yang sama. Sinkron ke semua klien dan late joiner terbukti di
+  `test/layout-sync.integration.test.ts`; interaksi UI belum dicek di browser.
+- [x] Non-admin yang memanggil endpoint → 403. Layout invalid → 400 dengan path field. `baseVersion` usang → 409.
+- [x] Tidak ada token browser yang bisa menulis metadata (Twirp → 401, pola test `05`).
 - Kirim layout hanya saat drop/mouseup, bukan per frame drag.
 
 **Test wajib:**
@@ -130,6 +138,8 @@ ada.
 - `wkr-m3-server`: `src/server/layout.service.ts`, `layout.route.ts` + test. Gelombang 2.
 - `wkr-m3-stage`: `src/web/stage/**`, untuk render dan template. Gelombang 2.
 - `wkr-m3-admin`: `src/web/stage/admin/**`, untuk drag dan resize. Gelombang 2.
+  **Realisasi:** digabung ke `wkr-m3-stage`; kode edit ada di `src/web/stage/` (`stage.edit.ts`, `Stage.tsx`,
+  `StageToolbar.tsx`), bukan `stage/admin/`.
 
 ---
 
