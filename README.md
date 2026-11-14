@@ -218,6 +218,7 @@ bun run test:e2e    # browser (Playwright, Chromium dengan kamera/mic/layar pals
 
 Test integrasi (`test/*.integration.test.ts`) dan e2e butuh LiveKit dev server aktif di `ws://127.0.0.1:7880`
 dengan kredensial `devkey`/`secret` (lihat Quick start); `.env` yang menunjuk LiveKit lain membuat test integrasi gagal.
+Tanpa LiveKit (CI): `ZOOMIN_SKIP_LIVEKIT_TESTS=1 bun test` melewati test yang butuh LiveKit nyata (terhitung `skip`).
 E2e menyalakan dua app sendiri dengan DB sementara: mode dev di port 3101 dan mode produksi di port 3102 (SPA di-build
 ke folder sementara lewat `WEB_DIST_DIR`, bukan `dist/web`). E2e tidak memanggil Google: login memakai endpoint
 test-only `POST /api/test/login` yang hanya aktif bila `ZOOMIN_TEST_AUTH=1` dan bukan production (project `prod`
@@ -251,6 +252,10 @@ Smoke test setelah deploy: `SMOKE_URL=https://<domain> bun test test/smoke.prod.
 Dua jalur: LiveKit sebagai stack Portainer di VPS (yang terbukti, lihat §Arsitektur deploy yang terbukti), atau satu
 server Linux penuh (Caddy + LiveKit + systemd + backup SQLite + rollback). Keduanya di
 [`deploy/README.md`](deploy/README.md). Versi rilis mengikuti `version` di `package.json` dan `CHANGELOG.md`.
+
+Image Docker: tiap push ke `main` (dan tag `v*`) GitHub Actions menguji lalu push `ghcr.io/bipprojectbali/zoomin`;
+deploy sebagai stack Portainer dari [`compose.yml`](compose.yml), langkahnya di
+[`deploy/README.md`](deploy/README.md) §App via Portainer (image GHCR).
 
 ## API
 

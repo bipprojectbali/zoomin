@@ -6,6 +6,11 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikut
 
 ### Added
 
+- **Image Docker + GHCR**: push ke `main` (dan tag `v*`) menjalankan test lalu menerbitkan
+  `ghcr.io/bipprojectbali/zoomin` (`latest`, `sha-<commit>`, versi). Deploy sebagai stack Portainer dari `compose.yml`
+  (Traefik, `zoomin.wibudev.com`, data SQLite di volume); rollback cukup ganti `ZOOMIN_TAG`. Panduan di
+  `deploy/README.md`.
+- Perintah `zoomin healthcheck`: cek `/api/health` server lokal, exit 0/1 (dipakai healthcheck container).
 - Favicon, ikon aplikasi (apple-touch-icon, ikon 192/512 + `site.webmanifest`), dan gambar pratinjau `og-image.png`
   untuk tautan yang dibagikan. Halaman punya meta SEO (deskripsi, Open Graph, Twitter card, canonical, theme-color);
   URL absolut di dalamnya mengikuti `PUBLIC_APP_URL`. `/robots.txt` mengizinkan landing dan menutup halaman privat
@@ -82,6 +87,11 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikut
 
 - **BREAKING:** login password admin (`ADMIN_PASSWORD`, `POST /api/auth/admin-login`) dan `SESSION_SECRET` (diganti
   `BETTER_AUTH_SECRET`). Hapus keduanya dari env produksi.
+
+### Fixed
+
+- `bun run build:binary -- --target <target>` gagal ("Unknown option '--target'"), dan `--outdir` ikut dipakai
+  sebagai folder build SPA sehingga binary menanam `dist/web` lama (atau gagal bila belum ada).
 
 ### Security
 

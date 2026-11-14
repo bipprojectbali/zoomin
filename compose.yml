@@ -1,0 +1,63 @@
+# Stack Portainer zoomin di belakang Traefik (network public-net), image dari GHCR (.github/workflows/docker.yml).
+# Env stack (Portainer > Stacks > Environment variables): lihat deploy/zoomin-stack.env.example.
+# Panduan: deploy/README.md bagian "App via Portainer (image GHCR)".
+#
+# Jalur trafik: klien -> Cloudflare -> Traefik (websecure) -> container :3000. Port app tidak di-publish.
+services:
+  zoomin:
+    # latest = build terbaru main; rollback: set ZOOMIN_TAG=sha-<7 char> (atau versi rilis, mis. 0.1.0) lalu redeploy.
+    image: ghcr.io/bipprojectbali/zoomin:${ZOOMIN_TAG:-latest}
+    container_name: zoomin
+    restart: unless-stopped
+    mem_limit: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    environment:
+      # NODE_ENV=production, HOST=0.0.0.0, PORT=3000, DB_PATH=/data/zoomin.sqlite sudah diset di image.
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://zoomin.wibudev.com}
+      # Kosong = ikut PUBLIC_APP_URL. Redirect Google: <BETTER_AUTH_URL>/api/auth/callback/google.
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?isi BETTER_AUTH_SECRET di env stack}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?isi GOOGLE_CLIENT_ID di env stack}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?isi GOOGLE_CLIENT_SECRET di env stack}
+      SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS:-}
+      # Server -> LiveKit (API + target proxy /livekit). Default: container `livekit` (deploy/livekit-compose.yml)
+      # lewat network public-net yang sama, tanpa keluar ke internet. Stack beda host: wss://lk.wibudev.com.
+      LIVEKIT_URL: ${LIVEKIT_URL:-ws://livekit:7880}
+      # Browser -> LiveKit (harus wss:// publik).
+      PUBLIC_LIVEKIT_URL: ${PUBLIC_LIVEKIT_URL:-wss://lk.wibudev.com}
+      # Harus sama persis dengan pasangan di stack LiveKit.
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?isi LIVEKIT_API_KEY di env stack}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?isi LIVEKIT_API_SECRET di env stack}
+      # App hanya bisa dicapai lewat Traefik (port tidak di-publish), jadi IP klien rate limit dari X-Forwarded-For.
+      TRUST_PROXY: "true"
+    volumes:
+      - zoomin-data:/data
+    healthcheck:
+      # Sama dengan HEALTHCHECK image; ditulis ulang agar terlihat di Portainer.
+      test: ["CMD", "/usr/local/bin/zoomin", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    networks:
+      - public-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=public-net"
+      - "traefik.http.routers.zoomin.rule=Host(`${ZOOMIN_HOST:-zoomin.wibudev.com}`)"
+      - "traefik.http.routers.zoomin.entrypoints=websecure"
+      - "traefik.http.routers.zoomin.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.zoomin.service=zoomin"
+      - "traefik.http.services.zoomin.loadbalancer.server.port=3000"
+
+volumes:
+  # SQLite (DB + WAL). Backup: lihat deploy/README.md §App via Portainer.
+  zoomin-data:
+
+networks:
+  public-net:
+    external: true

@@ -1,0 +1,22 @@
+# Konteks build Docker: hanya yang dibutuhkan build SPA + compile binary.
+.git
+.github
+node_modules
+dist
+bin
+data
+.env*
+!.env.example
+*.sqlite
+*.sqlite-*
+*.db
+*.pem
+*.key
+RND
+e2e
+test
+test-results
+playwright-report
+.DS_Store
+Dockerfile
+compose.yml

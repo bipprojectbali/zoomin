@@ -12,6 +12,7 @@ Artefak untuk satu server Linux: Caddy (TLS + reverse proxy + SNI ke TURN) → a
 | `backup-sqlite.sh` | `/usr/local/bin/zoomin-backup-sqlite` |
 | `../.env.example` | dasar `/etc/zoomin/zoomin.env` (secret app) |
 | `livekit-compose.yml`, `livekit-stack.env.example` | stack Portainer LiveKit (alternatif, lihat bagian Portainer) |
+| `../compose.yml`, `zoomin-stack.env.example` | stack Portainer app dari image GHCR (lihat bagian App via Portainer) |
 
 Versi yang diverifikasi (2026-11-14): livekit-server **1.13.11** (rilis terbaru, 25 Okt; `livekit.yaml.example`
 di-parse oleh binary 1.13.11, log `turn.externalTLS: true, turn.proxyProtocol: true`), Caddy **2.11.9** (5 Nov)
@@ -292,6 +293,44 @@ IP hasil STUN salah (mis. VPS punya beberapa IP publik): di `LIVEKIT_CONFIG` gan
 tambahkan `node_ip: <IP publik VPS>` di bawah `rtc:`. Keduanya harus diubah bersama: selama `use_external_ip: true`,
 `node_ip` ditimpa hasil STUN; sebaliknya `use_external_ip: false` tanpa `node_ip` mengiklankan IP bridge 172.x.
 Jangan tambahkan `port_range_start/end`: bila diisi, LiveKit memakai range itu dan `udp_port` diabaikan.
+
+## App via Portainer (image GHCR)
+
+Workflow `.github/workflows/docker.yml` jalan pada push ke `main`, tag `v*`, dan manual (workflow_dispatch): job `test`
+(typecheck + `bun test`, test yang butuh LiveKit dilewati lewat `ZOOMIN_SKIP_LIVEKIT_TESTS=1`) lalu job `image`
+membangun `Dockerfile` (linux/amd64) dan push ke `ghcr.io/bipprojectbali/zoomin`. Tag: `latest` (main), `sha-<7 char>`
+(tiap build), `<versi>` + `<major>.<minor>` (tag `v<versi>`). Image berisi single binary di distroless (user nonroot
+65532), DB di volume `/data`, `HEALTHCHECK` lewat `zoomin healthcheck`. Stack: [`compose.yml`](../compose.yml) di root
+repo (router Traefik `zoomin`, network `public-net`, sama dengan stack LiveKit).
+
+1. **Registry.** Setelah build pertama, package muncul di GitHub (profil/org > Packages > `zoomin`). Pilih salah satu:
+   - Public: Package settings > Change visibility > Public. Portainer bisa pull tanpa login.
+   - Private: buat PAT (classic) dengan scope `read:packages` saja, lalu Portainer > Registries > Add registry > Custom:
+     URL `ghcr.io`, username GitHub, password = PAT.
+2. **Google Console.** Di OAuth client: Authorized JavaScript origins `https://zoomin.wibudev.com`, Authorized redirect
+   URIs `https://zoomin.wibudev.com/api/auth/callback/google`.
+3. **DNS.** `zoomin.wibudev.com` mengarah ke VPS (proxied Cloudflare seperti `lk.wibudev.com`).
+4. **Stack.** Portainer > Stacks > Add stack > Web editor: tempel isi `compose.yml` (atau Repository: repo ini, path
+   `compose.yml`). Environment variables: isi dari `deploy/zoomin-stack.env.example` (wajib: `BETTER_AUTH_SECRET`,
+   `GOOGLE_CLIENT_ID/SECRET`, `LIVEKIT_API_KEY/SECRET` sama dengan stack LiveKit; dianjurkan `SUPER_ADMIN_EMAILS`).
+   Deploy. Default `LIVEKIT_URL=ws://livekit:7880` memakai container LiveKit lewat `public-net`; bila LiveKit tidak
+   di host/network yang sama isi `wss://lk.wibudev.com`.
+5. **Cek.** Container `healthy` di Portainer, lalu `SMOKE_URL=https://zoomin.wibudev.com bun test test/smoke.prod.test.ts`
+   dari mesin dev, login Google, buat room. Migrasi SQLite jalan otomatis saat start.
+6. **Update.** Stack > Update the stack > "Re-pull image and redeploy". Otomatis: aktifkan webhook stack (Portainer
+   Business, atau GitOps updates), simpan URL-nya sebagai secret repo `PORTAINER_WEBHOOK_URL`; job `image` memanggilnya
+   setelah push dari `main` (dilewati bila secret kosong).
+7. **Rollback.** Set `ZOOMIN_TAG=sha-<7 char>` (lihat daftar tag di halaman package) lalu update stack. Migrasi hanya
+   maju: bila rilis baru menambah migrasi, kembalikan juga DB dari backup (stop stack, salin file, hapus `-wal`/`-shm`).
+8. **CLI darurat.** `docker exec zoomin zoomin user list`, `docker exec zoomin zoomin user promote <email> --role admin`.
+
+**Backup volume.** Image distroless tidak punya `sqlite3`; jalankan `backup-sqlite.sh` di host terhadap file di volume
+(nama volume = `<nama stack>_zoomin-data`, butuh paket `sqlite3` di host):
+
+```bash
+DB="$(docker volume inspect -f '{{ .Mountpoint }}' zoomin_zoomin-data)/zoomin.sqlite"
+sudo ./deploy/backup-sqlite.sh "$DB" /var/backups/zoomin 14
+```
 
 ## Backup SQLite
 

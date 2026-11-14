@@ -1,0 +1,77 @@
+# Test lalu build + push image Docker ke GHCR (ghcr.io/bipprojectbali/zoomin). Deploy: compose.yml (stack Portainer).
+name: docker
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # Sama dengan Dockerfile (oven/bun:1.4.2) dan versi yang diverifikasi repo.
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      # CI tidak punya LiveKit dev: test yang butuh LiveKit nyata dilewati (test/livekit.gate.ts) dan tetap
+      # terhitung `skip` di output; jalankan lengkap secara lokal dengan `livekit-server --dev`.
+      - run: bun test
+        env:
+          ZOOMIN_SKIP_LIVEKIT_TESTS: "1"
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # Di level job: env milik step sendiri tidak terbaca di `if` step itu; secret tidak bisa dipakai di `if` langsung.
+      PORTAINER_WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # Opsional: redeploy otomatis lewat webhook stack Portainer (isi secret PORTAINER_WEBHOOK_URL di repo).
+      - name: Portainer webhook
+        if: ${{ env.PORTAINER_WEBHOOK_URL != '' && github.ref == 'refs/heads/main' }}
+        run: curl -fsS -X POST --max-time 30 "$PORTAINER_WEBHOOK_URL" -o /dev/null
