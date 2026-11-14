@@ -1,7 +1,7 @@
 /** Bagian visual tile: video + skeleton, avatar inisial, indikator bicara & mic mati. */
 import { useIsMuted, useIsSpeaking, VideoTrack, type TrackReference } from "@livekit/components-react";
 import { Track, type Participant } from "livekit-client";
-import { MicOff } from "lucide-react";
+import { CircleSlash, MicOff, MonitorUp, UserRound, VideoOff } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,15 +9,33 @@ import { cn } from "@/lib/utils";
 import { STAGE_LABELS } from "./stage.labels";
 import { initialsOf } from "./stage.tile.logic";
 
-/** Avatar inisial besar + nama (+ status) untuk kamera mati / slot tidak aktif. */
-export function TileAvatar({ name, status }: { name: string; status?: string }) {
+// Tile kecil (QA-04): root tile = size container; di bawah ROOMY cukup avatar karena nama & status sudah ada di label.
+// Tinggi ikut diukur: tile strip bisa cukup lebar tapi pendek. Kelas ditulis utuh agar terdeteksi Tailwind.
+const ROOMY_ONLY = "hidden [@container(min-width:200px)_and_(min-height:150px)]:block";
+const SMALL_ONLY = "flex [@container(min-width:200px)_and_(min-height:150px)]:hidden";
+const AVATAR_SIZE = "size-10 [@container(min-width:200px)_and_(min-height:150px)]:size-12 [@container(min-width:320px)_and_(min-height:220px)]:size-20";
+
+/** Avatar inisial (peserta keluar: ikon netral, bukan inisial) + nama & status di tile yang cukup lebar. */
+export function TileAvatar({ name, status, left }: { name: string; status?: string; left?: boolean }) {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-2 text-center">
-      <Avatar className="size-12 sm:size-20">
-        <AvatarFallback className="bg-primary/15 text-lg font-semibold sm:text-2xl">{initialsOf(name)}</AvatarFallback>
+    <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-2 pb-8 text-center">
+      <Avatar className={AVATAR_SIZE}>
+        <AvatarFallback className="bg-primary/15 text-base font-semibold [@container(min-width:320px)_and_(min-height:220px)]:text-2xl">
+          {left ? <UserRound aria-hidden className="size-1/2 text-muted-foreground" /> : initialsOf(name)}
+        </AvatarFallback>
       </Avatar>
-      <span className="max-w-full truncate text-sm font-medium">{name}</span>
-      {status && <span className="text-xs text-muted-foreground">{status}</span>}
+      <span className={cn("max-w-full truncate text-sm font-medium", ROOMY_ONLY)}>{name}</span>
+      {status && <span className={cn("max-w-full truncate text-xs text-muted-foreground", ROOMY_ONLY)}>{status}</span>}
+    </div>
+  );
+}
+
+/** Layar milik sendiri tidak dirender sebagai video untuk pemiliknya (hindari efek cermin, QA-02). */
+export function OwnScreenNotice({ text }: { text: string }) {
+  return (
+    <div data-testid="own-screen-notice" className="flex h-full w-full flex-col items-center justify-center gap-2 p-2 pb-8 text-center">
+      <MonitorUp aria-hidden className="size-8 text-primary [@container(min-width:320px)_and_(min-height:220px)]:size-12" />
+      <span className={cn("max-w-full text-sm font-medium", ROOMY_ONLY)}>{text}</span>
     </div>
   );
 }
@@ -68,4 +86,20 @@ export function MicOffBadge({ participant }: { participant: Participant }) {
       <MicOff className="size-3 text-white" />
     </span>
   );
+}
+
+/** Status di label untuk tile kecil: ikon + tooltip, karena teks status di avatar disembunyikan (QA-04). */
+export function StatusIcon({ text, cameraOff }: { text: string; cameraOff: boolean }) {
+  const Icon = cameraOff ? VideoOff : CircleSlash;
+  return (
+    <span title={text} role="img" aria-label={text} className={cn("shrink-0", SMALL_ONLY)}>
+      <Icon className="size-3.5" />
+    </span>
+  );
+}
+
+/** StatusIcon "Kamera mati" untuk publikasi kamera yang di-mute (hook butuh track nyata). */
+export function CameraMutedIcon({ track }: { track: TrackReference }) {
+  const muted = useIsMuted(track);
+  return muted ? <StatusIcon text={STAGE_LABELS.cameraOff} cameraOff /> : null;
 }

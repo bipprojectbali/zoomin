@@ -3,10 +3,9 @@ import { useDraggable, useDroppable } from "@dnd-kit/react";
 import type { TrackReference } from "@livekit/components-react";
 import { ArrowLeft, ArrowRight, Focus, Plus, Trash2 } from "lucide-react";
 import { useCallback } from "react";
-import type { TrackRef } from "../../shared/layout.model";
 import { useStage, type DragData, type DropData, type StageActions } from "./stage.context";
 import { STAGE_LABELS } from "./stage.labels";
-import { keyOf, refOf, type ResolvedSlot } from "./stage.resolve";
+import { keyOf, type ExtraItem, type ResolvedSlot } from "./stage.resolve";
 import type { TileMenuItem } from "./TileMenu";
 import { TileView } from "./TileView";
 
@@ -56,20 +55,20 @@ function EditableSlotTile({ item, actions, badge }: { item: Item; actions: Stage
   );
 }
 
-/** Track di luar layout (strip "lainnya"); admin: seret ke slot = ganti, menu = tambah slot. */
-export function ExtraTile({ track }: { track: TrackReference }) {
+/** Track/avatar di luar layout (strip "lainnya"); admin: seret ke slot = ganti, menu = tambah slot. */
+export function ExtraTile({ item }: { item: ExtraItem<TrackReference> }) {
   const { actions } = useStage();
-  const trackRef = refOf(track);
-  if (!actions) return <TileView trackRef={trackRef} track={track} slotIndex={null} />;
-  return <EditableExtraTile track={track} trackRef={trackRef} actions={actions} />;
+  if (!actions) return <TileView trackRef={item.ref} track={item.track} slotIndex={null} />;
+  return <EditableExtraTile item={item} actions={actions} />;
 }
 
-function EditableExtraTile({ track, trackRef, actions }: { track: TrackReference; trackRef: TrackRef; actions: StageActions }) {
+function EditableExtraTile({ item, actions }: { item: ExtraItem<TrackReference>; actions: StageActions }) {
+  const trackRef = item.ref;
   const drag = useDraggable({ id: `extra-${keyOf(trackRef)}`, data: { kind: "extra", ref: trackRef } satisfies DragData });
   return (
     <TileView
       trackRef={trackRef}
-      track={track}
+      track={item.track}
       slotIndex={null}
       adminItems={[{ label: STAGE_LABELS.addToLayout, icon: Plus, onSelect: () => actions.place(null, trackRef) }]}
       drag={{ ref: drag.ref, handleRef: drag.handleRef, isDragging: drag.isDragging }}

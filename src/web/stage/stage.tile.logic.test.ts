@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { initialsOf, kindLabel, personOf, shouldMirror, tileTitle } from "./stage.tile.logic";
+import { initialsOf, kindLabel, personOf, rememberNames, shouldMirror, tileTitle } from "./stage.tile.logic";
 
 // test-only
 const people = [{ identity: "u_me", name: "Admin" }, { identity: "u_budi", name: "Budi Peserta" }, { identity: "u_anon", name: "" }];
@@ -9,9 +9,19 @@ describe("personOf", () => {
     expect(personOf("u_budi", people, "u_me")).toEqual({ name: "Budi Peserta", isLocal: false, present: true });
     expect(personOf("u_me", people, "u_me")).toEqual({ name: "Admin", isLocal: true, present: true });
   });
-  test("tidak ada di room → 'Peserta keluar', tanpa ID internal", () => {
+  test("tidak ada di room & tak dikenal → 'Peserta', tanpa ID internal", () => {
     const p = personOf("u_eZXQTEqZF10bDVlkJKzh", people, "u_me");
-    expect(p).toEqual({ name: "Peserta keluar", isLocal: false, present: false });
+    expect(p).toEqual({ name: "Peserta", isLocal: false, present: false });
+    expect(tileTitle(p, "screen-2")).toBe("Peserta · keluar · Layar 2");
+  });
+  test("cache nama: peserta yang keluar tetap bernama asli (QA-03)", () => {
+    const known = new Map<string, string>();
+    rememberNames(known, people);
+    rememberNames(known, [{ identity: "u_budi", name: "  " }]); // nama kosong tidak menimpa
+    const left = personOf("u_budi", [], "u_me", known);
+    expect(left).toEqual({ name: "Budi Peserta", isLocal: false, present: false });
+    expect(tileTitle(left, "screen-2")).toBe("Budi Peserta · keluar · Layar 2");
+    expect(known.has("u_anon")).toBe(false);
   });
   test("nama kosong → 'Peserta', bukan identity", () => {
     expect(personOf("u_anon", people, "u_me").name).toBe("Peserta");

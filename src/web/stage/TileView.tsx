@@ -12,7 +12,7 @@ import { STAGE_LABELS } from "./stage.labels";
 import { keyOf } from "./stage.resolve";
 import { kindLabel, shouldMirror, tileTitle } from "./stage.tile.logic";
 import { TileMenu, type TileMenuItem } from "./TileMenu";
-import { MicOffBadge, SpeakingRing, TileAvatar, TileMedia } from "./TileParts";
+import { CameraMutedIcon, MicOffBadge, OwnScreenNotice, SpeakingRing, StatusIcon, TileAvatar, TileMedia } from "./TileParts";
 
 /** Ref & state dnd-kit untuk tile admin; handleRef = tombol seret terpisah (bukan seluruh tile, UX-16). */
 export type TileDrag = {
@@ -71,7 +71,15 @@ export function TileView({ trackRef, track, slotIndex, adminItems = [], drag, ba
     : [];
 
   const inactiveStatus = person.present && isCamera ? STAGE_LABELS.cameraOff : `${kindLabel(trackRef.trackName)} · ${STAGE_LABELS.inactive}`;
-  const avatar = <TileAvatar name={person.name} status={track ? STAGE_LABELS.cameraOff : inactiveStatus} />;
+  const avatar = <TileAvatar name={person.name} status={track ? STAGE_LABELS.cameraOff : inactiveStatus} left={!person.present} />;
+  const ownScreen = track?.source === Track.Source.ScreenShare && person.isLocal;
+  const media = ownScreen ? (
+    <OwnScreenNotice text={STAGE_LABELS.sharingOwn(kindLabel(trackRef.trackName))} />
+  ) : track ? (
+    <TileMedia key={track.publication.trackSid} track={track} mirror={shouldMirror(track.source, person.isLocal)} fallback={avatar} />
+  ) : (
+    avatar
+  );
 
   return (
     <div
@@ -85,19 +93,16 @@ export function TileView({ trackRef, track, slotIndex, adminItems = [], drag, ba
       role="group"
       onDoubleClick={track ? toggleExpand : undefined}
       className={cn(
-        "group relative h-full w-full overflow-hidden rounded-xl bg-muted [&:fullscreen]:rounded-none [&:fullscreen]:bg-black",
+        "group relative [container-type:size] h-full w-full overflow-hidden rounded-xl bg-muted [&:fullscreen]:rounded-none [&:fullscreen]:bg-black",
         drag?.isDragging && "opacity-50",
       )}
     >
-      {track ? (
-        <TileMedia key={track.publication.trackSid} track={track} mirror={shouldMirror(track.source, person.isLocal)} fallback={avatar} />
-      ) : (
-        avatar
-      )}
+      {media}
       {participant && isCamera && <SpeakingRing participant={participant} />}
       <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-md bg-black/60 px-2 py-0.5 text-xs text-white">
         {participant && isCamera && <MicOffBadge participant={participant} />}
-        <span className="truncate">{title}</span>
+        {track ? isCamera && <CameraMutedIcon track={track} /> : <StatusIcon text={inactiveStatus} cameraOff={person.present && isCamera} />}
+        <span className="min-w-0 truncate">{title}</span>
         {badge && <span className="shrink-0 rounded bg-primary px-1 text-[10px] text-primary-foreground">{badge}</span>}
       </div>
       <div className={cn("absolute top-2 right-2 flex gap-0.5 rounded-md bg-black/50 p-0.5 backdrop-blur-sm", TOOLBAR_VISIBILITY)}>

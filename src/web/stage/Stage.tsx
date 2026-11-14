@@ -3,21 +3,22 @@ import { DragDropProvider, type DragEndEvent } from "@dnd-kit/react";
 import { useRemoteParticipants, useTracks } from "@livekit/components-react";
 import { RoomEvent, Track, type Room } from "livekit-client";
 import { Minimize2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { setFocus, setPanelSizes, setTemplate, swapSlots, type LayoutState } from "../../shared/layout.model";
 import { StageContext, type DragData, type DropData, type StageActions, type StageCtx } from "./stage.context";
 import { placeTrack, removeSlot } from "./stage.edit";
 import { STAGE_LABELS } from "./stage.labels";
-import { autoLayout, keyOf, refOf, resolveSlots } from "./stage.resolve";
-import { personOf } from "./stage.tile.logic";
+import { autoLayout, avatarRefs, keyOf, refOf, resolveSlots } from "./stage.resolve";
+import { personOf, rememberNames } from "./stage.tile.logic";
 import { OthersStrip, TemplateView } from "./StageTemplates";
 import { StageToolbar } from "./StageToolbar";
 import { TileView } from "./TileView";
 
 const SOURCES = [Track.Source.Camera, Track.Source.ScreenShare];
-// Join/leave selalu memicu update; nama ikut agar label tile tidak basi. Event lain (speaking dsb) ditangani per tile.
-const PARTICIPANT_EVENTS = [RoomEvent.ParticipantNameChanged];
+// Join/leave selalu memicu update; nama ikut agar label tile tidak basi, metadata (role) menentukan tile avatar.
+// Event lain (speaking dsb) ditangani per tile.
+const PARTICIPANT_EVENTS = [RoomEvent.ParticipantNameChanged, RoomEvent.ParticipantMetadataChanged];
 
 export function Stage({ room, layout, editable, onCommit }: {
   room: Room;
@@ -28,8 +29,13 @@ export function Stage({ room, layout, editable, onCommit }: {
   // onlySubscribed false: publikasi yang belum ter-subscribe tetap mengisi slot (bukan dianggap kosong).
   const tracks = useTracks(SOURCES, { room, onlySubscribed: false });
   const remotes = useRemoteParticipants({ room, updateOnlyOn: PARTICIPANT_EVENTS });
-  const effective = useMemo(() => layout ?? autoLayout(tracks), [layout, tracks]);
-  const { slots, extras } = useMemo(() => resolveSlots(effective, tracks), [effective, tracks]);
+  const people = useMemo(() => [room.localParticipant, ...remotes], [room, remotes]);
+  // Peserta yang bisa publish tanpa kamera tetap punya tile avatar (QA-01).
+  const avatars = useMemo(() => avatarRefs(people, tracks), [people, tracks]);
+  const effective = useMemo(() => layout ?? autoLayout(tracks, avatars), [layout, tracks, avatars]);
+  const { slots, extras } = useMemo(() => resolveSlots(effective, tracks, avatars), [effective, tracks, avatars]);
+  // Nama terakhir per identity selama sesi: slot peserta yang keluar tetap bernama (QA-03).
+  const knownNames = useRef(new Map<string, string>()).current;
   const [editError, setEditError] = useState<string | null>(null);
   const [expandedKey, setExpanded] = useState<string | null>(null);
   // Track yang diperbesar hilang (berhenti share/keluar) → otomatis kembali ke layout.
@@ -69,7 +75,7 @@ export function Stage({ room, layout, editable, onCommit }: {
   }, [editable, effective, onCommit, room]);
 
   const ctx = useMemo<StageCtx>(() => {
-    const people = [room.localParticipant, ...remotes];
+    rememberNames(knownNames, people);
     const localIdentity = room.localParticipant.identity;
     return {
       actions,
@@ -78,11 +84,11 @@ export function Stage({ room, layout, editable, onCommit }: {
       expanded: expandedTrack ? expandedKey : null,
       setExpanded,
       who: (identity) => ({
-        person: personOf(identity, people, localIdentity),
+        person: personOf(identity, people, localIdentity, knownNames),
         participant: people.find((p) => p.identity === identity),
       }),
     };
-  }, [actions, effective, expandedKey, expandedTrack, remotes, room]);
+  }, [actions, effective, expandedKey, expandedTrack, people, knownNames, room]);
 
   const onDragEnd = (event: DragEndEvent) => {
     if (event.canceled || !actions) return;
@@ -115,7 +121,7 @@ export function Stage({ room, layout, editable, onCommit }: {
   const body = (
     <div data-testid="stage" data-template={layout ? layout.template : "auto"} className="flex h-full w-full flex-col">
       {actions && !expandedView && <StageToolbar template={effective.template} onSelect={actions.setTemplate} />}
-      {!layout && <p className="shrink-0 px-2 text-xs text-muted-foreground">{STAGE_LABELS.autoLayout}</p>}
+      {!layout && editable && <p className="shrink-0 px-2 text-xs text-muted-foreground">{STAGE_LABELS.autoLayout}</p>}
       {editError && (
         <p role="alert" className="shrink-0 px-2 text-xs text-destructive">
           {editError}
