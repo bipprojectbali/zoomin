@@ -1,6 +1,6 @@
 import { ADMIN_PASSWORD, expect, test } from "./fixtures";
 
-const RATE_LIMITED_TEXT = "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.";
+const RATE_LIMITED_TEXT = "Terlalu banyak percobaan. Coba lagi dalam 15 menit.";
 /** = ADMIN_LOGIN_MAX_FAILURES (src/server/auth.route.ts). */
 const LOGIN_MAX_FAILURES = 5;
 
@@ -54,7 +54,7 @@ test.describe("auth admin", () => {
 test("404: route tak dikenal menampilkan halaman tidak ditemukan dengan jalan pulang", async ({ page }) => {
   await page.goto("/tidak/ada/halaman-ini");
   await expect(page.getByRole("heading", { name: "Halaman tidak ditemukan" })).toBeVisible();
-  await page.getByRole("link", { name: "Ke daftar room" }).click();
+  await page.getByRole("link", { name: "Ke lobby" }).click();
   // Tanpa sesi lobby mengarah ke login.
   await expect(page).toHaveURL(/\/login$/);
 });

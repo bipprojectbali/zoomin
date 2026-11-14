@@ -32,11 +32,12 @@ test("sesi ganda: akun sama buka room di tab kedua → tab pertama terputus deng
 
   const screen = admin.getByTestId("room-status-screen");
   await expect(screen).toHaveAttribute("data-kind", "disconnected");
-  await expect(screen).toContainText("Anda membuka room ini di tab/perangkat lain");
+  await expect(screen.getByRole("heading", { name: "Room dibuka di tab lain" })).toBeVisible();
+  await expect(screen).toContainText("Anda bergabung dari tab atau perangkat lain dengan akun yang sama. Hanya satu sesi yang bisa aktif.");
   await expect(admin.getByTestId("connection-status")).toHaveAttribute("data-status", "disconnected");
 
-  // "Pakai di tab ini" merebut kembali sesi; tab kedua yang sekarang terputus.
-  await screen.getByRole("button", { name: "Pakai di tab ini" }).click();
+  // "Gunakan di tab ini" merebut kembali sesi; tab kedua yang sekarang terputus.
+  await screen.getByRole("button", { name: "Gunakan di tab ini" }).click();
   await expectConnected(admin);
   await expect(second.getByTestId("room-status-screen")).toHaveAttribute("data-kind", "disconnected");
 });

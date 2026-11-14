@@ -1,10 +1,13 @@
 import type { Page } from "@playwright/test";
-import { expect, expectVideoFlowing, identityOf, openRoom, stage, stageOrder, test, tile, tileMenuAction } from "./fixtures";
+import { ADMIN_ID, expect, expectVideoFlowing, identityOf, openRoom, stage, stageOrder, test, tile, tileMenuAction } from "./fixtures";
 
 type JoinAs = (role: "participant" | "viewer", name: string, media?: { camera?: boolean }) => Promise<Page>;
 const AUTO_NOTE = "Layout otomatis (admin belum mengatur)";
 
-/** Peserta kamera + 1 layar; layout otomatis: slot = layar saja, kamera di strip "Lainnya" (stage.resolve.ts). */
+/**
+ * Peserta kamera + 1 layar; layout otomatis: slot = layar saja, kamera di strip "Lainnya" (stage.resolve.ts).
+ * Admin tanpa kamera ikut punya tile avatar (QA-01) di strip, jadi strip disaring per identity.
+ */
 async function setupStage(admin: Page, roomId: string, joinAs: JoinAs) {
   const sharer = await joinAs("participant", "Penyaji Layout", { camera: true });
   const id = await identityOf(sharer);
@@ -15,7 +18,9 @@ async function setupStage(admin: Page, roomId: string, joinAs: JoinAs) {
   await expectVideoFlowing(tile(admin, id, "screen-1"));
   await expectVideoFlowing(tile(admin, id, "camera"));
   await expect.poll(() => stageOrder(admin)).toEqual([`${id}/screen-1`]);
-  await expect(admin.getByTestId("stage-extras").getByTestId("stage-tile")).toHaveAttribute("data-track-name", "camera");
+  const extras = admin.getByTestId("stage-extras");
+  await expect(tile(extras, id, "camera")).toBeVisible();
+  await expect(tile(extras, ADMIN_ID, "camera")).toBeVisible();
   return { sharer, id, CAMERA: `${id}/camera`, SCREEN: `${id}/screen-1` };
 }
 
@@ -29,7 +34,8 @@ async function arrange(admin: Page, id: string): Promise<string[]> {
 
   await tileMenuAction(admin, tile(admin, id, "camera"), "Tambahkan ke layout");
   await expect.poll(() => stageOrder(admin)).toEqual([`${id}/screen-1`, `${id}/camera`]);
-  await expect(admin.getByTestId("stage-extras")).toHaveCount(0);
+  // Kamera penyaji pindah ke slot; strip tinggal avatar admin.
+  await expect(tile(admin.getByTestId("stage-extras"), id, "camera")).toHaveCount(0);
 
   await tileMenuAction(admin, tile(admin, id, "screen-1"), "Pindah ke kanan");
   await expect.poll(() => stageOrder(admin)).toEqual([`${id}/camera`, `${id}/screen-1`]);
@@ -41,12 +47,13 @@ test("layout: admin atur template & slot, penonton melihat layout yang sama", as
   const viewer = await joinAs("viewer", "Penonton Layout");
   await expect.poll(() => stageOrder(viewer)).toEqual([SCREEN]);
   await expect(stage(viewer)).toHaveAttribute("data-template", "auto");
-  await expect(viewer.getByText(AUTO_NOTE)).toBeVisible();
+  // Catatan layout otomatis hanya untuk yang bisa mengedit (admin), bukan penonton.
+  await expect(admin.getByText(AUTO_NOTE)).toBeVisible();
+  await expect(viewer.getByText(AUTO_NOTE)).toHaveCount(0);
 
   const adminOrder = await arrange(admin, id);
   await expect(stage(viewer)).toHaveAttribute("data-template", "focus");
   await expect.poll(() => stageOrder(viewer)).toEqual(adminOrder);
-  await expect(viewer.getByText(AUTO_NOTE)).toHaveCount(0);
   await expectVideoFlowing(tile(viewer, id, "camera"));
 
   // "Fokuskan untuk semua" pada slot 1 → jadi slot 0 di semua klien.
@@ -86,7 +93,7 @@ test("layout: 'Hapus dari layout' tersiar; 'Perbesar' hanya lokal (layout penont
   await expect.poll(() => stageOrder(admin)).toEqual([SCREEN]);
   await expect.poll(() => stageOrder(viewer)).toEqual([SCREEN]);
   // Track yang dihapus tetap terlihat di strip "Lainnya".
-  await expect(viewer.getByTestId("stage-extras").getByTestId("stage-tile")).toHaveAttribute("data-track-name", "camera");
+  await expect(tile(viewer.getByTestId("stage-extras"), id, "camera")).toBeVisible();
 
   await tileMenuAction(admin, tile(admin, id, "screen-1"), "Perbesar");
   await expect(admin.getByTestId("tile-expanded")).toBeVisible();

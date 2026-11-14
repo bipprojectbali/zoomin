@@ -31,10 +31,8 @@ begitu bug diperbaiki test itu jadi "unexpectedly passed" → hapus `test.fail()
 
 ## Catatan (bukan bug app, tidak di-`test.fail`)
 
-- **Bentrok `data-testid="stage"`:** react-resizable-panels memberi panel ber-`id="stage"` (template Fokus,
-  `StageTemplates.tsx` `FOCUS_IDS`) atribut `data-testid="stage"`, sama dengan root stage. Test memakai
-  `[data-testid="stage"][data-template]` (`stage()` di `fixtures.ts`). Bila ingin bersih: ganti id panel, mis.
-  `focus-main`/`focus-strip`.
+- **Bentrok `data-testid="stage"`** (sudah beres): panel Fokus kini ber-id `focus-main`/`focus-strip`, jadi
+  `data-testid="stage"` tunggal dan `stage()` di `fixtures.ts` cukup `getByTestId("stage")`.
 - **Peserta yang keluar sangat cepat tidak memicu toast:** bila tamu keluar sebelum LiveKit menyiarkannya ke peserta
   lain (~<1 dtk setelah connect), admin tidak pernah menerima `ParticipantConnected`/`Disconnected`, jadi tak ada
   toast "bergabung"/"keluar". Perilaku LiveKit, wajar.

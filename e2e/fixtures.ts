@@ -81,15 +81,12 @@ export async function openRoom(page: Page, roomId: string, media: MediaChoice = 
   await expectConnected(page);
 }
 
-/**
- * Root stage. `data-template` wajib di selector: react-resizable-panels memberi panel ber-id "stage" (template fokus)
- * atribut data-testid="stage" juga.
- */
-export const stage = (page: Page): Locator => page.locator('[data-testid="stage"][data-template]');
+/** Root stage (`data-template` = template aktif). */
+export const stage = (page: Page): Locator => page.getByTestId("stage");
 
-/** Tile stage milik `identity` dengan nama track `trackName` (camera / screen-N). */
-export const tile = (page: Page, identity: string, trackName: string): Locator =>
-  page.locator(`[data-testid="stage-tile"][data-identity="${identity}"][data-track-name="${trackName}"]`);
+/** Tile stage milik `identity` dengan nama track `trackName` (camera / screen-N; peserta tanpa kamera = avatar "camera"). */
+export const tile = (scope: Page | Locator, identity: string, trackName: string): Locator =>
+  scope.locator(`[data-testid="stage-tile"][data-identity="${identity}"][data-track-name="${trackName}"]`);
 
 /** Tunggu video di tile benar-benar menerima frame (videoWidth > 0). */
 export async function expectVideoFlowing(t: Locator): Promise<void> {

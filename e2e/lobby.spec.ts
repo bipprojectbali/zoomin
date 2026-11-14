@@ -18,6 +18,12 @@ test("lobby: buat room cukup judul, muncul di daftar, buat link undangan peserta
   // Form direset setelah sukses.
   await expect(form.getByLabel("Judul room")).toHaveValue("");
 
+  // Panel undangan per kartu collapsed sampai invite-toggle diklik.
+  const toggle = item.getByTestId("invite-toggle");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(item.getByTestId("create-invite")).toBeHidden();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
   const urls: string[] = [];
   for (const role of ["participant", "viewer"] as const) {
     await item.locator(`[data-testid="invite-role"][data-role="${role}"]`).click();
@@ -32,7 +38,7 @@ test("lobby: buat room cukup judul, muncul di daftar, buat link undangan peserta
   await expect(page.locator(`[data-testid="room-item"][data-room-id="${roomId}"]`)).toBeVisible();
 });
 
-test("lobby: tamu logout wajib konfirmasi", async ({ roomId, joinAs }) => {
+test("lobby: tamu Keluar akun wajib konfirmasi", async ({ roomId, joinAs }) => {
   const guest = await joinAs("participant", "Tamu Logout");
   await guest.goto("/");
   await expect(guest.locator(`[data-testid="room-item"][data-room-id="${roomId}"]`)).toBeVisible();
@@ -46,7 +52,6 @@ test("lobby: tamu logout wajib konfirmasi", async ({ roomId, joinAs }) => {
   await expect(dialog).toHaveCount(0);
   await expect(guest).toHaveURL(/\/$/);
   await guest.getByTestId("logout").click();
-  // Tombol aksi = tombol terakhir di footer AlertDialog (setelah Batal); labelnya sedang diganti, jadi tanpa teks.
-  await guest.getByRole("alertdialog").getByRole("button").last().click();
+  await guest.getByRole("alertdialog").getByRole("button", { name: "Keluar akun" }).click();
   await expect(guest).toHaveURL(/\/login$/);
 });
