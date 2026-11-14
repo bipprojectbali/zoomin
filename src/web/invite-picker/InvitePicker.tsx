@@ -1,16 +1,14 @@
-import { Loader2, Mail } from "lucide-react";
-import { useId, useImperativeHandle, useMemo, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode, type Ref } from "react";
-import { UserAvatar } from "@/app/UserAvatar";
+import { Loader2 } from "lucide-react";
+import { useId, useImperativeHandle, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { useSession } from "@/session.context";
-import type { UserSearchItem } from "../../shared/api.types";
 import { InviteChip } from "./InviteChip";
-import { isEmail, normalizeEmail, parseEmails, type InviteEntry } from "./invite.parse";
+import { InviteOptionRow } from "./InviteOption";
+import { useManualEmails } from "./invite.manual.store";
+import { buildOptions, defaultActive, type InviteOption } from "./invite.options";
+import { normalizeEmail, parseEmails, type InviteEntry } from "./invite.parse";
 import { INVITE_PICKER_TEXT as TEXT } from "./invite-picker.labels";
 import { useUserSearch } from "./useUserSearch";
-
-type Option = { kind: "user"; user: UserSearchItem } | { kind: "manual"; email: string };
 
 /** Handle imperatif: `flush()` meng-commit teks yang masih diketik jadi chip lalu mengembalikan nilai lengkapnya. */
 export type InvitePickerHandle = { flush: () => InviteEntry[] };
@@ -31,65 +29,85 @@ type Props = {
 };
 
 const DEFAULT_ROLE = "participant" as const;
+const LIST_CLASS = "absolute inset-x-0 top-full z-50 mt-1 max-h-64 overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md";
+const NOTE_CLASS = "flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground";
 
 /**
- * Combobox "Undang orang" (P1–P3): saran akun terdaftar, opsi "Undang <email>" untuk email manual, tempel banyak
- * email, chip ber-peran. Email sesi sendiri & duplikat diabaikan.
+ * Dropdown multi-select "Undang orang" (P1/P3 + M1–M6, RND/plan/09): terbuka saat fokus, akun terdaftar + email manual
+ * tersimpan ber-checkbox, "Tambah <email>" untuk email baru, tempel banyak email, chip ber-peran di bawahnya.
  */
 export function InvitePicker({ value, onChange, inputId, describedBy, disabled, legacyInputTestId, action, ref }: Props) {
-  const selfEmail = useSession().user?.email;
+  const self = useSession().user;
+  const manual = useManualEmails(self?.id);
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useState<number | null>(null); // null = baris bawaan (defaultActive)
   const listId = useId();
-  const search = useUserSearch(text);
-  const taken = useMemo(
-    () => new Set([...value.map((v) => v.email), ...(selfEmail ? [normalizeEmail(selfEmail)] : [])]),
-    [value, selfEmail],
-  );
+  const expanded = open && !disabled;
+  const search = useUserSearch(text, expanded);
+  const options = buildOptions({ text, users: search.items, saved: manual.list, selfEmail: self?.email });
+  const checked = new Set(value.map((v) => v.email));
+  const activeIndex = Math.min(active ?? defaultActive(options, text), options.length - 1);
 
-  const typed = normalizeEmail(text);
-  const options: Option[] = search.items.filter((u) => !taken.has(normalizeEmail(u.email))).map((user) => ({ kind: "user", user }));
-  if (isEmail(typed) && !taken.has(typed) && !search.items.some((u) => normalizeEmail(u.email) === typed)) {
-    options.push({ kind: "manual", email: typed });
-  }
-  const expanded = open && (options.length > 0 || search.loading);
-  const activeIndex = Math.min(active, options.length - 1);
-
-  function add(entries: InviteEntry[]): InviteEntry[] {
-    const next = entries.length ? [...value, ...entries] : value;
-    if (entries.length) onChange(next);
+  function resetText() {
     setText("");
-    setActive(0);
+    setActive(null);
+  }
+
+  /** Toggle centang; teks cari tetap (centang beberapa dari satu pencarian), kecuali "Tambah <email>". */
+  function toggle(option: InviteOption) {
+    if (option.kind === "add") (resetText(), manual.add([option.email]));
+    if (checked.has(option.email)) {
+      if (option.kind !== "add") onChange(value.filter((v) => v.email !== option.email)); // "Tambah" tidak pernah menghapus centang
+      return;
+    }
+    const extra = option.kind === "user" ? { name: option.user.name, image: option.user.image } : {};
+    onChange([...value, { email: option.email, role: DEFAULT_ROLE, ...extra }]);
+  }
+
+  function removeSaved(email: string) {
+    manual.remove(email);
+    if (checked.has(email)) onChange(value.filter((v) => v.email !== email));
+  }
+
+  /** Teks bebas → chip: valid juga disimpan sebagai email manual (M3), tidak valid ditandai. */
+  function commitText(raw = text): InviteEntry[] {
+    const taken = [...checked, ...(self?.email ? [normalizeEmail(self.email)] : [])];
+    const parsed = parseEmails(raw, taken);
+    manual.add(parsed.filter((p) => !p.invalid).map((p) => p.email));
+    const next = parsed.length ? [...value, ...parsed.map(({ email, invalid }) => ({ email, role: DEFAULT_ROLE, ...(invalid && { invalid }) }))] : value;
+    if (parsed.length) onChange(next);
+    resetText();
     return next;
   }
 
-  function pick(option: Option) {
-    if (option.kind === "manual") return add([{ email: option.email, role: DEFAULT_ROLE }]);
-    const { email, name, image } = option.user;
-    add([{ email: normalizeEmail(email), role: DEFAULT_ROLE, name, image }]);
-  }
-
-  /** Teks bebas → chip (tidak valid ditandai). */
-  const commitText = (raw = text) =>
-    add(parseEmails(raw, taken).map(({ email, invalid }) => ({ email, role: DEFAULT_ROLE, ...(invalid && { invalid }) })));
-
   // Bukan commit saat blur: chip baru menggeser layout (dialog ter-center ulang) sehingga klik tombol submit meleset.
-  useImperativeHandle(ref, () => ({ flush: () => commitText() }));
+  // Teks tanpa "@" = sisa kata cari (toggle tidak mengosongkan input) → dibuang, bukan jadi chip tidak valid.
+  useImperativeHandle(ref, () => ({ flush: () => (text.includes("@") ? commitText() : (resetText(), value)) }));
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    const option = expanded && activeIndex >= 0 ? options[activeIndex] : undefined;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       setOpen(true);
-      if (options.length) setActive((activeIndex + (e.key === "ArrowDown" ? 1 : options.length - 1)) % options.length);
-    } else if (e.key === "Enter" || (e.key === "," && text.trim())) {
-      if (e.key === "Enter" && !text.trim()) return; // Enter kosong → submit form
+      const n = options.length;
+      if (n) setActive(e.key === "ArrowDown" ? (activeIndex + 1) % n : (activeIndex - 1 + n) % n);
+    } else if (e.key === "Enter" || (e.key === " " && !text && option)) {
+      if (option) {
+        e.preventDefault();
+        toggle(option);
+      } else if (text.trim()) {
+        e.preventDefault();
+        commitText();
+      } // Enter tanpa teks & tanpa baris aktif → submit form
+    } else if (e.key === "," && text.trim()) {
       e.preventDefault();
-      const option = expanded ? options[activeIndex] : undefined;
-      if (option) pick(option);
-      else commitText();
+      commitText();
+    } else if (e.key === "Delete" && option?.kind === "saved") {
+      e.preventDefault();
+      removeSaved(option.email);
     } else if (e.key === "Escape" && expanded) {
-      e.preventDefault(); // tutup saran saja; dialog induk menahan Escape ini lewat onEscapeKeyDown (RoomSettingsDialog)
+      e.preventDefault(); // tutup dropdown saja; dialog induk menahan Escape ini lewat onEscapeKeyDown (RoomSettingsDialog)
       setOpen(false);
     } else if (e.key === "Backspace" && !text && value.length) {
       onChange(value.slice(0, -1));
@@ -118,69 +136,41 @@ export function InvitePicker({ value, onChange, inputId, describedBy, disabled, 
               aria-expanded={expanded}
               aria-controls={listId}
               aria-autocomplete="list"
-              aria-activedescendant={expanded && options.length ? optionId(activeIndex) : undefined}
+              aria-activedescendant={expanded && activeIndex >= 0 ? optionId(activeIndex) : undefined}
               aria-describedby={describedBy}
               autoComplete="off"
               placeholder={TEXT.placeholder}
               disabled={disabled}
               value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                setOpen(true);
-                setActive(0);
-              }}
+              onChange={(e) => (setText(e.target.value), setOpen(true), setActive(null))}
               onFocus={() => setOpen(true)}
+              onClick={() => setOpen(true)}
               onBlur={() => setOpen(false)}
               onKeyDown={onKeyDown}
               onPaste={onPaste}
             />
           </label>
           {expanded && (
-            <ul
-              id={listId}
-              role="listbox"
-              aria-label={TEXT.label}
-              className="absolute inset-x-0 top-full z-50 mt-1 max-h-64 overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-            >
-              {search.loading && options.length === 0 && (
-                <li className="flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground" role="presentation">
+            <ul id={listId} role="listbox" aria-multiselectable="true" aria-label={TEXT.label} className={LIST_CLASS}>
+              {options.map((option, i) => (
+                <InviteOptionRow
+                  key={`${option.kind}:${option.email}`}
+                  option={option}
+                  id={optionId(i)}
+                  checked={checked.has(option.email)}
+                  active={i === activeIndex}
+                  onHover={() => setActive(i)}
+                  onToggle={() => toggle(option)}
+                  onRemoveSaved={() => removeSaved(option.email)}
+                />
+              ))}
+              {search.loading && (
+                <li className={NOTE_CLASS} role="presentation">
                   <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                   {TEXT.searching}
                 </li>
               )}
-              {options.map((option, i) => (
-                <li
-                  key={option.kind === "user" ? option.user.id : `manual:${option.email}`}
-                  id={optionId(i)}
-                  role="option"
-                  aria-selected={i === activeIndex}
-                  data-testid={option.kind === "user" ? "invite-picker-option" : "invite-picker-manual"}
-                  data-email={option.kind === "user" ? normalizeEmail(option.user.email) : option.email}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
-                    i === activeIndex && "bg-accent text-accent-foreground",
-                  )}
-                  // mousedown: cegah blur input (blur akan meng-commit teks sebelum klik opsi terproses).
-                  onMouseDown={(e) => e.preventDefault()}
-                  onMouseEnter={() => setActive(i)}
-                  onClick={() => pick(option)}
-                >
-                  {option.kind === "user" ? (
-                    <>
-                      <UserAvatar user={option.user} className="size-6" />
-                      <span className="flex min-w-0 flex-col">
-                        <span className="truncate font-medium">{option.user.name}</span>
-                        <span className="truncate text-xs text-muted-foreground">{option.user.email}</span>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="size-4 shrink-0" aria-hidden="true" />
-                      <span className="truncate">{TEXT.manual(option.email)}</span>
-                    </>
-                  )}
-                </li>
-              ))}
+              {!search.loading && options.length === 0 && <li className={NOTE_CLASS} role="presentation" data-testid="invite-picker-empty">{TEXT.empty}</li>}
             </ul>
           )}
         </div>

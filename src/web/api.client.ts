@@ -173,7 +173,7 @@ export const acceptInvite = (body: AcceptInviteBody) => request<AcceptInviteResp
 /** GET /api/rooms?limit=&cursor=. */
 export const listRooms = (query: ListRoomsQuery = {}) => request<Page<RoomSummary>>("GET", `/api/rooms${queryString(query)}`);
 
-/** GET /api/users/search?q=&limit=: saran akun untuk undangan (admin+ / host room; selain itu 403, 429 rate_limited). */
+/** GET /api/users/search?q=&limit=: akun untuk undangan, `q` kosong = semua (admin+ / host room; selain itu 403, 429 rate_limited). */
 export const searchUsers = (q: string, limit?: number) =>
   request<UserSearchResponse>("GET", `/api/users/search${queryString({ q, limit })}`);
 

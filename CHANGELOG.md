@@ -70,6 +70,9 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikut
 
 ### Changed
 
+- Pemilih undangan sekarang dropdown multi-pilih yang bisa dicari, dengan checkbox per akun; email manual yang
+  diketik tetap tersimpan sebagai pilihan. Pencarian akun boleh tanpa kata kunci (menampilkan semua akun urut nama)
+  dan mengembalikan hingga 50 hasil.
 - **BREAKING:** lobby pindah dari `/` ke `/app`; `/` sekarang landing page (tetap tampil walau sudah login).
 - **BREAKING:** peran room `admin` berganti nama menjadi **`host`** (termasuk pilihan peran di link undangan).
 - **BREAKING:** tamu wajib masuk dengan Google sebelum menerima undangan; tidak ada lagi akun tamu yang cukup

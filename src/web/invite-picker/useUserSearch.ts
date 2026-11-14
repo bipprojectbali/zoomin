@@ -1,29 +1,35 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiRequestError, searchUsers } from "@/api.client";
-import { USER_SEARCH_MIN, type UserSearchItem } from "../../shared/api.types";
+import type { UserSearchItem } from "../../shared/api.types";
 
 const DEBOUNCE_MS = 250;
 const HTTP_FORBIDDEN = 403;
 const HTTP_TOO_MANY = 429;
 
 /**
- * Saran akun terdaftar untuk `query` (debounce, ≥ USER_SEARCH_MIN huruf). 403 → pencarian dimatikan untuk sesi
- * komponen ini (tetap bisa undang email manual); 429/galat lain → saran kosong untuk query itu.
+ * Akun terdaftar untuk `query` (kosong = semua, urut nama; M1/M5) selama `enabled` (dropdown terbuka), debounce.
+ * Hasil di-cache per query selama komponen hidup (buka/tutup dropdown tidak memanggil ulang server).
+ * 403 → pencarian dimatikan (tetap bisa undang email manual); 429/galat lain → kosong untuk query itu.
  */
-export function useUserSearch(query: string): { items: UserSearchItem[]; loading: boolean } {
+export function useUserSearch(query: string, enabled: boolean): { items: UserSearchItem[]; loading: boolean } {
+  // ponytail: cache tanpa kadaluarsa per mount; akun baru muncul setelah form dibuka ulang.
+  const cache = useRef(new Map<string, UserSearchItem[]>());
   const [items, setItems] = useState<UserSearchItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const q = query.trim();
 
   useEffect(() => {
+    const cached = cache.current.get(q);
+    if (cached) return void setItems(cached);
     setItems([]);
-    if (forbidden || q.length < USER_SEARCH_MIN) return setLoading(false);
+    if (forbidden || !enabled) return setLoading(false);
     let stale = false;
     setLoading(true);
     const timer = setTimeout(async () => {
       try {
         const res = await searchUsers(q);
+        cache.current.set(q, res.items);
         if (!stale) setItems(res.items);
       } catch (err) {
         if (stale) return;
@@ -37,7 +43,7 @@ export function useUserSearch(query: string): { items: UserSearchItem[]; loading
       stale = true;
       clearTimeout(timer);
     };
-  }, [q, forbidden]);
+  }, [q, enabled, forbidden]);
 
   return { items, loading };
 }
