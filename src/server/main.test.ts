@@ -1,4 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { t } from "elysia";
 import { RoomServiceClient } from "livekit-server-sdk";
 import { createApi } from "./api";
@@ -52,5 +55,38 @@ describe("createApi onError", () => {
   test("toHttpUrl", () => {
     expect(toHttpUrl("ws://127.0.0.1:7880")).toBe("http://127.0.0.1:7880");
     expect(toHttpUrl("wss://lk.example.test")).toBe("https://lk.example.test");
+  });
+});
+
+// Butuh `openssl` untuk membuat sertifikat self-signed sementara; tanpa itu test TLS dilewati.
+const hasOpenssl = Bun.which("openssl") !== null;
+
+describe("main server TLS", () => {
+  test.skipIf(!hasOpenssl)("TLS_CERT_PATH + TLS_KEY_PATH → HTTPS /api/health 200", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "zoomin-tls-"));
+    try {
+      const certPath = join(dir, "cert.pem");
+      const keyPath = join(dir, "key.pem");
+      const gen = Bun.spawnSync(
+        ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=localhost",
+          "-keyout", keyPath, "-out", certPath],
+        { stderr: "pipe" },
+      );
+      if (gen.exitCode !== 0) throw new Error(`openssl gagal membuat sertifikat: ${gen.stderr.toString()}`);
+      const tlsServer = createServer({ ...deps, config: { ...config, tls: { certPath, keyPath } } }, 0);
+      try {
+        const res = await fetch(`https://localhost:${tlsServer.port}/api/health`, { tls: { rejectUnauthorized: false } });
+        expect(res.status).toBe(200);
+      } finally {
+        tlsServer.stop(true);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("file sertifikat tidak ada → throw saat start", () => {
+    const missing = { certPath: "/tidak/ada/cert.pem", keyPath: "/tidak/ada/key.pem" };
+    expect(() => createServer({ ...deps, config: { ...config, tls: missing } }, 0)).toThrow("TLS_CERT_PATH tidak ditemukan");
   });
 });

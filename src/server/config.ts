@@ -14,6 +14,8 @@ export type Config = {
   adminPassword: string;
   /** Base URL app untuk link undangan. */
   publicAppUrl: string;
+  /** Path sertifikat + kunci TLS (PEM). Diset → server HTTPS; kosong → HTTP. */
+  tls?: { certPath: string; keyPath: string };
 };
 
 export const SESSION_SECRET_MIN_LENGTH = 32;
@@ -48,6 +50,12 @@ export function loadConfig(env: Env = process.env): Config {
     throw new Error(`loadConfig: SESSION_SECRET minimal ${SESSION_SECRET_MIN_LENGTH} karakter (sekarang ${sessionSecret.length})`);
   }
 
+  const certPath = env.TLS_CERT_PATH?.trim();
+  const keyPath = env.TLS_KEY_PATH?.trim();
+  if (Boolean(certPath) !== Boolean(keyPath)) {
+    throw new Error("loadConfig: TLS_CERT_PATH dan TLS_KEY_PATH harus diset bersamaan (sekarang hanya salah satu)");
+  }
+
   const livekitUrl = env.LIVEKIT_URL?.trim() || DEFAULT_LIVEKIT_URL;
   return {
     nodeEnv,
@@ -60,5 +68,6 @@ export function loadConfig(env: Env = process.env): Config {
     sessionSecret,
     adminPassword,
     publicAppUrl: env.PUBLIC_APP_URL?.trim() || DEFAULT_PUBLIC_APP_URL,
+    tls: certPath && keyPath ? { certPath, keyPath } : undefined,
   };
 }

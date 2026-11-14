@@ -64,4 +64,11 @@ describe("loadConfig", () => {
   test("PORT invalid → throw", () => {
     expect(() => loadConfig({ PORT: "abc" })).toThrow("PORT");
   });
+
+  test("TLS: keduanya diset → aktif, tidak diset → undefined, salah satu → throw", () => {
+    expect(loadConfig({ TLS_CERT_PATH: "c.pem", TLS_KEY_PATH: "k.pem" }).tls).toEqual({ certPath: "c.pem", keyPath: "k.pem" });
+    expect(loadConfig({}).tls).toBeUndefined();
+    expect(() => loadConfig({ TLS_CERT_PATH: "c.pem" })).toThrow("TLS_KEY_PATH");
+    expect(() => loadConfig({ TLS_KEY_PATH: "k.pem", TLS_CERT_PATH: " " })).toThrow("bersamaan");
+  });
 });

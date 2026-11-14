@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { RoomServiceClient } from "livekit-server-sdk";
 import index from "../web/index.html";
 import type { ApiDeps } from "./api.deps";
@@ -15,12 +16,22 @@ export function createServer(deps: ApiDeps, port: number) {
   const api = createApi(deps);
   return Bun.serve({
     port,
+    tls: loadTls(deps.config.tls),
     development: deps.config.nodeEnv !== "production",
     routes: {
       "/api/*": (req) => api.fetch(req),
       "/*": index,
     },
   });
+}
+
+/** Config TLS → opsi `tls` Bun.serve (isi file, bukan path). Throw bila file tidak ada agar gagal saat start. */
+function loadTls(tls: ApiDeps["config"]["tls"]) {
+  if (!tls) return undefined;
+  for (const [name, path] of [["TLS_CERT_PATH", tls.certPath], ["TLS_KEY_PATH", tls.keyPath]] as const) {
+    if (!existsSync(path)) throw new Error(`createServer: ${name} tidak ditemukan (${path})`);
+  }
+  return { cert: Bun.file(tls.certPath), key: Bun.file(tls.keyPath) };
 }
 
 /** LiveKit Twirp memakai HTTP(S), sedangkan config menyimpan URL ws(s). */
