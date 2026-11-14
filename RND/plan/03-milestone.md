@@ -16,6 +16,7 @@ worker lain. Worker tidak boleh commit, push, atau ganti branch.
 | M1–M3 | Selesai di level kode + test (`bun test` 330+ pass, typecheck bersih, e2e 28/28), plus gelombang UX (`../qa/01-ux-audit.md`, `02`). Kriteria "diuji manual di 2 browser" tertutup oleh e2e multi-context; uji perangkat nyata ikut M4. |
 | M4 | Artefak siap (`deploy/`, versi 0.1.0, CHANGELOG). Deploy menunggu perintah user + keputusan domain final (K3). |
 | M5 | Ditunda. |
+| M6 | Selesai di level kode + test (branch `feature/auth-google`, belum di-merge/deploy): login Google (Better Auth), peran global, `/admin`, `/dev`, landing, e2e pindah ke test login. Lihat §M6. |
 
 Ringkasan kesiapan rilis: `../qa/00-status-rilis.md`.
 
@@ -188,6 +189,29 @@ internet mengikuti keputusan K1.
 
 **Paralelisasi:** `wkr-m4-infra` memegang `deploy/**` (livekit.yaml template tanpa secret, Caddyfile, unit
 systemd). `wkr-m4-docs` memegang `CHANGELOG.md` + bagian deploy di README, dikerjakan sekali di akhir.
+
+---
+
+## M6 — Auth & peran (login Google, admin, /dev, landing)
+
+**Status:** selesai di level kode + test di branch `feature/auth-google`; merge dan deploy menunggu persetujuan
+user. Spec terkunci: `05-auth-roles.md` (keputusan A1–A14, dicatat juga di `04`).
+
+**Scope:** Better Auth 1.7.x dengan Google OAuth sebagai satu-satunya login (menghapus `ADMIN_PASSWORD` /
+`SESSION_SECRET`), peran global `user`/`admin`/`super_admin` (super_admin hanya dari `SUPER_ADMIN_EMAILS`), peran room
+`host`/`participant`/`viewer`, profil `/settings`, panel `/admin` (ban + kick dari room aktif, hapus, revoke sesi,
+hapus room), konsol `/dev` (ubah peran admin, health, audit log, domain email, ringkasan config), landing publik `/`
+(lobby pindah ke `/app`), CLI darurat `zoomin user list|promote|unban`, migrasi `0002_auth.sql` + `0003_admin.sql`.
+
+**Kriteria selesai:**
+- Endpoint & aturan A4/A5 sesuai `05` §Endpoint, dengan test route/service (`admin.*.test.ts`, `dev.route.test.ts`,
+  `auth.*.test.ts`).
+- Jalur login test-only (`ZOOMIN_TEST_AUTH`) mati di production, dibuktikan `e2e/prod.spec.ts` (404).
+- E2e tidak memanggil Google; server e2e terisolasi dari `.env` (`--no-env-file`, `playwright.config.ts`).
+- Docs: `.env.example` (langkah OAuth Google), README, `deploy/README.md`, CHANGELOG `[Unreleased]` (BREAKING).
+
+**Sisa sebelum deploy:** buat OAuth client Google produksi + publish consent screen (R22), isi env produksi baru,
+uji login Google nyata dari domain produksi (e2e hanya memakai test login).
 
 ---
 

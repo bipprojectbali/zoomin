@@ -15,6 +15,46 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikut
   membuat kamera/share layar/clipboard gagal) plus alamat LAN untuk perangkat lain.
 - Proxy signaling LiveKit di `/livekit`: set `PUBLIC_LIVEKIT_URL=wss://<domain-app>/livekit` agar browser cukup
   menjangkau satu hostname (mis. lewat Cloudflare Tunnel), tanpa subdomain LiveKit. Media tetap langsung ke LiveKit.
+- **Login dengan akun Google** (Better Auth) menggantikan login password admin. Akun Google mana pun bisa mendaftar;
+  user baru hanya bisa masuk room yang mengundangnya.
+- **Peran global** `user` / `admin` / `super_admin`. Super admin ditentukan oleh `SUPER_ADMIN_EMAILS` (disinkronkan
+  setiap login); admin diangkat atau diturunkan oleh super admin. Hanya admin dan super admin yang bisa membuat room.
+- **Halaman profil** `/settings`: ubah nama tampilan, pakai foto Google, lihat dan cabut sesi login di perangkat lain,
+  hapus akun sendiri. Foto profil tampil di tile avatar dan daftar peserta.
+- **Panel admin** `/admin`: cari akun, blokir (dengan alasan dan masa berlaku opsional; akun langsung dikeluarkan dari
+  room yang sedang diikuti), buka blokir, cabut sesi, hapus akun, dan kelola room (hapus room).
+- **Konsol developer** `/dev` (super admin): angkat/turunkan admin, kesehatan sistem (LiveKit, DB), audit log aksi
+  admin, pembatasan domain email login, dan ringkasan konfigurasi tanpa secret.
+- **Landing page** publik di `/` yang menonjolkan perbandingan beberapa layar sekaligus.
+- Perintah darurat `zoomin user list`, `zoomin user promote <email> --role admin|user`, dan `zoomin user unban <email>`
+  untuk mengelola akun langsung di server.
+- Variabel env baru: `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+  `SUPER_ADMIN_EMAILS`, `WEB_DIST_DIR` (opsional), dan `ZOOMIN_TEST_AUTH` (khusus test otomatis). Panduan membuat
+  OAuth client Google ada di `.env.example` / `zoomin env`.
+
+### Changed
+
+- **BREAKING:** lobby pindah dari `/` ke `/app`; `/` sekarang landing page (tetap tampil walau sudah login).
+- **BREAKING:** peran room `admin` berganti nama menjadi **`host`** (termasuk pilihan peran di link undangan).
+- **BREAKING:** tamu wajib masuk dengan Google sebelum menerima undangan; tidak ada lagi akun tamu yang cukup
+  mengisi nama. Akun lama (admin password dan tamu) tidak dimigrasikan: room dan layout-nya tetap ada, tapi daftar
+  anggota room lama kosong, jadi undang ulang peserta.
+- Admin dan super admin yang membuka room tanpa undangan diperlakukan sebagai host.
+
+### Removed
+
+- **BREAKING:** login password admin (`ADMIN_PASSWORD`, `POST /api/auth/admin-login`) dan `SESSION_SECRET` (diganti
+  `BETTER_AUTH_SECRET`). Hapus keduanya dari env produksi.
+
+### Security
+
+- **BREAKING:** semua sesi lama dan semua link undangan lama tidak berlaku setelah upgrade (kunci tanda tangan baru);
+  semua orang perlu login ulang dan undangan perlu dibuat ulang.
+- Aksi admin (blokir, buka blokir, hapus akun, ubah peran, cabut sesi, hapus room, ubah setting) dicatat di audit log.
+- Endpoint admin bawaan Better Auth tidak dibuka lewat HTTP; aturan siapa boleh mengelola siapa ditegakkan server
+  (admin tidak bisa menyentuh admin lain atau super admin, tidak ada yang bisa mengelola akunnya sendiri).
+- Login dibatasi rate limit Better Auth per IP. Jalur login khusus test (`ZOOMIN_TEST_AUTH`) selalu mati di production
+  dan dibuktikan oleh test.
 
 ## [0.1.0] - 2026-11-14
 

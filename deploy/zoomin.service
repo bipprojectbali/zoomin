@@ -21,7 +21,8 @@ Environment=TRUST_PROXY=true
 Environment=DB_PATH=/var/lib/zoomin/zoomin.sqlite
 # Matikan cache transpiler (default menulis ke cache dir platform, read-only di bawah ProtectSystem=strict).
 Environment=BUN_RUNTIME_TRANSPILER_CACHE_PATH=0
-# Secret (LIVEKIT_API_KEY/SECRET, SESSION_SECRET, ADMIN_PASSWORD) + PORT, URL. Mode 640 root:zoomin.
+# Secret (LIVEKIT_API_KEY/SECRET, BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID/SECRET) + SUPER_ADMIN_EMAILS, PORT, URL.
+# Mode 640 root:zoomin. Jangan isi ZOOMIN_TEST_AUTH (khusus test otomatis; production mengabaikannya).
 EnvironmentFile=/etc/zoomin/zoomin.env
 # Butuh dist/web (bun run build, ikut di tarball rilis); tanpanya start gagal dan systemd mengulang (Restart=on-failure).
 ExecStart=/usr/local/bin/bun src/server/main.ts

@@ -3,8 +3,13 @@ import { parseEnv } from "node:util";
 import { loadConfig, REQUIRED_IN_PRODUCTION } from "../server/config";
 import { ENV_EXAMPLE, envTable } from "./cli.docs";
 
-/** Semua variabel yang dibaca config.ts (`env.X` / `pick("X"`), di-scan agar daftar tidak drift dari kode. */
-const configSource = await Bun.file(new URL("../server/config.ts", import.meta.url)).text();
+/**
+ * Semua variabel yang dibaca config.ts (`env.X` / `pick("X"`), di-scan agar daftar tidak drift dari kode.
+ * static.serve.ts ikut di-scan: WEB_DIST_DIR dibaca di sana (resolveWebDir), bukan lewat loadConfig.
+ */
+const configSource = (
+  await Promise.all(["../server/config.ts", "../server/static.serve.ts"].map((p) => Bun.file(new URL(p, import.meta.url)).text()))
+).join("\n");
 const CONFIG_VARS = [...new Set([...configSource.matchAll(/env\.([A-Z][A-Z0-9_]+)|pick\("([A-Z0-9_]+)"/g)].map((m) => m[1] ?? m[2] ?? ""))];
 
 /** Baris aktif (bukan komentar/kosong) template. */

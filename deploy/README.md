@@ -94,9 +94,30 @@ sudo chown root:livekit /etc/livekit/keys.yaml && sudo chmod 640 /etc/livekit/ke
 
 sudo cp .env.example /etc/zoomin/zoomin.env && sudo chown root:zoomin /etc/zoomin/zoomin.env && sudo chmod 640 /etc/zoomin/zoomin.env
 sudo sed -i "s|^LIVEKIT_API_KEY=.*|LIVEKIT_API_KEY=$KEY|; s|^LIVEKIT_API_SECRET=.*|LIVEKIT_API_SECRET=$SECRET|" /etc/zoomin/zoomin.env
-unset KEY SECRET
-sudo nano /etc/zoomin/zoomin.env
+# Kunci Better Auth (sesi, state OAuth, tanda tangan undangan). Mengganti nilainya nanti = semua user ter-logout
+# dan semua link undangan lama tidak berlaku.
+AUTH="$(openssl rand -base64 48 | tr -d '/+=')"
+sudo sed -i "s|^BETTER_AUTH_SECRET=.*|BETTER_AUTH_SECRET=$AUTH|" /etc/zoomin/zoomin.env
+unset KEY SECRET AUTH
+sudo nano /etc/zoomin/zoomin.env   # isi GOOGLE_CLIENT_ID/SECRET, SUPER_ADMIN_EMAILS, URL (tabel di bawah)
 ```
+
+### OAuth client Google
+
+Login hanya lewat Google, jadi app produksi butuh OAuth client sendiri (langkah lengkap: `.env.example` bagian 4):
+
+1. console.cloud.google.com → APIs & Services → **OAuth consent screen**: nama app, email kontak; scope default
+   (email, profile, openid).
+2. **Credentials → Create credentials → OAuth client ID**, tipe **Web application**:
+   - Authorized JavaScript origins: `https://<APP_DOMAIN>` (= `PUBLIC_APP_URL`).
+   - Authorized redirect URIs: `https://<APP_DOMAIN>/api/auth/callback/google` (= `<BETTER_AUTH_URL>/api/auth/callback/google`).
+3. Salin Client ID + secret ke `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` di `/etc/zoomin/zoomin.env` (lewat `nano`,
+   jangan di command line yang tersimpan di history).
+4. Consent screen berstatus "Testing" hanya menerima akun test user (maks 100). Untuk tamu umum tekan
+   **Publish app**.
+
+Origin atau redirect URI yang tidak persis sama dengan URL yang dibuka browser → Google menolak dengan
+`redirect_uri_mismatch`.
 
 Isi `/etc/zoomin/zoomin.env` (selain di atas). `EnvironmentFile` menimpa `Environment=` di unit, jadi var yang
 "diset unit" **harus dihapus** dari env file (salinan `.env.example` berisi `NODE_ENV=development`, `HOST=0.0.0.0`,
@@ -111,9 +132,13 @@ Isi `/etc/zoomin/zoomin.env` (selain di atas). `EnvironmentFile` menimpa `Enviro
 | `LIVEKIT_URL` | `ws://127.0.0.1:7880` (server-ke-server, tanpa lewat Caddy) |
 | `PUBLIC_LIVEKIT_URL` | `wss://<LK_DOMAIN>` |
 | `PUBLIC_APP_URL` | `https://<APP_DOMAIN>` |
-| `SESSION_SECRET` | `openssl rand -base64 48` (≥ 32 char) |
-| `ADMIN_PASSWORD` | password kuat |
-| `TRUST_PROXY` | diset unit: `true` (hapus baris dari env file; wajib di belakang Caddy, tanpa ini semua user berbagi IP proxy dan rate limit login mengunci semua orang) |
+| `BETTER_AUTH_SECRET` | `openssl rand -base64 48` (≥ 32 char; diisi langkah di atas) |
+| `BETTER_AUTH_URL` | kosong (ikut `PUBLIC_APP_URL`), atau `https://<APP_DOMAIN>` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | dari OAuth client Google (§OAuth client Google) |
+| `SUPER_ADMIN_EMAILS` | email Google pengelola, dipisah koma (satu-satunya cara menjadi super_admin) |
+| `ZOOMIN_TEST_AUTH` | kosong (diabaikan di production; jangan diisi) |
+| `WEB_DIST_DIR` | kosong (default `dist/web` di folder rilis) |
+| `TRUST_PROXY` | diset unit: `true` (hapus baris dari env file; wajib di belakang Caddy, tanpa ini semua user berbagi IP proxy dan rate limit login/undangan mengunci semua orang) |
 | `TLS_CERT_PATH`/`TLS_KEY_PATH` | kosong (TLS di Caddy) |
 
 ### LiveKit config + unit
@@ -170,6 +195,23 @@ sudo systemctl enable zoomin && sudo systemctl restart zoomin
 journalctl -u zoomin -n 20   # "zoomin: http://127.0.0.1:3000/ (... env production)"
 sudo systemctl reload caddy
 ```
+
+Setelah start pertama, login dengan akun di `SUPER_ADMIN_EMAILS` lalu angkat admin dari `/dev`. Jalan darurat akun
+di server (langsung ke DB; `--db` perlu karena `DB_PATH` diset di unit, bukan di env file):
+
+```bash
+cd /opt/zoomin/current
+sudo -u zoomin bun src/server/main.ts user list --env-file /etc/zoomin/zoomin.env --db /var/lib/zoomin/zoomin.sqlite
+sudo -u zoomin bun src/server/main.ts user promote <email> --role admin --env-file /etc/zoomin/zoomin.env --db /var/lib/zoomin/zoomin.sqlite
+sudo -u zoomin bun src/server/main.ts user unban <email> --env-file /etc/zoomin/zoomin.env --db /var/lib/zoomin/zoomin.sqlite
+# binary: sudo -u zoomin /opt/zoomin/current/zoomin user list --env-file /etc/zoomin/zoomin.env --db /var/lib/zoomin/zoomin.sqlite
+```
+
+**Upgrade dari 0.1.0 (login password → Google):** hapus `ADMIN_PASSWORD` dan `SESSION_SECRET` dari
+`/etc/zoomin/zoomin.env`, isi variabel login di tabel atas, dan siapkan OAuth client Google sebelum restart (tanpa
+`BETTER_AUTH_SECRET`/`GOOGLE_CLIENT_*` server gagal start). Migrasi 0002 menghapus akun lama: semua sesi dan link
+undangan lama tidak berlaku, room + layout tetap ada tapi anggotanya perlu diundang ulang. Backup DB dulu (langkah di
+atas) agar rollback ke 0.1.0 tetap mungkin.
 
 Migrasi SQL jalan otomatis saat start (idempotent). SPA disajikan dari `dist/web` hasil `bun run build`
 (`scripts/build.web.ts`: code splitting, minify, Tailwind, nama file ber-hash). Sourcemap `*.map` dibuat external

@@ -23,8 +23,11 @@
 | R17 ✅ | `POST /api/auth/admin-login` tanpa rate limit | Brute force password admin global | **Beres:** 5 gagal / 15 menit per IP (`ADMIN_LOGIN_MAX_FAILURES`), accept undangan 200 / jam per IP, `429` + `Retry-After`. IP dari `X-Forwarded-For` hanya bila `TRUST_PROXY=true`. Limiter in-memory: reset saat restart, tidak dibagi antar proses (cukup untuk satu instance). | wkr-m4-infra | `src/server/auth.ratelimit.ts` |
 | R18 | Link undangan HMAC tidak bisa dicabut (multi-pakai sampai kedaluwarsa, maks 720 jam) | Link bocor tetap berlaku | TTL pendek untuk role admin/participant. Bila perlu pencabutan: tabel `invites` (nonce + revoked) | Orkestrator | `src/server/auth.invite.ts` |
 | R19 | Urutan cek 401 → 404 → 403 membocorkan keberadaan room ke user yang sudah login | Rendah: enumerasi id room | Terima untuk MVP. Bila perlu, samakan 404 dan 403 untuk non-member | Orkestrator | `*.route.ts` |
-
 | R20 | Uji otomatis memakai kamera/mic/layar palsu Chromium. Picker asli, izin OS (macOS Screen Recording), Firefox/Safari, dan jaringan seluler belum diuji. | Bug yang hanya muncul di perangkat nyata lolos ke 0.1.0 | Checklist `../spike/06-browser-manual.md` + kriteria jaringan M4 dijalankan user setelah deploy. Ringkasan di `../qa/00-status-rilis.md`. | User | `../qa/02-ux-recheck.md` §Metode |
+| R21 | Login hanya lewat Google (A1): Google down, OAuth client dihapus/disuspend, atau secret bocor/terputar membuat tidak ada yang bisa login | Seluruh app tak bisa dimasuki (sesi aktif tetap jalan sampai kedaluwarsa) | Sesi dibaca dari DB, tetap berlaku walau Google down. Jalan darurat CLI `zoomin user` (A11) untuk peran/ban. Secret di env produksi saja. Bila perlu login cadangan: tambah provider kedua (Better Auth) atas keputusan user. | User | `05` A1, A11 |
+| R22 | Consent screen Google berstatus "Testing": hanya akun test user (maks 100) yang bisa login; lainnya ditolak Google | Tamu luar gagal login saat rilis | Langkah "Publish app" di `.env.example` bagian 4, README §Setup login Google, `deploy/README.md` §OAuth client Google. Cek sebelum deploy. | User | `.env.example` |
+| R23 | Jalur login test-only `POST /api/test/login` (A12) aktif di server publik = siapa pun login sebagai email apa pun, termasuk super_admin | Ambil alih penuh | Aktif hanya bila `ZOOMIN_TEST_AUTH=1` DAN `NODE_ENV !== "production"` (`config.ts`); endpoint server-only Better Auth tidak dipasang tanpa flag. Dijaga test: `config.test.ts`, `auth.test.route.test.ts`, dan e2e `prod.spec.ts` (404 di production walau flag diset). Jangan jalankan mode dev di server publik. | Orkestrator | `05` A12 |
+| R24 | `redirect_uri_mismatch` / origin drift: `BETTER_AUTH_URL`, `PUBLIC_APP_URL`, dan URL yang dibuka browser berbeda | Login Google gagal | A14: satu URL cukup, yang kosong mengikuti yang lain. Troubleshooting di README. | User | `05` A14 |
 
 ## Keputusan yang diambil (2026-11-14)
 
@@ -42,6 +45,30 @@ Diambil orkestrator atas wewenang yang diberikan user untuk menyiapkan rilis 0.1
 | D8 | Pre-join **tanpa tombol kembali** untuk tamu tanpa sesi. | Tamu tidak punya lobby untuk dituju; tombol kembali hanya untuk pengguna bersesi (QA-09). | `src/web/prejoin/PreJoin.tsx`. |
 | D9 | **Pilihan speaker di pre-join ditunda.** Di dalam room, menu mic sudah memuat daftar speaker (`audiooutput`). | Pemilihan output (`setSinkId`) tidak didukung merata di semua browser; mic + kamera sudah bisa dipilih di pre-join. | Item P3 di `../qa/00-status-rilis.md`. |
 
+## Keputusan auth & peran (2026-11-14, disetujui user)
+
+Spec lengkap dan kontrak endpoint/skema: `05-auth-roles.md`. Ringkasan untuk jejak keputusan:
+
+| # | Keputusan |
+|---|---|
+| A1 | Better Auth 1.7.x stabil; satu-satunya login Google OAuth. `ADMIN_PASSWORD` + `/api/auth/admin-login` dihapus. |
+| A2 | Sign-up terbuka untuk akun Google mana pun; user baru = `user`, hanya masuk room yang mengundangnya. |
+| A3 | Dua lapis peran: global `user`/`admin`/`super_admin`; room `host`/`participant`/`viewer` (`host` menggantikan `admin`). |
+| A4 | `super_admin` hanya dari env `SUPER_ADMIN_EMAILS`, disinkronkan tiap login; tidak bisa diberikan/dicabut lewat UI/API. |
+| A5 | `admin` diangkat/diturunkan hanya oleh super_admin. Admin tidak bisa mengubah peran atau menyentuh admin/super_admin; tidak ada yang bisa ban/hapus diri sendiri. |
+| A6 | Ban via plugin admin Better Auth (alasan + masa berlaku opsional): sesi dicabut + dikeluarkan dari semua room LiveKit aktif. Hapus = hard delete. |
+| A7 | Buat room: admin & super_admin; pembuat jadi `host`. Admin global tanpa keanggotaan diperlakukan `host`. |
+| A8 | Audit log wajib untuk aksi admin/dev. |
+| A9 | Setting `allowed_email_domains` di DB (`app_settings`), ditegakkan saat login. |
+| A10 | Rute: `/` landing, `/login`, `/app` lobby, `/rooms/:roomId`, `/invite/:invite`, `/settings`, `/admin`, `/dev`, `*` 404. |
+| A11 | Jalan darurat CLI `zoomin user list` / `promote <email> --role admin\|user` / `unban <email>` langsung ke DB. |
+| A12 | Test/e2e tanpa Google: `POST /api/test/login` hanya bila bukan production DAN `ZOOMIN_TEST_AUTH=1`; test membuktikan 404 di production. |
+| A13 | Akun lama (tamu tanpa akun) tidak dimigrasikan; migrasi tetap SQL bernomor idempotent. |
+| A14 | `BETTER_AUTH_URL` default = `PUBLIC_APP_URL` (dan sebaliknya); redirect Google `<BETTER_AUTH_URL>/api/auth/callback/google`. |
+
+Dampak ke keputusan lama: K2 (a) digantikan A1 (lihat di bawah); R17 (rate limit `admin-login`) tidak berlaku lagi
+karena endpoint dihapus, limiter undangan tetap, login dibatasi rate limit Better Auth.
+
 ## Keputusan terbuka untuk user
 
 Urut dari yang paling memblokir.
@@ -49,7 +76,7 @@ Urut dari yang paling memblokir.
 | # | Keputusan | Opsi | Rekomendasi | Memblokir |
 |---|---|---|---|---|
 | **K1** (default D1) | **Model akses internet.** Server ada di IP Tailscale 100.64.0.8. Artefak default ke (b); konfirmasi user masih diperlukan sebelum deploy. | (a) Semua user wajib anggota tailnet, subdomain → IP Tailscale, sertifikat `tailscale cert` atau DNS-01. (b) VPS/IP publik untuk LiveKit + TURN, app boleh tetap di tailnet. (c) Relay/tunnel TCP saja (media lewat TURN/TLS, kualitas turun; dukungan UDP belum diverifikasi). | (a) bila user internal semua. (b) bila ada tamu luar tailnet. | M4, R5 |
-| **K2** ✅ | **Auth pengguna** — **Diputuskan (a):** admin global via `ADMIN_PASSWORD` + link undangan HMAC per room+role, multi-pakai sampai kedaluwarsa (default 72 jam, maks 720 jam), tidak bisa dicabut (R18). | (a) Satu admin (password dari env) + link undangan bertanda tangan per role + nama tamu. (b) Email/password (mis. Better Auth). (c) Identitas Tailscale (header `tailscale serve`), hanya bila K1=a. (d) SSO/OIDC. | (a) untuk MVP internal: tabel minimal dan tanpa email. Naik ke (b)/(d) bila butuh akun permanen. | M1 |
+| **K2** ✅ | **Auth pengguna** — **Diganti 2026-11-14 oleh A1 (Google via Better Auth, lihat §Keputusan auth & peran).** Sebelumnya diputuskan (a): admin global via `ADMIN_PASSWORD` + link undangan HMAC per room+role, multi-pakai sampai kedaluwarsa (default 72 jam, maks 720 jam), tidak bisa dicabut (R18). | (a) Satu admin (password dari env) + link undangan bertanda tangan per role + nama tamu. (b) Email/password (mis. Better Auth). (c) Identitas Tailscale (header `tailscale serve`), hanya bila K1=a. (d) SSO/OIDC. | (a) untuk MVP internal: tabel minimal dan tanpa email. Naik ke (b)/(d) bila butuh akun permanen. | M1 |
 | **K3** | **Domain + TLS** | Subdomain apa (`app.`, `lk.`, `turn.`)? CA: Let's Encrypt (butuh 80/443 publik atau DNS-01) vs `tailscale cert`. | Ikuti K1. TURN butuh domain + sertifikat sendiri (`01` §Deploy 3). | M4 |
 | **K4** | **Router** | React Router (rekomendasi user) vs TanStack Router | React Router declarative. Hanya ~3 rute, jadi type-safe search params tidak dibutuhkan. | M1 (ringan) |
 | **K5** | **Batas peserta & layar** per room | Contoh: maks N peserta, maks M layar per peserta, maks total share per room | Angka awal dari `07` (lokal): ≤ 12 share × 24 penonton masih bersih (loss 0.08%), 16 × 30 rusak. Usulan sementara maks ~8 share aktif per room (0% loss lokal), final setelah load test produksi + uji decode browser. Ditegakkan di backend (token/moderasi) sebagai konstanta bernama. | M2/M4, R3 |

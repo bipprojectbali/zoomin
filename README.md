@@ -1,8 +1,26 @@
 # zoomin
 
 Ruang meeting self-hosted di atas LiveKit. Satu peserta bisa membagikan **beberapa layar sekaligus** (plus kamera
-dan mic), dan admin room mengatur layout panggung (side-by-side, grid, focus; tukar slot, resize) yang sama untuk
-semua penonton. Backend Bun + Elysia + SQLite, frontend React (SPA) yang di-bundle oleh Bun.
+dan mic), dan host room mengatur layout panggung (side-by-side, grid, focus; tukar slot, resize) yang sama untuk
+semua penonton. Login dengan akun Google (Better Auth). Backend Bun + Elysia + SQLite, frontend React (SPA) yang
+di-bundle oleh Bun.
+
+## Akun & peran
+
+- **Login Google** adalah satu-satunya cara masuk (tidak ada login password). Akun Google mana pun boleh mendaftar,
+  kecuali super admin membatasi domain email di `/dev`. Akun yang diblokir tidak bisa masuk.
+- **Profil** (`/settings`): ubah nama tampilan, pakai foto Google, lihat dan cabut sesi login di perangkat lain,
+  hapus akun sendiri. Foto profil tampil di tile avatar dan daftar peserta.
+- **Dua lapis peran.** Peran global (akun): `user` · `admin` · `super_admin`. Peran room: `host` · `participant` ·
+  `viewer` (dari link undangan; `host` dulu bernama `admin`).
+  - `user`: hanya masuk room yang mengundangnya.
+  - `admin`: membuat room (pembuat jadi host), masuk room mana pun sebagai host, dan di `/admin` memblokir/membuka
+    blokir, mencabut sesi, atau menghapus akun `user`, serta menghapus room.
+  - `super_admin`: semua kemampuan admin plus `/dev` (mengangkat/menurunkan admin, kesehatan sistem, audit log,
+    domain email yang diizinkan, ringkasan konfigurasi). **Hanya dari env `SUPER_ADMIN_EMAILS`**, disinkronkan setiap
+    login; tidak bisa diberikan lewat UI. Tidak ada yang bisa memblokir/menghapus dirinya sendiri.
+- **Halaman**: `/` landing publik, `/login`, `/app` lobby, `/rooms/:roomId`, `/invite/:invite`, `/settings`,
+  `/admin` (admin+), `/dev` (super_admin). Aksi admin/dev tercatat di audit log.
 
 ## Prasyarat
 
@@ -21,17 +39,36 @@ RND/spike/.bin/livekit-server --dev                                  # binary bu
 docker run --rm -p 7880:7880 -p 7881:7881 -p 7882:7882/udp livekit/livekit-server:v1.13.11 --dev --bind 0.0.0.0 --node-ip 127.0.0.1
 
 cp .env.example .env          # atau: bun src/server/main.ts env > .env  (binary: zoomin env > .env)
+# isi GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET (§Setup login Google) dan SUPER_ADMIN_EMAILS=<email Google Anda>
 bun run dev                   # http://localhost:3000
 ```
 
-Buka **`http://localhost:3000`** (bukan `http://0.0.0.0:3000`: itu bukan secure context, kamera/layar/salin link
-gagal) dan login admin dengan `ADMIN_PASSWORD` (default dev: `admin`).
+Buka **`http://localhost:3000`** (bukan `http://0.0.0.0:3000` atau IP LAN: itu bukan secure context sehingga
+kamera/layar/salin link gagal, dan origin-nya tidak terdaftar di Google) lalu **Masuk dengan Google**. Email yang ada
+di `SUPER_ADMIN_EMAILS` otomatis menjadi super_admin; angkat admin lain dari `/dev`. Tanpa kredensial Google, app
+tetap jalan tapi tombol login menampilkan "Login Google belum dikonfigurasi".
 
 ## Setup
 
 Di development semua variabel punya default (cocok dengan LiveKit `--dev`). Di `NODE_ENV=production`,
-`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `SESSION_SECRET` (minimal 32 karakter), dan `ADMIN_PASSWORD` wajib diset;
-server gagal start bila ada yang kosong. Penjelasan tiap variabel: `.env.example` (sama dengan output `zoomin env`).
+`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `BETTER_AUTH_SECRET` (minimal 32 karakter), `GOOGLE_CLIENT_ID`, dan
+`GOOGLE_CLIENT_SECRET` wajib diset; server gagal start bila ada yang kosong. Penjelasan tiap variabel: `.env.example`
+(sama dengan output `zoomin env`; tabel: `zoomin --docs env`).
+
+### Setup login Google
+
+Langkah lengkap ada di `.env.example` bagian 4. Ringkasnya, di Google Cloud Console buat OAuth client tipe
+**Web application** dengan:
+
+- Authorized JavaScript origins: `PUBLIC_APP_URL` (lokal `http://localhost:3000`).
+- Authorized redirect URI: `<BETTER_AUTH_URL>/api/auth/callback/google` (`BETTER_AUTH_URL` default = `PUBLIC_APP_URL`;
+  lokal `http://localhost:3000/api/auth/callback/google`).
+- Consent screen berstatus "Testing" hanya menerima akun yang didaftarkan sebagai test user (maks 100); tekan
+  "Publish app" agar akun lain bisa login.
+
+Salin Client ID/secret ke `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, buat `BETTER_AUTH_SECRET` dengan
+`openssl rand -base64 48` (menggantinya membuat semua user ter-logout dan link undangan lama tidak berlaku), dan isi
+`SUPER_ADMIN_EMAILS` (dipisah koma).
 
 Variabel jaringan:
 
@@ -49,9 +86,11 @@ bun run build   # prebuild SPA ke dist/web (wajib sebelum start)
 bun run start   # mode production, menyajikan dist/web
 ```
 
-Buka http://localhost:3000 dan login sebagai admin dengan `ADMIN_PASSWORD` (default dev: `admin`).
+Buka http://localhost:3000 dan masuk dengan Google.
 
-Mode production menolak start bila `dist/web/index.html` belum ada. `bun run build` menghasilkan aset ber-hash yang
+Mode production menolak start bila `dist/web/index.html` belum ada (lokasi bisa diganti env `WEB_DIST_DIR`). Daftar
+file SPA dibaca sekali saat start, jadi **restart server setelah `bun run build`**; tanpa itu halaman kosong karena
+chunk lama 404. Untuk kerja lokal pakai `bun run dev`. `bun run build` menghasilkan aset ber-hash yang
 diperkecil dan dipecah per halaman (`scripts/build.web.ts`); sourcemap dibuat terpisah dan tidak disajikan server.
 
 ### Single binary
@@ -76,6 +115,16 @@ zoomin check               # validasi konfigurasi tanpa start; secret hanya dita
 zoomin migrate             # terapkan migrasi lalu keluar
 zoomin                     # jalankan server (= zoomin serve)
 ```
+
+Jalan darurat akun (langsung ke DB di server, mis. saat tidak ada super_admin yang bisa login):
+
+```bash
+zoomin user list                                  # email, peran, status blokir
+zoomin user promote ana@example.com --role admin  # atau --role user untuk menurunkan; super_admin hanya dari env
+zoomin user unban ana@example.com
+```
+
+Dari source: `bun src/server/main.ts user list` (opsi `--db`/`--env-file` sama dengan perintah lain).
 
 Binary berjalan sebagai `NODE_ENV=production` kecuali `NODE_ENV` diset eksplisit, jadi secret produksi wajib diisi
 (`zoomin check` memberi tahu yang kurang). `.env` di direktori kerja dimuat otomatis. `--env-file` hanya mengisi
@@ -142,13 +191,13 @@ klien. Cookie sesi app tidak diteruskan ke LiveKit, dan token (`access_token`) t
 
 ## Alur pakai
 
-1. Admin membuat room di lobby (id + judul).
-2. Admin membuat link undangan per peran (`admin` / `participant` / `viewer`), masa berlaku default 72 jam, maks 720.
+1. Admin (peran global) membuat room di lobby `/app` (id + judul) dan menjadi host room itu.
+2. Host membuat link undangan per peran (`host` / `participant` / `viewer`), masa berlaku default 72 jam, maks 720.
    Link juga bisa dibuat dari dalam room lewat tombol **Undang**.
-3. Tamu membuka link, melihat judul room + peran, mengisi nama, lalu memeriksa kamera/mic di layar pre-join sebelum
-   masuk.
+3. Tamu membuka link, melihat judul room + peran, masuk dengan Google bila belum, lalu memeriksa kamera/mic di layar
+   pre-join sebelum masuk. Nama dan foto diambil dari profil.
 4. Peserta menyalakan kamera/mic dan menekan "Tambah layar" berulang kali untuk membagikan beberapa layar.
-5. Admin room memilih template, menukar slot (drag-drop), dan me-resize panel. Semua penonton, termasuk yang join
+5. Host memilih template, menukar slot (drag-drop), dan me-resize panel. Semua penonton, termasuk yang join
    belakangan, melihat layout yang sama.
 
 Viewer hanya menonton: tidak ada tombol kamera/mic/layar, dan server menolak publish dari token viewer.
@@ -163,7 +212,11 @@ bun run test:e2e    # browser (Playwright, Chromium dengan kamera/mic/layar pals
 
 Test integrasi (`test/*.integration.test.ts`) dan e2e butuh LiveKit dev server aktif di `ws://127.0.0.1:7880`
 dengan kredensial `devkey`/`secret` (lihat Quick start); `.env` yang menunjuk LiveKit lain membuat test integrasi gagal.
-E2e menyalakan app sendiri di port 3101 dengan DB sementara; pasang browser-nya sekali dengan
+E2e menyalakan dua app sendiri dengan DB sementara: mode dev di port 3101 dan mode produksi di port 3102 (SPA di-build
+ke folder sementara lewat `WEB_DIST_DIR`, bukan `dist/web`). E2e tidak memanggil Google: login memakai endpoint
+test-only `POST /api/test/login` yang hanya aktif bila `ZOOMIN_TEST_AUTH=1` dan bukan production (project `prod`
+membuktikan 404). Server e2e dijalankan dengan `bun --no-env-file` dan semua variabel diset eksplisit di
+`playwright.config.ts`, jadi `.env` developer tidak ikut terbaca. Pasang browser-nya sekali dengan
 `bunx --bun playwright install chromium`. Laporan dan trace ada di `e2e/.artifacts/`, bug yang ditemukan e2e
 dicatat di `e2e/BUGS.md`.
 
@@ -179,6 +232,12 @@ Smoke test setelah deploy: `SMOKE_URL=https://<domain> bun test test/smoke.prod.
 | Toast/banner "Gagal terhubung ke server media" | Browser tidak bisa menjangkau LiveKit | Cek `PUBLIC_LIVEKIT_URL` bisa dibuka dari perangkat klien (`wss://`, bukan `ws://127.0.0.1`), dan port media VPS terbuka |
 | `POST /api/rooms/:id/token` 500, log `syncRoomLayout` gagal | `LIVEKIT_URL` atau key/secret tidak cocok dengan server LiveKit | Samakan `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` dengan server LiveKit, lalu restart app |
 | Error `M_ID` dari `chrome-extension://...` di konsol | Ekstensi browser, bukan app | Abaikan, atau uji di profil/incognito tanpa ekstensi |
+| Google menampilkan `Error 400: redirect_uri_mismatch` | `BETTER_AUTH_URL`/`PUBLIC_APP_URL` berbeda dengan origin yang dibuka browser, atau `<BETTER_AUTH_URL>/api/auth/callback/google` belum didaftarkan di OAuth client | Buka app persis di `PUBLIC_APP_URL` (lokal `http://localhost:3000`), daftarkan origin + redirect URI di Google Cloud Console, restart app |
+| Tombol login: "Login Google belum dikonfigurasi" | `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` kosong (dev) | Isi keduanya di `.env` (§Setup login Google), restart app |
+| Login ditolak: domain email tidak diizinkan | Super admin membatasi domain email di `/dev` → Pengaturan | Masuk dengan akun berdomain yang diizinkan, atau minta super admin menambah domain (super admin sendiri selalu bisa masuk) |
+| "Akun Anda diblokir admin" | Akun diblokir dari `/admin` | Minta admin membuka blokir; darurat di server: `zoomin user unban <email>` |
+| Login Google gagal untuk akun tertentu ("access blocked"/belum terdaftar) | Consent screen masih "Testing" dan akun bukan test user | Tambah akun sebagai test user, atau "Publish app" di OAuth consent screen |
+| Halaman kosong, konsol menampilkan chunk `.js` 404 setelah `bun run build` | Server produksi membaca daftar file SPA sekali saat start; build baru menghapus chunk lama | Restart server setelah tiap build; untuk lokal pakai `bun run dev` |
 | Log LiveKit memperingatkan UDP receive buffer kecil | Batas `net.core.rmem_max` kernel host | Opsional: naikkan `net.core.rmem_max` lewat sysctl di host VPS |
 
 ## Deploy
@@ -189,34 +248,57 @@ server Linux penuh (Caddy + LiveKit + systemd + backup SQLite + rollback). Kedua
 
 ## API
 
-Semua endpoint JSON di bawah `/api`, sesi lewat cookie `zm_session`. Kontrak tipe: `src/shared/api.types.ts`.
-Error dikembalikan sebagai `{ error, code?, path? }`: `code` stabil untuk diterjemahkan UI (mis. `room_not_found`,
-`invite_invalid`, `rate_limited`), `path` untuk error validasi (400). Login admin dan penerimaan undangan dibatasi per
-IP; bila lewat batas → `429` + header `Retry-After`.
+Semua endpoint JSON di bawah `/api`, sesi lewat cookie Better Auth (login Google). Kontrak tipe:
+`src/shared/api.types.ts`. Error dikembalikan sebagai `{ error, code?, path? }`: `code` stabil untuk diterjemahkan UI
+(mis. `room_not_found`, `invite_invalid`, `rate_limited`, `banned`, `insufficient_role`, `cannot_modify_self`),
+`path` untuk error validasi (400). Tanpa sesi → 401 `unauthorized`; akun diblokir → 403 `banned`; peran kurang →
+403 `insufficient_role`. Penerimaan undangan dibatasi per IP; bila lewat batas → `429` + header `Retry-After`.
 
-| Method | Path | Body | Respons |
+Better Auth dipasang di `/api/auth/*` (mis. `POST /api/auth/sign-in/social` untuk memulai login Google,
+callback `/api/auth/callback/google`, `POST /api/auth/sign-out`). Endpoint plugin admin Better Auth
+`/api/auth/admin/*` sengaja diblok (404); aksi admin lewat `/api/admin/*` dan `/api/dev/*`.
+
+| Method | Path | Akses / body | Respons |
 |---|---|---|---|
-| GET | `/api/health` | - | `{ ok: true }` |
-| GET | `/api/me` | - | `{ user }` \| 401 |
-| POST | `/api/auth/admin-login` | `{ password }` | `{ user }` + cookie \| 401 \| 429 (5 gagal / 15 menit per IP) |
-| POST | `/api/auth/logout` | - | 204 |
-| GET | `/api/rooms?limit=&cursor=` | - | `{ items, nextCursor }` (limit default 20, maks 100) |
-| POST | `/api/rooms` | `{ id, title }` (admin global) | `RoomSummary`; pembuat jadi admin room |
-| GET | `/api/rooms/:roomId` | - (anggota / admin global) | `RoomSummary` \| 401 \| 403 \| 404 |
-| POST | `/api/rooms/:roomId/invites` | `{ role, ttlHours? }` (admin room / global) | `{ url, expiresAt }` |
-| GET | `/api/invites/preview?invite=` | - (sesi opsional) | `InvitePreview` (judul room, peran, sesi saat ini) \| 400 \| 404 |
-| POST | `/api/invites/accept` | `{ invite, name }` | `{ user, roomId }` + cookie \| 429 (200 / jam per IP) |
-| POST | `/api/rooms/:roomId/token` | - | `{ token, url, role }` (role dari DB, bukan dari body) |
-| GET | `/api/rooms/:roomId/layout` | - | `{ version, layout \| null }` |
-| PUT | `/api/rooms/:roomId/layout` | `{ baseVersion, layout }` (admin room) | `{ version }` \| 409 `{ currentVersion }` |
+| GET | `/api/health` | publik | `{ ok: true }` |
+| GET | `/api/me` | sesi | `{ user }` (`SessionUser`) \| 401 \| 403 `banned` |
+| PATCH | `/api/me` | sesi, `{ name?, image? }` (nama 1-60; `image` URL https atau `null` = foto Google) | `{ user }` |
+| DELETE | `/api/me` | sesi (bukan super_admin) | 204 (hapus akun sendiri) |
+| GET | `/api/me/sessions` | sesi | `{ items }` (sesi login, tanda `current`) |
+| DELETE | `/api/me/sessions` · `/api/me/sessions/:id` | sesi | 204 (cabut semua sesi lain / satu sesi) |
+| GET | `/api/rooms?limit=&cursor=` | sesi | `{ items, nextCursor }` (user: room yang diikuti; admin+: semua; limit default 20, maks 100) |
+| POST | `/api/rooms` | admin+, `{ id, title }` | `RoomSummary`; pembuat jadi host \| 403 `insufficient_role` |
+| GET | `/api/rooms/:roomId` | anggota / admin+ | `RoomSummary` \| 401 \| 403 \| 404 |
+| POST | `/api/rooms/:roomId/invites` | host room / admin+, `{ role, ttlHours? }` | `{ url, expiresAt }` |
+| GET | `/api/invites/preview?invite=` | publik (sesi opsional) | `InvitePreview` (judul room, peran, sesi saat ini) \| 400 \| 404 |
+| POST | `/api/invites/accept` | sesi, `{ invite }` | `{ user, roomId, role }` \| 401 \| 429 (200 / jam per IP) |
+| POST | `/api/rooms/:roomId/token` | anggota / admin+ | `{ token, url, role }` (role dari DB, bukan dari body) |
+| GET | `/api/rooms/:roomId/layout` | anggota / admin+ | `{ version, layout \| null }` |
+| PUT | `/api/rooms/:roomId/layout` | host / admin+, `{ baseVersion, layout }` | `{ version }` \| 409 `{ currentVersion }` |
+| GET | `/api/admin/users?q=&role=&banned=&limit=&cursor=` | admin+ | `Page<AdminUser>` |
+| POST | `/api/admin/users/:id/ban` | admin+, `{ reason, expiresInHours? }` | `{ user }` (sesi dicabut + dikeluarkan dari room aktif) |
+| POST | `/api/admin/users/:id/unban` | admin+ | `{ user }` |
+| DELETE | `/api/admin/users/:id` | admin+ | 204 |
+| POST | `/api/admin/users/:id/sessions/revoke` | admin+ | 204 |
+| GET | `/api/admin/rooms?limit=&cursor=` | admin+ | `Page<RoomSummary & { members, active, participants }>` |
+| DELETE | `/api/admin/rooms/:id` | admin+ | 204 (hapus room di DB + LiveKit) |
+| PUT | `/api/dev/users/:id/role` | super_admin, `{ role: "user" \| "admin" }` | `{ user }` |
+| GET | `/api/dev/health` | super_admin | `SystemHealth` (versi, LiveKit, DB) |
+| GET | `/api/dev/audit?action=&actorId=&limit=&cursor=` | super_admin | `Page<AuditEntry>` |
+| GET · PUT | `/api/dev/settings` | super_admin, `{ allowedEmailDomains }` | `AppSettings` |
+| GET | `/api/dev/config` | super_admin | ringkasan config (secret hanya "diset"/"kosong") |
+
+Aksi `/api/admin/*` (admin+) hanya boleh menyasar akun `user`; super_admin juga boleh menyasar admin. Tidak ada yang
+bisa menyasar dirinya sendiri (403 `cannot_modify_self`) atau super_admin. Semua aksi admin/dev dicatat di audit log.
 
 ## Struktur folder
 
 ```
-src/cli/      CLI binary (serve, migrate, check, env, docs)
-src/server/   API Elysia, auth (sesi + undangan), room, token LiveKit, layout (CAS SQLite + room metadata)
+src/cli/      CLI binary (serve, migrate, check, user, env, docs)
+src/server/   API Elysia, auth (Better Auth + Google, peran, undangan), admin/dev, room, token LiveKit, layout
 src/shared/   kontrak API, model layout, konvensi nama track (screen-<n>)
-src/web/      SPA React: pages/, lobby/, prejoin/, room/ (media + multi layar), stage/ (layout + edit admin)
+src/web/      SPA React: pages/, landing/, app/, lobby/, prejoin/, room/ (media + multi layar), stage/ (layout + edit
+              host), settings/ (profil), admin/, dev/
 scripts/      build SPA produksi + single binary
 migrations/   migrasi SQLite
 test/         test integrasi dengan LiveKit dev + smoke test produksi
@@ -229,6 +311,8 @@ RND/          rencana (plan/), spike, dan QA (qa/)
 
 - Share layar hanya di browser desktop. Audio layar hanya di Chromium.
 - Link undangan multi-pakai sampai kedaluwarsa dan **tidak bisa dicabut**.
+- Login hanya lewat Google: bila Google/OAuth client bermasalah tidak ada yang bisa masuk (sesi yang sudah ada tetap
+  berlaku). Jalan darurat peran/blokir: `zoomin user` di server.
 - Uji browser otomatis (Playwright + QA mode produksi) memakai media palsu. Uji perangkat nyata dengan picker layar
   dan izin OS, serta jaringan seluler/UDP diblokir, belum dilakukan; checklist manual ada di
   `RND/spike/06-browser-manual.md`. Status rilis: [`RND/qa/00-status-rilis.md`](RND/qa/00-status-rilis.md).

@@ -6,9 +6,11 @@ konvensi khusus proyek. Detail pakai/deploy: `README.md`, `deploy/README.md`.
 ## Proyek
 
 Ruang meeting self-hosted di atas LiveKit. Pembeda: satu peserta bisa membagikan **beberapa layar sekaligus**, dan
-admin room mengatur layout panggung (template, drag-drop, resize, fokus) yang sama untuk semua penonton. Fitur lain:
-room, undangan per peran (`admin`/`participant`/`viewer`), pre-join, daftar peserta, toast, banner koneksi, rate limit
-login/undangan, build produksi, single binary + CLI, proxy signaling opsional `/livekit`.
+host room mengatur layout panggung (template, drag-drop, resize, fokus) yang sama untuk semua penonton. Fitur lain:
+login Google (Better Auth) + profil, peran global `user`/`admin`/`super_admin`, panel `/admin` dan `/dev` (audit log,
+domain email, health), landing publik `/` (lobby di `/app`), room, undangan per peran room
+(`host`/`participant`/`viewer`), pre-join, daftar peserta, toast, banner koneksi, rate limit, build produksi, single
+binary + CLI (`zoomin user` darurat), proxy signaling opsional `/livekit`. Spec auth: `RND/plan/05-auth-roles.md`.
 
 Status: app terbukti jalan lewat Cloudflare Tunnel + LiveKit 1.13.11 di VPS (stack Portainer
 `deploy/livekit-compose.yml`). Versi rilis = `version` di `package.json` + `CHANGELOG.md`.
@@ -16,7 +18,8 @@ Status: app terbukti jalan lewat Cloudflare Tunnel + LiveKit 1.13.11 di VPS (sta
 ## Stack
 
 - Runtime **Bun 1.4.2** (wajib Bun/TypeScript, bukan Node), TypeScript `^7.0.2`, ESM.
-- Server: Elysia `^1.4.32`, SQLite `bun:sqlite`, `livekit-server-sdk` `^2.19.3`.
+- Server: Elysia `^1.4.32`, SQLite `bun:sqlite`, `livekit-server-sdk` `^2.19.3`, **`better-auth` `^1.7.23`**
+  (Google OAuth + plugin admin, DB = `bun:sqlite` yang sama; skema dari migrasi SQL, bukan CLI Better Auth).
 - Web: React `^19.3.1` SPA di-bundle Bun (HTML import), `react-router` `^8.5.1`, `livekit-client` `^2.24.0`,
   `@livekit/components-react`, Tailwind `^4.3.5` (`bun-plugin-tailwind`), radix-ui/shadcn (`src/web/components/ui`),
   `@dnd-kit/react` **0.5.3 dipin exact** (R11), `react-resizable-panels`, `sonner`.
@@ -26,12 +29,14 @@ Status: app terbukti jalan lewat Cloudflare Tunnel + LiveKit 1.13.11 di VPS (sta
 ## Peta folder
 
 ```
-src/server/   API Elysia: auth (sesi, undangan, rate limit), rooms, token, layout, livekit.proxy, config, db
+src/server/   API Elysia: auth.better (Better Auth), auth.guard (sesi → peran), auth.me/invite/test route, admin.*, dev.*,
+              audit.*, settings.*, rooms, token, layout, livekit.proxy, static.serve, config, db
 src/shared/   kontrak API (api.types.ts), model layout, room id, konvensi nama track (screen-<n>)
-src/web/      SPA: pages/, lobby/, prejoin/, room/, stage/ (layout), components/ui/
+src/web/      SPA: pages/, landing/, app/ (header, guard), lobby/, prejoin/, room/, stage/ (layout), settings/,
+              admin/, dev/, components/ui/; auth.client.ts (klien Better Auth)
 src/cli/      CLI single binary (args, help, docs, check, run); entrypoint tetap src/server/main.ts
 scripts/      build.web.ts (SPA → dist/web), build.binary.ts (→ bin/)
-migrations/   SQL bernomor (0001_init.sql, ...)
+migrations/   SQL bernomor: 0001_init, 0002_auth (tabel Better Auth + peran room host), 0003_admin (audit_log, app_settings)
 test/         integrasi dengan LiveKit dev + smoke produksi
 e2e/          Playwright (temuan bug di e2e/BUGS.md)
 deploy/       artefak produksi (systemd/Caddy, stack Portainer LiveKit)
@@ -49,7 +54,7 @@ bun install
 bun run dev              # hot reload, http://localhost:3000 (bukan 0.0.0.0)
 bun test                 # unit + integrasi (integrasi butuh LiveKit dev)
 bun run typecheck        # tsc --noEmit
-bun run test:e2e         # Playwright; sekali: bunx --bun playwright install chromium
+bun run test:e2e         # Playwright (server dev :3101 + prod :3102); sekali: bunx --bun playwright install chromium
 bun run build            # SPA produksi → dist/web (wajib sebelum bun run start)
 bun run start            # NODE_ENV=production
 bun run build:binary     # bin/zoomin-<os>-<arch>; build:binary:all untuk semua target
@@ -63,9 +68,25 @@ LiveKit dev lokal: `RND/spike/.bin/livekit-server --dev` (atau Docker `livekit/l
 
 - **Fitur baru wajib test `bun test`** di pekerjaan yang sama; UI → tambah e2e di `e2e/`. Jalankan sebelum lapor.
 - **Test integrasi & e2e wajib memakai LiveKit dev lokal** (`devkey`/`secret`), bukan LiveKit VPS/produksi.
+- **E2e terisolasi dari `.env`**: server e2e jalan dengan `bun --no-env-file` dan semua variabel config diset
+  eksplisit di `playwright.config.ts` (`BASE_ENV`); env baru → tambahkan juga di sana. Login e2e lewat helper
+  `e2e/fixtures.ts` (test login), build prod e2e ke folder sementara (`WEB_DIST_DIR`), bukan `dist/web`.
 - **Jangan beri `roomAdmin`** di token browser (`src/server/token.service.ts`): pemegangnya bisa menulis metadata
   room tanpa validasi (R6). Perubahan layout lewat `PUT /api/rooms/:roomId/layout` (CAS versi).
-- **Role & identity dari DB/sesi**, tidak pernah dari body request (R7). `identity = user.id`.
+- **Role & identity dari sesi Better Auth**, tidak pernah dari body request (R7). `identity = user.id`. Route membaca
+  sesi lewat `src/server/auth.guard.ts` (macro Elysia `{ auth: "user" | "admin" | "super_admin" }`, atau
+  `getSessionState`/`requireRole`): 401 tanpa sesi, 403 `banned`, 403 `insufficient_role`. Peran room dari
+  `room_members`; admin/super_admin global tanpa keanggotaan diperlakukan `host`.
+- **Aturan peran (A4/A5, `RND/plan/05-auth-roles.md`)**: `super_admin` HANYA dari env `SUPER_ADMIN_EMAILS`
+  (disinkronkan tiap login di `auth.better.ts`), tidak pernah bisa diset lewat UI/API/CLI. `admin` diangkat/diturunkan
+  hanya oleh super_admin (`PUT /api/dev/users/:id/role`). Admin hanya mengelola akun `user`; super_admin mengelola
+  `user` + `admin`; tidak ada yang menyasar diri sendiri atau super_admin (`admin.service.ts`).
+- **Jangan buka plugin admin Better Auth lewat HTTP**: `/api/auth/admin/*` diblok di `api.ts` karena tidak menegakkan
+  A5. Aksi admin lewat `/api/admin/*` / `/api/dev/*` yang memanggil `auth.api.*` dari server.
+- **Audit wajib** untuk setiap aksi admin/dev (ban, unban, hapus, ubah peran, revoke sesi, buat/hapus room, ubah
+  setting) lewat `recordAudit` (`audit.repository.ts`); aksi admin baru tanpa entri audit = bug.
+- **Login test-only** `POST /api/test/login` (A12): hanya aktif bila `ZOOMIN_TEST_AUTH=1` DAN bukan production;
+  e2e/test tidak pernah memanggil Google. Test `prod` membuktikan 404 di production; jangan longgarkan guard ini.
 - **Error API wajib punya `code`** stabil: pakai `apiError(code, error, path?)` di `src/server/api.error.ts`;
   tambah kode baru di `ApiErrorCode` (`src/shared/api.types.ts`) dan terjemahannya di `src/web/error.message.ts`.
 - **Label UI Bahasa Indonesia terpusat** di `*.labels.ts` (`room.labels.ts`, `prejoin.labels.ts`, `stage.labels.ts`,
@@ -74,10 +95,12 @@ LiveKit dev lokal: `RND/spike/.bin/livekit-server --dev` (atau Docker `livekit/l
   lewat kelas CSS.
 - **Batas file** (aturan global Rule 8): route 150, service 300, repository 250, types 300, test 400 baris; hard
   limit 500 baris / 20.000 karakter. Pecah, jangan menambah ke file yang sudah lewat batas.
-- **Migrasi**: file SQL bernomor baru di `migrations/` (`0002_<nama>.sql`), lalu tambahkan import + entri di
+- **Migrasi**: file SQL bernomor baru di `migrations/` (berikutnya `0004_<nama>.sql`), lalu tambahkan import + entri di
   `MIGRATIONS` (`src/server/db.ts`); `db.test.ts` gagal bila daftar tak sinkron. Migrasi hanya maju, idempotent.
 - **Secret**: jangan membaca, mencetak, atau commit `.env` (hanya `.env.example`). `zoomin check` menampilkan
-  secret sebagai "diset"/"kosong". Variabel baru → tambahkan ke `.env.example` + `src/server/config.ts`.
+  secret sebagai "diset"/"kosong". Variabel baru → tambahkan ke `.env.example` + `src/server/config.ts`
+  (`src/cli/cli.docs.test.ts` gagal bila tak sinkron). Tabel Better Auth (`user`, `session`, `account`) berisi email
+  dan token: jangan log isinya (pakai user id).
 - **Hardcoded value**: URL/host/kredensial lewat env (`config.ts`); default dev ditandai `// test-only`.
 
 ## Dokumen RND
