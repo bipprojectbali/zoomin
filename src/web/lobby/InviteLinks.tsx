@@ -8,7 +8,7 @@ import { copyText } from "@/clipboard.copy";
 import { errorMessage } from "@/error.message";
 import { cn } from "@/lib/utils";
 import { ROLE_LABEL, ROLES } from "@/role.label";
-import type { Role } from "../../shared/api.types";
+import type { RoomRole } from "../../shared/api.types";
 import { loadInvites, saveInvites, type StoredInvites } from "./invite.storage";
 import { formatDateTime } from "./lobby.format";
 
@@ -22,17 +22,17 @@ const TEXT = {
   copyFailed: "Gagal menyalin link. Pilih teks link lalu salin manual.",
   linkLabel: (role: string) => `Link ${role}`,
   expires: (when: string) => `berlaku sampai ${when}`,
-  adminWarning: "Siapa pun yang punya link ini menjadi admin room: bisa mengatur layout dan membuat undangan. Bagikan hanya ke orang tepercaya.",
+  hostWarning: "Siapa pun yang punya link ini menjadi host room: bisa mengatur layout dan membuat undangan. Bagikan hanya ke orang tepercaya.",
   roleHint: {
     participant: "Bisa bicara, menyalakan kamera, dan berbagi layar.",
     viewer: "Hanya menonton dan mendengar.",
-    admin: "Akses penuh ke room.",
-  } satisfies Record<Role, string>,
+    host: "Mengatur layout dan mengundang orang.",
+  } satisfies Record<RoomRole, string>,
 };
 
 /** Pilih peran → buat link undangan → salin. Link tersimpan di sessionStorage sampai tab ditutup. */
 export function InviteLinks({ roomId }: { roomId: string }) {
-  const [role, setRole] = useState<Role>("participant");
+  const [role, setRole] = useState<RoomRole>("participant");
   const [links, setLinks] = useState<StoredInvites>(() => loadInvites(roomId));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,10 +87,10 @@ export function InviteLinks({ roomId }: { roomId: string }) {
           {pending ? TEXT.creating : TEXT.create(ROLE_LABEL[role])}
         </Button>
       </div>
-      {role === "admin" ? (
+      {role === "host" ? (
         <p className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200" role="note">
           <TriangleAlert className="mt-px size-4 shrink-0" aria-hidden="true" />
-          {TEXT.adminWarning}
+          {TEXT.hostWarning}
         </p>
       ) : (
         <p className="text-xs text-muted-foreground">{TEXT.roleHint[role]}</p>

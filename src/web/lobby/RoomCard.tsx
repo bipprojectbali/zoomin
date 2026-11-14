@@ -31,7 +31,7 @@ export function RoomCard({ room, canInvite }: { room: RoomSummary; canInvite: bo
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate font-medium">{room.title}</h3>
-            <Badge variant={room.role === "admin" ? "default" : "secondary"}>
+            <Badge variant={room.role === "host" ? "default" : "secondary"}>
               {room.role ? ROLE_LABEL[room.role] : TEXT.notMember}
             </Badge>
           </div>

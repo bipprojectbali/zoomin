@@ -1,15 +1,21 @@
-import { LinkIcon, Loader2 } from "lucide-react";
+import { Clock, LinkIcon, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { AppBrand } from "@/app.brand";
+import { startGoogleLogin } from "@/app/google.login";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { acceptInvite, ApiRequestError, logout, previewInvite } from "@/api.client";
+import { acceptInvite, ApiRequestError, previewInvite } from "@/api.client";
 import { errorMessage } from "@/error.message";
 import { saveMediaPreferences, stashFirstJoinChoices } from "@/prejoin/media.preferences";
 import { PreJoin } from "@/prejoin/PreJoin";
 import { inviteSubtitle, roleKeptNote } from "@/prejoin/prejoin.labels";
 import type { PreJoinChoices } from "@/prejoin/prejoin.types";
+import { GoogleMark } from "@/landing/GoogleMark";
+import { ROLE_LABEL } from "@/role.label";
 import { canPublishFor } from "@/room/room.connection";
+import { useSession } from "@/session.context";
 import type { InvitePreview } from "../../shared/api.types";
 
 const TEXT = {
@@ -20,7 +26,14 @@ const TEXT = {
   retry: "Coba lagi",
   home: "Ke lobby",
   notYou: "Bukan Anda?",
-  logout: "Keluar akun",
+  logout: "Ganti akun",
+  invitedTo: "Anda diundang ke room",
+  asRole: "Peran",
+  expires: (at: number) => `Berlaku sampai ${new Date(at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}`,
+  signInHelp: "Masuk dengan akun Google Anda untuk bergabung. Setelah masuk, Anda kembali ke halaman ini.",
+  signIn: "Masuk dengan Google untuk bergabung",
+  redirecting: "Mengalihkan ke Google…",
+  signedInAs: (name: string, email: string) => `Masuk sebagai ${name} (${email})`,
 };
 
 /** Kode error yang berarti undangan memang tidak bisa dipakai (bukan gangguan sementara). */
@@ -35,6 +48,7 @@ type State =
 export function InvitePage() {
   const { invite = "" } = useParams();
   const navigate = useNavigate();
+  const { signOut } = useSession();
   const [state, setState] = useState<State>({ kind: "loading" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,11 +71,11 @@ export function InvitePage() {
     void load();
   }, [load]);
 
-  async function onJoin(choices: PreJoinChoices, name?: string) {
+  async function onJoin(choices: PreJoinChoices) {
     setBusy(true);
     setError(null);
     try {
-      const { roomId } = await acceptInvite(name === undefined ? { invite } : { invite, name });
+      const { roomId } = await acceptInvite({ invite });
       saveMediaPreferences(choices);
       stashFirstJoinChoices(roomId, choices);
       navigate(`/rooms/${encodeURIComponent(roomId)}`, { replace: true });
@@ -72,9 +86,20 @@ export function InvitePage() {
     }
   }
 
+  async function onSignIn() {
+    setBusy(true);
+    setError(null);
+    try {
+      await startGoogleLogin(`/invite/${encodeURIComponent(invite)}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
   async function onLogout() {
     try {
-      await logout();
+      await signOut();
       await load();
     } catch (err) {
       console.error("invite: logout gagal", err);
@@ -113,7 +138,7 @@ export function InvitePage() {
                 </Button>
               )}
               <Button asChild variant="outline">
-                <Link to="/">{TEXT.home}</Link>
+                <Link to="/app">{TEXT.home}</Link>
               </Button>
             </div>
           </CardContent>
@@ -123,29 +148,68 @@ export function InvitePage() {
   }
 
   const { preview } = state;
-  const note = preview.currentUser ? roleKeptNote(preview) : null;
+  const me = preview.currentUser;
+  if (!me) {
+    return (
+      <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/40 p-4">
+        <AppBrand />
+        <section className="w-full max-w-sm rounded-2xl border bg-card p-6 shadow-sm sm:p-8" data-testid="invite-signin">
+          <p className="text-sm text-muted-foreground">{TEXT.invitedTo}</p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight break-words">{preview.roomTitle}</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted-foreground">{TEXT.asRole}</span>
+            <Badge variant="secondary" data-testid="invite-role">
+              {ROLE_LABEL[preview.effectiveRole]}
+            </Badge>
+          </div>
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="size-3.5" aria-hidden="true" />
+            {TEXT.expires(preview.expiresAt)}
+          </p>
+          <p className="mt-5 text-sm text-muted-foreground">{TEXT.signInHelp}</p>
+          {error && (
+            <p className="mt-3 text-sm text-destructive" role="alert" data-testid="invite-signin-error">
+              {error}
+            </p>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="mt-4 h-11 w-full gap-3"
+            disabled={busy}
+            onClick={() => void onSignIn()}
+            data-testid="invite-google"
+          >
+            {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <GoogleMark />}
+            {busy ? TEXT.redirecting : TEXT.signIn}
+          </Button>
+        </section>
+      </main>
+    );
+  }
+
+  const note = roleKeptNote(preview);
   return (
     <PreJoin
       title={preview.roomTitle}
       subtitle={inviteSubtitle(preview)}
       canPublish={canPublishFor(preview.effectiveRole)}
-      askName={!preview.currentUser}
-      backTo={preview.currentUser ? "/" : null}
+      backTo="/app"
       busy={busy}
       error={error}
-      onJoin={(choices, name) => void onJoin(choices, name)}
+      onJoin={(choices) => void onJoin(choices)}
       footer={
-        preview.currentUser && (
-          <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-            {note && <p>{note}</p>}
-            <p>
-              {TEXT.notYou}{" "}
-              <Button type="button" variant="link" className="h-auto p-0" disabled={busy} onClick={() => void onLogout()}>
-                {TEXT.logout}
-              </Button>
-            </p>
-          </div>
-        )
+        <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+          {note && <p>{note}</p>}
+          <p data-testid="invite-signed-in-as">{TEXT.signedInAs(me.name, me.email)}</p>
+          <p>
+            {TEXT.notYou}{" "}
+            <Button type="button" variant="link" className="h-auto p-0" disabled={busy} onClick={() => void onLogout()}>
+              {TEXT.logout}
+            </Button>
+          </p>
+        </div>
       }
     />
   );

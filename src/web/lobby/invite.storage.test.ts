@@ -21,7 +21,7 @@ test("simpan & baca ulang, link kedaluwarsa dibuang", () => {
   stubStorage();
   saveInvites("r1", {
     participant: { url: "http://x/invite/a", expiresAt: 2000 },
-    admin: { url: "http://x/invite/b", expiresAt: 500 },
+    host: { url: "http://x/invite/b", expiresAt: 500 },
   });
   expect(loadInvites("r1", 1000)).toEqual({ participant: { url: "http://x/invite/a", expiresAt: 2000 } });
   expect(loadInvites("r2", 1000)).toEqual({});

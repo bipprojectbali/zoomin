@@ -1,7 +1,7 @@
-import type { CreateInviteResponse, Role } from "../../shared/api.types";
+import type { CreateInviteResponse, RoomRole } from "../../shared/api.types";
 
-/** Link undangan terakhir per role untuk satu room. */
-export type StoredInvites = Partial<Record<Role, CreateInviteResponse>>;
+/** Link undangan terakhir per peran untuk satu room. */
+export type StoredInvites = Partial<Record<RoomRole, CreateInviteResponse>>;
 
 const key = (roomId: string) => `zm.invites.${roomId}`;
 

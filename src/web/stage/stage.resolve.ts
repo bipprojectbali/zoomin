@@ -22,13 +22,13 @@ export type ResolvedSlot<T> = { index: number; slot: LayoutSlot; track: T | null
 export type ExtraItem<T> = { ref: TrackRef; track: T | null };
 
 /**
- * Tile avatar (QA-01): peserta yang bisa publish (admin/participant dari metadata `{"role":…}`) tanpa publikasi kamera
+ * Tile avatar (QA-01): peserta yang bisa publish (host/participant dari metadata `{"role":…}`) tanpa publikasi kamera
  * dapat ref kamera `{identity, "camera"}` agar tetap punya tile. Penonton tidak.
  */
 export function avatarRefs(people: { identity: string; metadata?: string }[], tracks: TrackLike[]): TrackRef[] {
   const withCamera = new Set(tracks.filter((t) => t.source === CAMERA_SOURCE).map((t) => t.participant.identity));
   return people
-    .filter((p) => !withCamera.has(p.identity) && ["admin", "participant"].includes(roleFromMetadata(p.metadata) ?? ""))
+    .filter((p) => !withCamera.has(p.identity) && ["host", "participant"].includes(roleFromMetadata(p.metadata) ?? ""))
     .map((p) => ({ identity: p.identity, trackName: CAMERA_TRACK }));
 }
 
@@ -64,7 +64,7 @@ export const focusMainIndex = (slots: { live: boolean }[]): number => (slots[0]?
 export const SIDE_BY_SIDE_MAX = 3;
 
 /**
- * Layout otomatis saat admin belum mengatur (UX-19, QA-01):
+ * Layout otomatis saat host belum mengatur (UX-19, QA-01):
  * - ada layar → slot = layar saja; kamera & avatar tidak masuk slot sehingga tampil di strip kecil "lainnya".
  * - tanpa layar → slot = kamera + avatar.
  * Template: 2 track → berdampingan, selain itu grid (1 track grid = penuh). Urutan stabil (numeric).

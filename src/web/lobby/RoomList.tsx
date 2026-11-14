@@ -1,7 +1,7 @@
 import { Loader2, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { RoomSummary, SessionUser } from "../../shared/api.types";
+import type { RoomSummary } from "../../shared/api.types";
 import { RoomCard } from "./RoomCard";
 
 const TEXT = {
@@ -11,13 +11,15 @@ const TEXT = {
   loadingMore: "Memuat…",
   emptyTitle: "Belum ada room",
   emptyAdmin: "Buat room pertama lewat form di atas, lalu bagikan link undangan.",
-  emptyGuest: "Anda belum tergabung di room mana pun. Minta link undangan ke admin room.",
+  emptyUserTitle: "Belum ada undangan",
+  emptyUser: "Anda belum diundang ke room mana pun. Minta link undangan ke host/admin.",
 };
 
 const SKELETON_COUNT = 3;
 
 type Props = {
-  user: SessionUser;
+  /** Admin global: boleh buat room & mengundang ke semua room. */
+  canCreate: boolean;
   rooms: RoomSummary[];
   loading: boolean;
   hasMore: boolean;
@@ -25,7 +27,7 @@ type Props = {
 };
 
 /** Daftar room lobby: skeleton saat load awal, state kosong, kartu room, tombol Muat lagi. */
-export function RoomList({ user, rooms, loading, hasMore, onLoadMore }: Props) {
+export function RoomList({ canCreate, rooms, loading, hasMore, onLoadMore }: Props) {
   const initialLoading = loading && rooms.length === 0;
   return (
     <section className="flex flex-col gap-3" aria-labelledby="room-list-heading" aria-busy={loading}>
@@ -46,18 +48,18 @@ export function RoomList({ user, rooms, loading, hasMore, onLoadMore }: Props) {
         </div>
       )}
       {!loading && rooms.length === 0 && (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed p-8 text-center">
+        <div data-testid="rooms-empty" className="flex flex-col items-center gap-2 rounded-xl border border-dashed p-8 text-center">
           <span className="flex size-10 items-center justify-center rounded-full bg-muted" aria-hidden="true">
             <Video className="size-5 text-muted-foreground" />
           </span>
-          <p className="font-medium">{TEXT.emptyTitle}</p>
-          <p className="max-w-sm text-sm text-muted-foreground">{user.isAdmin ? TEXT.emptyAdmin : TEXT.emptyGuest}</p>
+          <p className="font-medium">{canCreate ? TEXT.emptyTitle : TEXT.emptyUserTitle}</p>
+          <p className="max-w-sm text-sm text-muted-foreground">{canCreate ? TEXT.emptyAdmin : TEXT.emptyUser}</p>
         </div>
       )}
       {rooms.length > 0 && (
         <ul className="flex flex-col gap-3">
           {rooms.map((room) => (
-            <RoomCard key={room.id} room={room} canInvite={user.isAdmin || room.role === "admin"} />
+            <RoomCard key={room.id} room={room} canInvite={canCreate || room.role === "host"} />
           ))}
         </ul>
       )}

@@ -1,4 +1,4 @@
-/** Tombol "Undang" + dialog link undangan per peran, tanpa keluar dari room (UX-13). Hanya untuk admin room. */
+/** Tombol "Undang" + dialog link undangan per peran, tanpa keluar dari room (UX-13). Hanya untuk host room. */
 import { UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";

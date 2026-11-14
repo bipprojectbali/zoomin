@@ -19,9 +19,10 @@ const p = (identity: string, name: string, role: string | null, isLocal = false)
 
 describe("roleFromMetadata", () => {
   test("role valid dibaca, sisanya null", () => {
-    expect(roleFromMetadata('{"role":"admin"}')).toBe("admin");
+    expect(roleFromMetadata('{"role":"host"}')).toBe("host");
     expect(roleFromMetadata('{"role":"viewer"}')).toBe("viewer");
     expect(roleFromMetadata('{"role":"root"}')).toBeNull();
+    expect(roleFromMetadata('{"role":"admin"}')).toBeNull(); // peran room lama, sudah diganti host
     expect(roleFromMetadata("bukan json")).toBeNull();
     expect(roleFromMetadata("null")).toBeNull();
     expect(roleFromMetadata(undefined)).toBeNull();
@@ -39,14 +40,14 @@ describe("displayName & initials", () => {
 });
 
 describe("sortParticipants", () => {
-  test("Anda dulu, lalu admin, peserta, penonton, tanpa role; dalam grup urut nama", () => {
+  test("Anda dulu, lalu host, peserta, penonton, tanpa role; dalam grup urut nama", () => {
     const list = [
       p("v", "Vina", "viewer"),
       p("x", "Xeno", null),
       p("b", "Budi", "participant"),
-      p("a2", "Zaki", "admin"),
+      p("a2", "Zaki", "host"),
       p("me", "Saya", "viewer", true),
-      p("a1", "Ani", "admin"),
+      p("a1", "Ani", "host"),
       p("c", "Citra", "participant"),
     ];
     expect(sortParticipants(list).map((x) => x.identity)).toEqual(["me", "a1", "a2", "b", "c", "v", "x"]);

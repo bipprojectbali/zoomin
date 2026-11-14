@@ -1,98 +1,100 @@
-import { Info, Loader2, LogIn } from "lucide-react";
-import { useState, type SubmitEvent } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Link, Navigate, useSearchParams } from "react-router";
 import { AppBrand } from "@/app.brand";
+import { startGoogleLogin } from "@/app/google.login";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { adminLogin } from "@/api.client";
-import { errorMessage } from "@/error.message";
-import { useSession, type LoginRedirectState } from "@/session.context";
+import { authErrorMessage, errorMessage } from "@/error.message";
+import { GoogleMark } from "@/landing/GoogleMark";
+import { DEFAULT_AFTER_LOGIN, safeNextPath } from "@/login.redirect";
+import { SessionLoading, useSession } from "@/session.context";
 
 const TEXT = {
-  title: "Masuk sebagai admin",
-  description: "Khusus admin untuk membuat room dan link undangan.",
-  password: "Password admin",
-  submit: "Masuk",
-  submitting: "Memproses…",
-  guestHelp: "Peserta masuk lewat link undangan dari admin room, tanpa password.",
-  sessionNeeded:
-    "Halaman yang Anda buka butuh sesi aktif. Peserta atau penonton: buka lagi link undangan dari admin room. Admin: masuk di bawah.",
+  title: "Masuk ke zoomin",
+  description: "Gunakan akun Google Anda untuk membuka room dan bergabung lewat undangan.",
+  google: "Lanjutkan dengan Google",
+  redirecting: "Mengalihkan ke Google…",
+  nextHint: "Masuk dulu untuk melanjutkan ke halaman yang Anda buka.",
+  policy:
+    "Dengan masuk, Anda setuju nama, email, dan foto profil Google Anda dipakai untuk identitas di room. Kami tidak meminta akses lain ke akun Google Anda.",
+  backHome: "Kembali ke beranda",
 };
 
-/** Halaman masuk admin: password → sesi cookie → halaman asal / lobby. */
+/** /login: satu tombol Google (ala Google/Linear). `?next=` hanya path internal; `?error=` → pesan Indonesia. */
 export function LoginPage() {
-  const navigate = useNavigate();
-  const { user } = useSession();
-  const state = useLocation().state as LoginRedirectState | null;
-  const [password, setPassword] = useState("");
+  const { user, loading } = useSession();
+  const [params] = useSearchParams();
+  const next = safeNextPath(params.get("next"));
+  const queryError = params.get("error");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const target = state?.from && state.from !== "/login" ? state.from : "/";
+  const [error, setError] = useState<string | null>(queryError ? authErrorMessage(queryError) : null);
 
-  async function onSubmit(e: SubmitEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function onGoogle() {
     setBusy(true);
     setError(null);
     try {
-      await adminLogin({ password });
-      navigate(target, { replace: true });
+      await startGoogleLogin(next);
+      // Sukses = browser sedang pindah ke Google; biarkan busy.
     } catch (err) {
-      console.error("login: admin-login gagal", err);
       setError(errorMessage(err));
       setBusy(false);
     }
   }
 
-  if (user && !busy) return <Navigate to="/" replace />;
+  if (loading && !user) return <SessionLoading />;
+  if (user) return <Navigate to={next} replace />;
 
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/40 p-4">
-      <AppBrand tagline />
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>
-            <h1 className="text-xl">{TEXT.title}</h1>
-          </CardTitle>
-          <CardDescription>{TEXT.description}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {/* Dari root `/` bukan deep link: tidak perlu peringatan (QA-13). */}
-          {state?.reason === "session" && state.from !== "/" && (
-            <p className="flex gap-2 rounded-md border bg-muted p-3 text-sm" role="status">
-              <Info className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden="true" />
-              {TEXT.sessionNeeded}
+    <main className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-muted/40 p-4">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(60%_100%_at_50%_0%,color-mix(in_oklch,var(--brand)_14%,transparent),transparent)]"
+      />
+      <div className="relative flex w-full max-w-sm flex-col items-center gap-6">
+        <Link to="/" aria-label={TEXT.backHome} className="rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+          <AppBrand />
+        </Link>
+        <section
+          aria-labelledby="login-title"
+          className="w-full rounded-2xl border bg-card p-6 text-card-foreground shadow-sm sm:p-8"
+          data-testid="login-card"
+        >
+          <h1 id="login-title" className="text-xl font-semibold tracking-tight">
+            {TEXT.title}
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">{TEXT.description}</p>
+          {next !== DEFAULT_AFTER_LOGIN && !error && (
+            <p className="mt-4 rounded-lg border bg-muted/60 px-3 py-2 text-sm" role="status">
+              {TEXT.nextHint}
             </p>
           )}
-          <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="admin-password">{TEXT.password}</Label>
-              <Input
-                id="admin-password"
-                type="password"
-                autoComplete="current-password"
-                autoFocus
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                aria-invalid={error ? true : undefined}
-                aria-describedby={error ? "login-error" : undefined}
-              />
-            </div>
-            {error && (
-              <p id="login-error" className="text-sm text-destructive" role="alert">
-                {error}
-              </p>
-            )}
-            <Button type="submit" disabled={busy || !password}>
-              {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <LogIn aria-hidden="true" />}
-              {busy ? TEXT.submitting : TEXT.submit}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-      <p className="max-w-sm text-center text-sm text-muted-foreground">{TEXT.guestHelp}</p>
+          {error && (
+            <p
+              id="login-error"
+              className="mt-4 flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+              role="alert"
+              data-testid="login-error"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              {error}
+            </p>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="mt-6 h-11 w-full gap-3 text-[15px]"
+            disabled={busy}
+            aria-describedby={error ? "login-error" : undefined}
+            onClick={() => void onGoogle()}
+            data-testid="login-google"
+          >
+            {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <GoogleMark />}
+            {busy ? TEXT.redirecting : TEXT.google}
+          </Button>
+        </section>
+        <p className="px-2 text-center text-xs leading-relaxed text-muted-foreground">{TEXT.policy}</p>
+      </div>
     </main>
   );
 }

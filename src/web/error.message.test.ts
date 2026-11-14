@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ApiErrorCode } from "../shared/api.types";
 import { ApiRequestError, parseRetryAfter } from "./api.client";
-import { errorMessage, mediaErrorMessage, rateLimitedText } from "./error.message";
+import { authErrorMessage, errorMessage, mediaErrorMessage, rateLimitedText } from "./error.message";
 
 const apiErr = (status: number, code?: ApiErrorCode, path?: string) =>
   new ApiRequestError(status, { error: "raw english text", code, path }, "TEST /api/x");
@@ -18,9 +18,13 @@ describe("errorMessage — API", () => {
       "room_exists",
       "invalid_input",
       "invite_invalid",
-      "invalid_credentials",
       "rate_limited",
       "layout_conflict",
+      "banned",
+      "email_domain_not_allowed",
+      "cannot_modify_self",
+      "insufficient_role",
+      "user_not_found",
     ];
     const msgs = codes.map((c) => errorMessage(apiErr(400, c)));
     for (const m of msgs) expect(m).not.toContain("raw english text");
@@ -28,7 +32,8 @@ describe("errorMessage — API", () => {
   });
 
   test("pesan spesifik dengan saran tindakan", () => {
-    expect(errorMessage(apiErr(401, "invalid_credentials"))).toBe("Password salah. Periksa lalu coba lagi.");
+    expect(errorMessage(apiErr(403, "banned"))).toContain("diblokir");
+    expect(errorMessage(apiErr(403, "insufficient_role"))).toContain("Peran akun");
     expect(errorMessage(apiErr(409, "room_exists"))).toContain("ID room sudah dipakai");
     expect(errorMessage(apiErr(400, "invite_invalid"))).toContain("Minta link baru ke admin room");
   });
@@ -109,5 +114,19 @@ describe("mediaErrorMessage", () => {
   });
   test("nama tak dikenal: fallback umum", () => {
     expect(mediaErrorMessage(new Error("boom"), "camera")).toBe("Kamera tidak bisa dipakai. Muat ulang halaman lalu coba lagi.");
+  });
+});
+
+describe("authErrorMessage — ?error= login Better Auth", () => {
+  test("domain & ban (case-insensitive)", () => {
+    expect(authErrorMessage("email_domain_not_allowed")).toContain("Domain email");
+    expect(authErrorMessage("BANNED_USER")).toContain("diblokir");
+    expect(authErrorMessage("banned")).toBe(authErrorMessage("BANNED_USER"));
+  });
+  test("provider Google belum dikonfigurasi", () => {
+    expect(authErrorMessage("PROVIDER_NOT_FOUND")).toBe("Login Google belum dikonfigurasi admin server.");
+  });
+  test("kode tak dikenal tetap pesan Indonesia + kodenya", () => {
+    expect(authErrorMessage("weird_code")).toBe("Login gagal (weird_code). Coba lagi, atau hubungi admin zoomin.");
   });
 });

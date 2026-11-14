@@ -28,7 +28,7 @@ export type ControlBarProps = {
   enabled: boolean;
   /** false untuk viewer: tanpa mic/kamera/layar. */
   canPublish: boolean;
-  /** Admin room: tampilkan Undang. */
+  /** Host room: tampilkan Undang. */
   canInvite: boolean;
   participantCount: number;
   onOpenParticipants: () => void;
@@ -92,7 +92,7 @@ export function ControlBar(p: ControlBarProps) {
   );
 }
 
-/** Keluar merah + konfirmasi ringan. Admin pun hanya "Keluar"; tidak ada "akhiri untuk semua". */
+/** Keluar merah + konfirmasi ringan. Host pun hanya "Keluar"; tidak ada "akhiri untuk semua". */
 function LeaveButton({ onLeave }: { onLeave: () => void }) {
   return (
     <AlertDialog>

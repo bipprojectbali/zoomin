@@ -69,9 +69,9 @@ const meta = (role: string) => JSON.stringify({ role });
 const avatar = (identity: string) => ({ identity, trackName: "camera" });
 
 describe("avatarRefs (QA-01)", () => {
-  test("admin/participant tanpa kamera dapat avatar; penonton, role tak dikenal, dan yang punya kamera tidak", () => {
+  test("host/participant tanpa kamera dapat avatar; penonton, role tak dikenal, dan yang punya kamera tidak", () => {
     const people = [
-      { identity: "adm", metadata: meta("admin") },
+      { identity: "adm", metadata: meta("host") },
       { identity: "p1", metadata: meta("participant") },
       { identity: "cam", metadata: meta("participant") },
       { identity: "v", metadata: meta("viewer") },

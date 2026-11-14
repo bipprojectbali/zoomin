@@ -91,14 +91,6 @@ function queryString(query: Record<string, string | number | boolean | null | un
 /** GET /api/me: user sesi (401 → ApiRequestError; 403 `banned`). Login/logout lewat auth.client.ts (Better Auth). */
 export const getMe = () => request<UserResponse>("GET", "/api/me");
 
-// TODO(auth-wave2): shim sementara agar SPA lama tetap ter-bundle (binary/e2e) sampai wkr-web-auth memindahkan
-// LoginPage/InvitePage/session.context ke auth.client.ts (RND/plan/05-auth-roles.md gelombang 2); lalu hapus keduanya.
-/** @deprecated pakai `signOut()` dari auth.client.ts. */
-export const logout = () => request<void>("POST", "/api/auth/sign-out", {});
-/** @deprecated login password admin dihapus (A1); pakai `signInWithGoogle()` dari auth.client.ts. */
-export const adminLogin = (_body: { password: string }): Promise<never> =>
-  Promise.reject(new Error("adminLogin: login password admin sudah dihapus, pakai login Google"));
-
 /** PATCH /api/me: ubah nama/foto profil. */
 export const updateMe = (body: ProfileUpdateBody) => request<UserResponse>("PATCH", "/api/me", body);
 

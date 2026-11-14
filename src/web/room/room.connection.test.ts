@@ -15,8 +15,8 @@ import {
 const apiError = (status: number, error = "pesan server") => new ApiRequestError(status, { error }, "POST /x");
 
 describe("canPublishFor", () => {
-  test("admin & participant boleh publish, viewer & null tidak", () => {
-    expect(canPublishFor("admin")).toBe(true);
+  test("host & participant boleh publish, viewer & null tidak", () => {
+    expect(canPublishFor("host")).toBe(true);
     expect(canPublishFor("participant")).toBe(true);
     expect(canPublishFor("viewer")).toBe(false);
     expect(canPublishFor(null)).toBe(false);

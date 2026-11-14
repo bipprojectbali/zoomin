@@ -17,19 +17,19 @@ import { ROOM_LABELS } from "@/room/room.labels";
 import { useRoomToasts } from "@/room/room.toasts";
 import { RoomStatusScreen } from "@/room/RoomStatusScreen";
 import { ROLE_LABEL } from "@/role.label";
-import { ProtectedPage, useSession } from "@/session.context";
+import { hasRole, RequireSession, useSession } from "@/session.context";
 import { useLayoutSync } from "@/stage/layout.sync";
 import { Stage } from "@/stage/Stage";
-import type { Role, RoomSummary } from "../../shared/api.types";
+import type { RoomRole, RoomSummary } from "../../shared/api.types";
 
 /** Halaman /rooms/:roomId (terlindung sesi). */
 export function RoomPage() {
   const { roomId = "" } = useParams();
   return (
-    <ProtectedPage>
+    <RequireSession>
       {/* key: ganti room = state koneksi baru sepenuhnya. */}
       <RoomView key={roomId} roomId={roomId} />
-    </ProtectedPage>
+    </RequireSession>
   );
 }
 
@@ -59,9 +59,9 @@ function RoomView({ roomId }: { roomId: string }) {
   }, [roomId, summaryAttempt]);
 
   const title = summary?.title ?? roomId;
-  // Admin global yang bukan member mendapat token admin (token.route.ts); peran dari token menang setelah join.
-  const role: Role | null = conn.role ?? summary?.role ?? (user?.isAdmin ? "admin" : null);
-  const toLobby = () => navigate("/");
+  // Admin global yang bukan member diperlakukan host (A7, token.route.ts); peran dari token menang setelah join.
+  const role: RoomRole | null = conn.role ?? summary?.role ?? (hasRole(user, "admin") ? "host" : null);
+  const toLobby = () => navigate("/app");
   const { status, room } = conn;
 
   let body;
@@ -98,7 +98,7 @@ function ConnectedRoom({ room, roomId, title, role, status, onLeave }: {
   room: Room;
   roomId: string;
   title: string;
-  role: Role | null;
+  role: RoomRole | null;
   status: ConnectionStatus;
   onLeave: () => void;
 }) {
@@ -122,14 +122,14 @@ function ConnectedRoom({ room, roomId, title, role, status, onLeave }: {
             {error}
           </p>
         )}
-        <Stage room={room} layout={layout} editable={role === "admin" && enabled} onCommit={(next) => void commit(next)} />
+        <Stage room={room} layout={layout} editable={role === "host" && enabled} onCommit={(next) => void commit(next)} />
       </main>
       <ControlBar
         room={room}
         roomId={roomId}
         enabled={enabled}
         canPublish={canPublishFor(role)}
-        canInvite={role === "admin"}
+        canInvite={role === "host"}
         participantCount={participantCount}
         onOpenParticipants={() => setParticipantsOpen(true)}
         onLeave={onLeave}

@@ -1,5 +1,5 @@
 import { ROLE_LABEL } from "@/role.label";
-import type { Role } from "../../shared/api.types";
+import type { RoomRole } from "../../shared/api.types";
 
 /** Semua label UI pre-join & undangan (terpusat). */
 export const PREJOIN_TEXT = {
@@ -29,7 +29,7 @@ export const PREJOIN_TEXT = {
 export type MediaKind = "camera" | "mic";
 
 /** Subtitle peran: "Anda akan masuk sebagai Peserta". */
-export const roleSubtitle = (role: Role) => `Anda akan masuk sebagai ${ROLE_LABEL[role]}`;
+export const roleSubtitle = (role: RoomRole) => `Anda akan masuk sebagai ${ROLE_LABEL[role]}`;
 
 /** Visual tombol toggle bulat: on = netral, off = merah, blocked = merah + badge peringatan. */
 export type ToggleTone = "on" | "off" | "blocked";
@@ -50,14 +50,14 @@ export function joinButtonState(busy: boolean, askName: boolean, name: string) {
 }
 
 /** Subtitle halaman undangan; bersesi → sebut identitas yang dipakai (UX-08). */
-export function inviteSubtitle(p: { effectiveRole: Role; currentUser: { name: string } | null }) {
+export function inviteSubtitle(p: { effectiveRole: RoomRole; currentUser: { name: string } | null }) {
   return p.currentUser
     ? `Anda akan masuk sebagai ${p.currentUser.name} (${ROLE_LABEL[p.effectiveRole]})`
     : roleSubtitle(p.effectiveRole);
 }
 
 /** Catatan bila peran undangan lebih rendah dari peran yang sudah dimiliki; null bila sama. */
-export function roleKeptNote(p: { role: Role; effectiveRole: Role }) {
+export function roleKeptNote(p: { role: RoomRole; effectiveRole: RoomRole }) {
   return p.role === p.effectiveRole
     ? null
     : `Undangan ini untuk ${ROLE_LABEL[p.role]}, tetapi peran Anda di room ini tetap ${ROLE_LABEL[p.effectiveRole]} (peran tidak diturunkan).`;

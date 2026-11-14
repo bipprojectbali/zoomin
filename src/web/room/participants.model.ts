@@ -1,19 +1,19 @@
-import type { Role } from "../../shared/api.types";
+import type { RoomRole } from "../../shared/api.types";
 import { parseTrackName } from "../../shared/track.naming";
 
 /** Data minimum satu peserta untuk diurutkan. */
 export type ParticipantLike = { identity: string; name?: string; isLocal: boolean; metadata?: string };
 
-const ROLE_ORDER: Record<Role, number> = { admin: 0, participant: 1, viewer: 2 };
+const ROLE_ORDER: Record<RoomRole, number> = { host: 0, participant: 1, viewer: 2 };
 const UNKNOWN_ROLE_ORDER = 3;
 const ROLES = Object.keys(ROLE_ORDER);
 
-/** Role dari participant metadata `{"role": ...}` (diset server di token); tak valid → null. */
-export function roleFromMetadata(metadata: string | undefined): Role | null {
+/** Peran room dari participant metadata metadata `{"role": ...}` (diset server di token); tak valid → null. */
+export function roleFromMetadata(metadata: string | undefined): RoomRole | null {
   if (!metadata) return null;
   try {
     const role: unknown = JSON.parse(metadata)?.role;
-    return typeof role === "string" && ROLES.includes(role) ? (role as Role) : null;
+    return typeof role === "string" && ROLES.includes(role) ? (role as RoomRole) : null;
   } catch {
     // Metadata bukan JSON (mis. diset pihak lain) = role tak diketahui, bukan kegagalan.
     return null;
@@ -34,7 +34,7 @@ export function initials(name: string): string {
     .join("");
 }
 
-/** Urutan panel: Anda dulu, lalu admin, peserta, penonton (role tak dikenal terakhir), lalu nama. */
+/** Urutan panel: Anda dulu, lalu host, peserta, penonton (role tak dikenal terakhir), lalu nama. */
 export function sortParticipants<T extends ParticipantLike>(list: readonly T[]): T[] {
   const rank = (p: T) => {
     const role = roleFromMetadata(p.metadata);

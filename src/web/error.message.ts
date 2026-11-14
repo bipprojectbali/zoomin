@@ -22,10 +22,38 @@ const CODE_TEXT: Record<ApiErrorCode, string> = {
   room_exists: "ID room sudah dipakai. Ganti ID room di Opsi lanjutan.",
   invalid_input: "Isian belum valid. Periksa kembali lalu coba lagi.",
   invite_invalid: "Link undangan tidak valid atau sudah kedaluwarsa. Minta link baru ke admin room.",
-  invalid_credentials: "Password salah. Periksa lalu coba lagi.",
   rate_limited: "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.", // tanpa Retry-After; lihat rateLimitedText
   layout_conflict: "Layout baru saja diubah admin lain. Tampilan sudah diperbarui, silakan ulangi perubahan Anda.",
+  banned: "Akun Anda diblokir admin. Hubungi admin zoomin bila menurut Anda ini keliru.",
+  email_domain_not_allowed: "Domain email akun Google ini tidak diizinkan. Masuk dengan akun Google kantor/organisasi Anda.",
+  cannot_modify_self: "Anda tidak bisa mengubah atau menghapus akun Anda sendiri dari sini.",
+  insufficient_role: "Peran akun Anda tidak cukup untuk tindakan ini.",
+  user_not_found: "Akun tidak ditemukan. Mungkin sudah dihapus.",
 };
+
+/**
+ * Kode error login dari Better Auth: `?error=<kode>` di /login (callback OAuth) atau `error.code` dari signIn.social.
+ * Kunci huruf kecil (pencocokan case-insensitive).
+ */
+const AUTH_ERROR_TEXT: Record<string, string> = {
+  email_domain_not_allowed: CODE_TEXT.email_domain_not_allowed,
+  banned: CODE_TEXT.banned,
+  banned_user: CODE_TEXT.banned,
+  provider_not_found: "Login Google belum dikonfigurasi admin server.",
+  access_denied: "Login dibatalkan. Klik Lanjutkan dengan Google untuk mencoba lagi.",
+  state_mismatch: "Sesi login kedaluwarsa atau dibuka di tab lain. Coba masuk lagi.",
+  please_restart_the_process: "Sesi login kedaluwarsa. Coba masuk lagi.",
+  unable_to_get_user_info: "Gagal membaca akun Google. Coba lagi beberapa saat lagi.",
+  unable_to_create_user: "Akun tidak bisa dibuat. Hubungi admin zoomin.",
+  unable_to_create_session: "Sesi tidak bisa dibuat. Hubungi admin zoomin bila berulang.",
+  signup_disabled: "Pendaftaran akun baru sedang ditutup. Hubungi admin zoomin.",
+  too_many_requests: CODE_TEXT.rate_limited,
+};
+
+/** Pesan Indonesia untuk kode error login Better Auth; kode tak dikenal → pesan umum yang menyebut kodenya. */
+export function authErrorMessage(code: string): string {
+  return AUTH_ERROR_TEXT[code.trim().toLowerCase()] ?? `Login gagal (${code}). Coba lagi, atau hubungi admin zoomin.`;
+}
 
 /** Fallback per status HTTP bila server tidak mengirim `code`. */
 const STATUS_TEXT: Record<number, string> = {
@@ -42,7 +70,6 @@ const FIELD_LABEL: Record<string, string> = {
   id: "ID room (huruf, angka, - atau _, maks 64 karakter)",
   title: "Judul room",
   name: "Nama",
-  password: "Password",
   role: "Peran",
   invite: "Link undangan",
 };

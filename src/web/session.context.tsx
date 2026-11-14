@@ -1,10 +1,14 @@
-import { Loader2, RotateCw } from "lucide-react";
+import { Loader2, RotateCw, ShieldX } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Navigate, useLocation } from "react-router";
+import { Link, Navigate, useLocation } from "react-router";
+import { AppBrand } from "@/app.brand";
 import { Button } from "@/components/ui/button";
-import type { SessionUser } from "../shared/api.types";
-import { ApiRequestError, getMe, logout as apiLogout } from "./api.client";
+import type { GlobalRole, SessionUser } from "../shared/api.types";
+import { ApiRequestError, getMe } from "./api.client";
+import { signOut as authSignOut } from "./auth.client";
 import { errorMessage } from "./error.message";
+import { loginPath } from "./login.redirect";
+import { hasRole } from "./role.global.label";
 
 const HTTP_UNAUTHORIZED = 401;
 
@@ -12,30 +16,30 @@ const TEXT = {
   loading: "Memuat sesi…",
   errorTitle: "Gagal memuat sesi",
   retry: "Coba lagi",
+  forbiddenTitle: "Tidak punya akses",
+  forbiddenBody: "Halaman ini hanya untuk peran tertentu. Minta admin memberi akses bila Anda membutuhkannya.",
+  backToApp: "Kembali ke Room",
   outsideProvider: "useSession dipakai di luar <SessionProvider>",
 };
 
-/** Nilai konteks sesi: user null = belum login (401) atau belum dicek. */
+/** Nilai konteks sesi: user null = belum login (401). `loading` true sampai GET /api/me pertama selesai. */
 export type SessionValue = {
   user: SessionUser | null;
   loading: boolean;
+  /** Pesan error non-401 (mis. server mati, 403 banned); null bila normal. */
   error: string | null;
   refresh: () => Promise<void>;
-  logout: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
-
-/** `location.state` yang dikirim RequireSession ke /login. */
-export type LoginRedirectState = { from: string; reason: "session" | "logout" };
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-/**
- * Provider sesi global (dipasang sekali di main.tsx). Tidak fetch saat mount: RequireSession yang memanggil
- * GET /api/me bila user belum diketahui, jadi berpindah halaman saat sudah login tidak memicu fetch ulang.
- */
+export { hasRole };
+
+/** Provider sesi global (sekali di main.tsx): GET /api/me saat mount, lalu hanya lewat refresh(). */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -46,10 +50,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setError(null);
     } catch (err) {
       setUser(null);
-      // 401 = belum login, kondisi normal; selain itu tampilkan.
-      if (err instanceof ApiRequestError && err.status === HTTP_UNAUTHORIZED) {
-        setError(null);
-      } else {
+      // 401 = belum login, kondisi normal; selain itu (termasuk 403 banned) tampilkan.
+      if (err instanceof ApiRequestError && err.status === HTTP_UNAUTHORIZED) setError(null);
+      else {
         console.error("session: GET /api/me gagal", err);
         setError(errorMessage(err));
       }
@@ -58,13 +61,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Error logout dilempar ke pemanggil supaya bisa ditampilkan di UI-nya.
-  const logout = useCallback(async () => {
-    await apiLogout();
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  // Error dilempar ke pemanggil supaya bisa ditampilkan di UI-nya (toast).
+  const signOut = useCallback(async () => {
+    await authSignOut();
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, loading, error, refresh, logout }), [user, loading, error, refresh, logout]);
+  const value = useMemo(() => ({ user, loading, error, refresh, signOut }), [user, loading, error, refresh, signOut]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
@@ -75,52 +82,68 @@ export function useSession(): SessionValue {
   return ctx;
 }
 
-/**
- * Render children hanya bila login. User belum diketahui (load pertama, habis login/terima undangan) → cek /api/me
- * sekali; 401 → /login dengan alasan, supaya tamu tahu harus lewat link undangan.
- */
-export function RequireSession({ children }: { children: ReactNode }) {
-  const { user, error, refresh } = useSession();
-  const location = useLocation();
-  const [checked, setChecked] = useState(user !== null);
+/** Spinner layar penuh selama sesi dicek. */
+export function SessionLoading() {
+  return (
+    <div className="flex min-h-svh items-center justify-center gap-2 text-muted-foreground" role="status">
+      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+      {TEXT.loading}
+    </div>
+  );
+}
 
-  useEffect(() => {
-    if (checked) return;
-    let alive = true;
-    void refresh().then(() => {
-      if (alive) setChecked(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [checked, refresh]);
+/** Render children hanya bila login; belum login → `/login?next=<path saat ini>`. */
+export function RequireSession({ children }: { children: ReactNode }) {
+  const { user, loading, error, refresh } = useSession();
+  const location = useLocation();
 
   if (user) return <>{children}</>;
-  if (!checked) {
-    return (
-      <div className="flex min-h-svh items-center justify-center gap-2 text-muted-foreground" role="status">
-        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        {TEXT.loading}
-      </div>
-    );
-  }
+  if (loading) return <SessionLoading />;
   if (error) {
     return (
       <div className="flex min-h-svh flex-col items-center justify-center gap-3 p-6 text-center" role="alert">
         <p className="font-semibold">{TEXT.errorTitle}</p>
         <p className="max-w-sm text-sm text-muted-foreground">{error}</p>
-        <Button type="button" variant="outline" onClick={() => setChecked(false)}>
+        <Button type="button" variant="outline" onClick={() => void refresh()}>
           <RotateCw />
           {TEXT.retry}
         </Button>
       </div>
     );
   }
-  const state: LoginRedirectState = { from: location.pathname + location.search, reason: "session" };
-  return <Navigate to="/login" replace state={state} />;
+  return <Navigate to={loginPath(location.pathname + location.search)} replace />;
 }
 
-/** Halaman terlindung (provider sudah global di main.tsx); alias RequireSession agar halaman lama tetap jalan. */
-export function ProtectedPage({ children }: { children: ReactNode }) {
-  return <RequireSession>{children}</RequireSession>;
+/** Seperti RequireSession, plus peran global minimal `min`; kurang → halaman "Tidak punya akses". */
+export function RequireRole({ min, children }: { min: GlobalRole; children: ReactNode }) {
+  return (
+    <RequireSession>
+      <RoleGate min={min}>{children}</RoleGate>
+    </RequireSession>
+  );
+}
+
+function RoleGate({ min, children }: { min: GlobalRole; children: ReactNode }) {
+  const { user } = useSession();
+  if (hasRole(user, min)) return <>{children}</>;
+  return <ForbiddenPage />;
+}
+
+/** Halaman 403 rapi dengan jalan pulang ke /app. */
+export function ForbiddenPage() {
+  return (
+    <main className="flex min-h-svh flex-col items-center justify-center gap-8 p-6 text-center" data-testid="forbidden">
+      <AppBrand />
+      <div className="flex max-w-md flex-col items-center gap-3">
+        <span className="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <ShieldX className="size-7" aria-hidden="true" />
+        </span>
+        <h1 className="text-2xl font-semibold">{TEXT.forbiddenTitle}</h1>
+        <p className="text-muted-foreground">{TEXT.forbiddenBody}</p>
+      </div>
+      <Button asChild>
+        <Link to="/app">{TEXT.backToApp}</Link>
+      </Button>
+    </main>
+  );
 }

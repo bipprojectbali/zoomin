@@ -30,14 +30,14 @@ export type PreJoinProps = {
   /** Konten tambahan di bawah tombol gabung (mis. "Bukan Anda? Keluar"). */
   footer?: ReactNode;
   /**
-   * Tujuan tombol "Ke lobby" (QA-09); default `/` untuk pengguna bersesi. `null` = tanpa tombol: tamu undangan
-   * tanpa sesi tidak punya lobby (/ → login admin), dan mematikan preview cukup lewat toggle kamera/mic.
+   * Tujuan tombol "Ke lobby" (QA-09); default `/app` untuk pengguna bersesi. `null` = tanpa tombol: tamu undangan
+   * tanpa sesi tidak punya lobby (lobby wajib login), dan mematikan preview cukup lewat toggle kamera/mic.
    */
   backTo?: string | null;
 };
 
 /** Layar "Siap bergabung?": preview kamera, toggle & pilih perangkat, nama, lalu Gabung sekarang. */
-export function PreJoin({ title, subtitle, canPublish, askName = false, busy = false, error, onJoin, footer, backTo = "/" }: PreJoinProps) {
+export function PreJoin({ title, subtitle, canPublish, askName = false, busy = false, error, onJoin, footer, backTo = "/app" }: PreJoinProps) {
   const [choices, setChoices] = useState<PreJoinChoices>(loadMediaPreferences);
   const [name, setName] = useState("");
   // Setelah klik gabung preview dilepas supaya kamera tidak menyala dua kali saat room mem-publish.

@@ -1,7 +1,7 @@
 import { ConnectionState, DisconnectReason, Room, RoomEvent } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { Role } from "../../shared/api.types";
+import type { RoomRole } from "../../shared/api.types";
 import { CAMERA_TRACK, MIC_TRACK } from "../../shared/track.naming";
 import { ApiRequestError, getRoomToken } from "../api.client";
 import { errorMessage } from "../error.message";
@@ -47,8 +47,8 @@ const API_ERROR: Record<number, ConnectionError> = {
 };
 
 /** Viewer hanya subscribe; tombol publish disembunyikan (spike 03: penolakan server baru datang ~10 dtk). */
-export function canPublishFor(role: Role | null): boolean {
-  return role === "admin" || role === "participant";
+export function canPublishFor(role: RoomRole | null): boolean {
+  return role === "host" || role === "participant";
 }
 
 /** Kontrol publish/layout hanya aktif saat benar-benar terhubung (BUG-03). */
@@ -131,7 +131,7 @@ export function disconnectErrorFor(reason: DisconnectReason | undefined): Connec
 export type RoomConnection = {
   /** Tetap terisi setelah putus agar bisa dibaca; kontrol wajib mengikuti `controlsEnabled(status)`. */
   room: Room | null;
-  role: Role | null;
+  role: RoomRole | null;
   status: ConnectionStatus;
   error: ConnectionError | null;
   /** Join ulang (token baru + Room baru). */

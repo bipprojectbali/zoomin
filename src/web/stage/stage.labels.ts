@@ -35,10 +35,10 @@ export const STAGE_LABELS = {
   noActive: "Belum ada track aktif",
   focusInactive: "Track fokus tidak aktif — pilih fokus lain",
   sharingOwn: (kind: string) => `Anda sedang membagikan ${kind}`,
-  autoLayout: "Layout otomatis (admin belum mengatur)",
+  autoLayout: "Layout otomatis (host belum mengatur)",
   editFailed: "Gagal mengubah layout",
   layoutInvalid: "Layout dari server tidak valid, diabaikan",
   layoutLoadFailed: "Gagal memuat layout",
   layoutSaveFailed: "Gagal menyimpan layout",
-  layoutConflict: "Layout diubah admin lain, dimuat ulang",
+  layoutConflict: "Layout diubah host lain, dimuat ulang",
 } as const;
