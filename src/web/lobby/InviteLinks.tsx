@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createInvite } from "@/api.client";
+import { copyText } from "@/clipboard.copy";
 import { errorMessage } from "@/error.message";
 import { cn } from "@/lib/utils";
 import { ROLE_LABEL, ROLES } from "@/role.label";
@@ -54,7 +55,7 @@ export function InviteLinks({ roomId }: { roomId: string }) {
 
   async function copy(url: string) {
     try {
-      await navigator.clipboard.writeText(url);
+      await copyText(url);
       toast.success(TEXT.copied);
     } catch (err) {
       console.error("lobby: salin link gagal", err);
