@@ -1,19 +1,29 @@
 import type {
   AcceptInviteBody,
   AcceptInviteResponse,
-  AdminLoginBody,
+  AdminRoomSummary,
+  AdminUser,
   ApiError,
   ApiErrorCode,
+  AppSettings,
+  AuditAction,
+  AuditEntry,
+  BanUserBody,
   CreateInviteBody,
   CreateInviteResponse,
   CreateRoomBody,
   InvitePreview,
+  GlobalRole,
   LayoutResponse,
   ListRoomsQuery,
+  MySession,
   Page,
+  ProfileUpdateBody,
   PutLayoutBody,
   PutLayoutResponse,
   RoomSummary,
+  SetRoleBody,
+  SystemHealth,
   TokenResponse,
   UserResponse,
 } from "../shared/api.types";
@@ -69,15 +79,87 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 const roomPath = (roomId: string) => `/api/rooms/${encodeURIComponent(roomId)}`;
+const userPath = (userId: string) => `/api/admin/users/${encodeURIComponent(userId)}`;
 
-/** GET /api/me: user sesi (401 → ApiRequestError). */
+/** Query string dari field terisi saja (undefined/""/null dilewati); "" bila kosong. */
+function queryString(query: Record<string, string | number | boolean | null | undefined>): string {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== null && v !== "") qs.set(k, String(v));
+  return qs.size ? `?${qs}` : "";
+}
+
+/** GET /api/me: user sesi (401 → ApiRequestError; 403 `banned`). Login/logout lewat auth.client.ts (Better Auth). */
 export const getMe = () => request<UserResponse>("GET", "/api/me");
 
-/** POST /api/auth/admin-login. */
-export const adminLogin = (body: AdminLoginBody) => request<UserResponse>("POST", "/api/auth/admin-login", body);
+// TODO(auth-wave2): shim sementara agar SPA lama tetap ter-bundle (binary/e2e) sampai wkr-web-auth memindahkan
+// LoginPage/InvitePage/session.context ke auth.client.ts (RND/plan/05-auth-roles.md gelombang 2); lalu hapus keduanya.
+/** @deprecated pakai `signOut()` dari auth.client.ts. */
+export const logout = () => request<void>("POST", "/api/auth/sign-out", {});
+/** @deprecated login password admin dihapus (A1); pakai `signInWithGoogle()` dari auth.client.ts. */
+export const adminLogin = (_body: { password: string }): Promise<never> =>
+  Promise.reject(new Error("adminLogin: login password admin sudah dihapus, pakai login Google"));
 
-/** POST /api/auth/logout. */
-export const logout = () => request<void>("POST", "/api/auth/logout");
+/** PATCH /api/me: ubah nama/foto profil. */
+export const updateMe = (body: ProfileUpdateBody) => request<UserResponse>("PATCH", "/api/me", body);
+
+/** DELETE /api/me: hapus akun sendiri (super_admin → 403). */
+export const deleteMe = () => request<void>("DELETE", "/api/me");
+
+/** GET /api/me/sessions: sesi aktif milik user. */
+export const listMySessions = () => request<{ items: MySession[] }>("GET", "/api/me/sessions");
+
+/** DELETE /api/me/sessions/:id: cabut satu sesi. */
+export const revokeMySession = (id: string) => request<void>("DELETE", `/api/me/sessions/${encodeURIComponent(id)}`);
+
+/** DELETE /api/me/sessions: cabut semua sesi selain yang sedang dipakai. */
+export const revokeOtherSessions = () => request<void>("DELETE", "/api/me/sessions");
+
+/** Query GET /api/admin/users. */
+export type ListUsersQuery = { q?: string; role?: GlobalRole; banned?: boolean; limit?: number; cursor?: string };
+
+/** GET /api/admin/users (admin+). */
+export const listUsers = (query: ListUsersQuery = {}) => request<Page<AdminUser>>("GET", `/api/admin/users${queryString(query)}`);
+
+/** POST /api/admin/users/:id/ban. */
+export const banUser = (userId: string, body: BanUserBody) => request<{ user: AdminUser }>("POST", `${userPath(userId)}/ban`, body);
+
+/** POST /api/admin/users/:id/unban. */
+export const unbanUser = (userId: string) => request<{ user: AdminUser }>("POST", `${userPath(userId)}/unban`);
+
+/** DELETE /api/admin/users/:id (hard delete). */
+export const deleteUser = (userId: string) => request<void>("DELETE", userPath(userId));
+
+/** POST /api/admin/users/:id/sessions/revoke: cabut semua sesi user. */
+export const revokeUserSessions = (userId: string) => request<void>("POST", `${userPath(userId)}/sessions/revoke`);
+
+/** GET /api/admin/rooms (admin+). */
+export const listAdminRooms = (query: { limit?: number; cursor?: string } = {}) =>
+  request<Page<AdminRoomSummary>>("GET", `/api/admin/rooms${queryString(query)}`);
+
+/** DELETE /api/admin/rooms/:id: hapus room DB + room LiveKit. */
+export const deleteAdminRoom = (roomId: string) => request<void>("DELETE", `/api/admin/rooms/${encodeURIComponent(roomId)}`);
+
+/** PUT /api/dev/users/:id/role (super_admin). */
+export const setUserRole = (userId: string, body: SetRoleBody) =>
+  request<{ user: AdminUser }>("PUT", `/api/dev/users/${encodeURIComponent(userId)}/role`, body);
+
+/** GET /api/dev/health (super_admin). */
+export const getSystemHealth = () => request<SystemHealth>("GET", "/api/dev/health");
+
+/** Query GET /api/dev/audit. */
+export type ListAuditQuery = { action?: AuditAction; actorId?: string; limit?: number; cursor?: string };
+
+/** GET /api/dev/audit (super_admin). */
+export const listAudit = (query: ListAuditQuery = {}) => request<Page<AuditEntry>>("GET", `/api/dev/audit${queryString(query)}`);
+
+/** GET /api/dev/settings (super_admin). */
+export const getSettings = () => request<AppSettings>("GET", "/api/dev/settings");
+
+/** PUT /api/dev/settings (super_admin). */
+export const putSettings = (body: AppSettings) => request<AppSettings>("PUT", "/api/dev/settings", body);
+
+/** GET /api/dev/config (super_admin): ringkasan config non-rahasia (secret = "diset"/"kosong"). */
+export const getDevConfig = () => request<Record<string, string>>("GET", "/api/dev/config");
 
 /** POST /api/rooms/:roomId/invites. */
 export const createInvite = (roomId: string, body: CreateInviteBody) =>
@@ -87,19 +169,13 @@ export const createInvite = (roomId: string, body: CreateInviteBody) =>
 export const previewInvite = (invite: string) =>
   request<InvitePreview>("GET", `/api/invites/preview?${new URLSearchParams({ invite })}`);
 
-/** POST /api/invites/accept (`name` diabaikan server bila sudah bersesi). */
+/** POST /api/invites/accept (wajib sesi; 401 bila belum login). */
 export const acceptInvite = (body: AcceptInviteBody) => request<AcceptInviteResponse>("POST", "/api/invites/accept", body);
 
 /** GET /api/rooms?limit=&cursor=. */
-export function listRooms(query: ListRoomsQuery = {}) {
-  const qs = new URLSearchParams();
-  if (query.limit !== undefined) qs.set("limit", String(query.limit));
-  if (query.cursor) qs.set("cursor", query.cursor);
-  const suffix = qs.size ? `?${qs}` : "";
-  return request<Page<RoomSummary>>("GET", `/api/rooms${suffix}`);
-}
+export const listRooms = (query: ListRoomsQuery = {}) => request<Page<RoomSummary>>("GET", `/api/rooms${queryString(query)}`);
 
-/** POST /api/rooms (admin global). */
+/** POST /api/rooms (admin+; user → 403 insufficient_role). */
 export const createRoom = (body: CreateRoomBody) => request<RoomSummary>("POST", "/api/rooms", body);
 
 /** GET /api/rooms/:roomId: detail satu room (member / admin global). */

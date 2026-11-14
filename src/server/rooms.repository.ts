@@ -1,5 +1,5 @@
 import { type Database, SQLiteError } from "bun:sqlite";
-import type { Page, Role, RoomSummary, SessionUser } from "../shared/api.types";
+import type { Page, RoomRole, RoomSummary, SessionUser } from "../shared/api.types";
 
 /** Default dan batas atas `limit` daftar room (kontrak GET /api/rooms). */
 export const ROOMS_PAGE_DEFAULT = 20;
@@ -11,7 +11,7 @@ export class RoomExistsError extends Error {}
 /** Dilempar listRoomsForUser bila cursor bukan hasil encodeCursor (dipetakan ke 400 oleh route). */
 export class InvalidCursorError extends Error {}
 
-type RoomRow = { id: string; title: string; role: Role | null; created_at: number };
+type RoomRow = { id: string; title: string; role: RoomRole | null; created_at: number };
 type Cursor = { createdAt: number; id: string };
 
 // Cursor opaque: base64url("createdAt,id"). id cocok SAFE_ID_PATTERN (tanpa koma), jadi split pertama aman.
@@ -29,9 +29,9 @@ function decodeCursor(cursor: string): Cursor {
 }
 
 /** Role user di room; null bila bukan member (atau room tidak ada). */
-export function getMembership(db: Database, roomId: string, userId: string): Role | null {
+export function getMembership(db: Database, roomId: string, userId: string): RoomRole | null {
   const row = db
-    .query<{ role: Role }, [string, string]>("SELECT role FROM room_members WHERE room_id = ? AND user_id = ?")
+    .query<{ role: RoomRole }, [string, string]>("SELECT role FROM room_members WHERE room_id = ? AND user_id = ?")
     .get(roomId, userId);
   return row?.role ?? null;
 }
@@ -53,7 +53,7 @@ export function getRoomForUser(db: Database, roomId: string, userId: string): Ro
 }
 
 // Urutan terbaru dulu; keyset (created_at, id) agar stabil walau created_at kembar.
-// Admin global: LEFT JOIN (semua room, role null bila bukan member). Lainnya: JOIN (hanya room member).
+// Admin/super_admin global: LEFT JOIN (semua room, role null bila bukan member). user: JOIN (hanya room member).
 const LIST_SQL = (join: "LEFT JOIN" | "JOIN") => `
   SELECT r.id, r.title, m.role, r.created_at
   FROM rooms r ${join} room_members m ON m.room_id = r.id AND m.user_id = ?1
@@ -70,14 +70,14 @@ export function listRoomsForUser(
   const limit = Math.min(Math.max(opts.limit ?? ROOMS_PAGE_DEFAULT, 1), ROOMS_PAGE_MAX);
   const after = opts.cursor ? decodeCursor(opts.cursor) : null;
   const rows = db
-    .query<RoomRow, [string, number | null, string | null, number]>(LIST_SQL(user.isAdmin ? "LEFT JOIN" : "JOIN"))
+    .query<RoomRow, [string, number | null, string | null, number]>(LIST_SQL(user.role === "user" ? "JOIN" : "LEFT JOIN"))
     .all(user.id, after?.createdAt ?? null, after?.id ?? null, limit + 1);
   const items = rows.slice(0, limit).map((r) => ({ id: r.id, title: r.title, role: r.role, createdAt: r.created_at }));
   const last = items.at(-1);
   return { items, nextCursor: rows.length > limit && last ? encodeCursor(last) : null };
 }
 
-/** Insert room + pembuatnya sebagai member admin dalam satu transaksi. Throw RoomExistsError bila id dipakai. */
+/** Insert room + pembuatnya sebagai member host dalam satu transaksi. Throw RoomExistsError bila id dipakai. */
 export function createRoom(db: Database, input: { id: string; title: string; createdBy: string }): RoomSummary {
   const createdAt = Date.now();
   try {
@@ -88,7 +88,7 @@ export function createRoom(db: Database, input: { id: string; title: string; cre
         input.createdBy,
         createdAt,
       );
-      db.query("INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, 'admin')").run(input.id, input.createdBy);
+      db.query("INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, 'host')").run(input.id, input.createdBy);
     })();
   } catch (cause) {
     if (cause instanceof SQLiteError && cause.code === "SQLITE_CONSTRAINT_PRIMARYKEY") {
@@ -96,5 +96,5 @@ export function createRoom(db: Database, input: { id: string; title: string; cre
     }
     throw new Error(`createRoom: gagal membuat room ${input.id}`, { cause });
   }
-  return { id: input.id, title: input.title, role: "admin", createdAt };
+  return { id: input.id, title: input.title, role: "host", createdAt };
 }

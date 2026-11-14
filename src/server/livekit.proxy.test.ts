@@ -1,13 +1,10 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { Room, TrackPublishOptions, TrackSource } from "@livekit/rtc-node";
-import { RoomServiceClient } from "livekit-server-sdk";
+import { createTestDeps, createTestUser } from "../../test/auth.helpers";
 import { startSyntheticAudio } from "../../test/synthetic-media";
 import type { TokenResponse } from "../shared/api.types";
-import { createSessionCookie } from "./auth.session";
-import { loadConfig } from "./config";
-import { openDb } from "./db";
 import { forwardedHeaders, livekitProxy, livekitWebSocket, upstreamUrl } from "./livekit.proxy";
-import { createServer, toHttpUrl } from "./main";
+import { createServer } from "./main";
 import { createRoom } from "./rooms.repository";
 
 describe("upstreamUrl", () => {
@@ -53,11 +50,9 @@ const fake = Bun.serve({
 });
 // Upstream "remote" yang menerima TCP tapi tak pernah menjawab handshake (host lambat/terblokir).
 const silent = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } });
-const db = openDb(":memory:");
 function appServer(livekitUrl: string, extra: Record<string, string> = {}) {
-  const config = loadConfig({ DB_PATH: ":memory:", HOST: "127.0.0.1", LIVEKIT_URL: livekitUrl, ...extra });
-  const roomService = new RoomServiceClient(toHttpUrl(config.livekitUrl), config.livekitApiKey, config.livekitApiSecret);
-  return { server: createServer({ db, config, roomService }, 0), config, roomService };
+  const deps = createTestDeps({ LIVEKIT_URL: livekitUrl, ...extra });
+  return { server: createServer(deps, 0), config: deps.config, roomService: deps.roomService, deps };
 }
 const viaFake = appServer(`ws://127.0.0.1:${fake.port}`).server;
 const deadPort = Bun.serve({ port: 0, fetch: () => new Response() });
@@ -166,9 +161,9 @@ describe("proxy ke LiveKit nyata", () => {
   });
 
   test("rtc-node connect via proxy dengan token dari endpoint lalu publish audio", async () => {
-    db.query("INSERT INTO users (id, name, is_admin, created_at) VALUES ('pxadmin', 'Admin', 1, 0)").run();
-    createRoom(db, { id: roomId, title: "Proxy IT", createdBy: "pxadmin" });
-    const cookie = createSessionCookie("pxadmin", withProxyUrl.config.sessionSecret, 60, false).split(";")[0]!;
+    const { deps } = withProxyUrl;
+    const { user, cookie } = await createTestUser(deps, { email: "pxadmin@example.test", role: "admin" });
+    createRoom(deps.db, { id: roomId, title: "Proxy IT", createdBy: user.id });
     const res = await fetch(`http://127.0.0.1:${withProxyUrl.server.port}/api/rooms/${roomId}/token`, { method: "POST", headers: { cookie } });
     expect(res.status).toBe(200);
     const { url, token } = (await res.json()) as TokenResponse;

@@ -1,28 +1,30 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { RoomServiceClient } from "livekit-server-sdk";
-import type { AcceptInviteResponse, ApiError, InvitePreview, Role } from "../shared/api.types";
+import { createTestDeps, createTestUser } from "../../test/auth.helpers";
+import type { AcceptInviteResponse, ApiError, InvitePreview, RoomRole, SessionUser } from "../shared/api.types";
 import { createApi } from "./api";
 import type { ApiDeps } from "./api.deps";
 import { createInvite } from "./auth.invite";
-import { createSessionCookie } from "./auth.session";
-import { loadConfig } from "./config";
-import { openDb } from "./db";
 
-const config = loadConfig({ DB_PATH: ":memory:" });
 let deps: ApiDeps;
 let app: ReturnType<typeof createApi>;
+let owner: { user: SessionUser; cookie: string };
+let guest: { user: SessionUser; cookie: string };
+let admin: { user: SessionUser; cookie: string };
 
-beforeEach(() => {
-  // Tidak dipanggil route undangan; hanya memenuhi tipe.
-  deps = { db: openDb(":memory:"), config, roomService: new RoomServiceClient("http://127.0.0.1:1", "k", "s") };
+beforeEach(async () => {
+  deps = createTestDeps({ PUBLIC_APP_URL: "https://app.example.test" });
   app = createApi(deps);
-  deps.db.run("INSERT INTO users (id, name, is_admin, created_at) VALUES ('owner', 'Owner', 0, 0), ('guest', 'Guest', 0, 0)");
-  deps.db.run("INSERT INTO rooms (id, title, created_by, created_at) VALUES ('r1', 'Rapat Desain', 'owner', 0)");
-  deps.db.run("INSERT INTO room_members (room_id, user_id, role) VALUES ('r1', 'owner', 'admin'), ('r1', 'guest', 'participant')");
+  // owner = user biasa yang menjadi host room (peran room, bukan peran global).
+  owner = await createTestUser(deps, { email: "owner@example.test", name: "Owner" });
+  guest = await createTestUser(deps, { email: "guest@example.test", name: "Guest" });
+  admin = await createTestUser(deps, { email: "admin@example.test", name: "Admin", role: "admin" });
+  deps.db.run("INSERT INTO rooms (id, title, created_by, created_at) VALUES ('r1', 'Rapat Desain', ?, 0)", [owner.user.id]);
+  deps.db.run("INSERT INTO room_members (room_id, user_id, role) VALUES ('r1', ?, 'host'), ('r1', ?, 'participant')", [owner.user.id, guest.user.id]);
 });
 
-const cookieFor = (userId: string) => createSessionCookie(userId, config.sessionSecret, 60, false).split(";")[0] ?? "";
-const inviteFor = (role: Role, ttlSeconds = 60, roomId = "r1") => createInvite({ roomId, role, ttlSeconds }, config.sessionSecret);
+const inviteFor = (role: RoomRole, ttlSeconds = 60, roomId = "r1") => createInvite({ roomId, role, ttlSeconds }, deps.config.authSecret);
+const roleOf = (userId: string) =>
+  deps.db.query<{ role: string }, [string]>("SELECT role FROM room_members WHERE room_id = 'r1' AND user_id = ?").get(userId)?.role;
 
 function call(method: string, path: string, body?: unknown, cookie?: string) {
   const headers: Record<string, string> = {};
@@ -34,6 +36,30 @@ function call(method: string, path: string, body?: unknown, cookie?: string) {
 }
 const preview = (invite: string, cookie?: string) =>
   call("GET", `/invites/preview?${new URLSearchParams({ invite })}`, undefined, cookie);
+const codeOf = async (res: Promise<Response>) => ((await (await res).json()) as ApiError).code;
+
+describe("POST /rooms/:roomId/invites", () => {
+  test("tanpa sesi → 401; room tidak ada → 404; member non-host → 403", async () => {
+    expect(await codeOf(call("POST", "/rooms/r1/invites", { role: "viewer" }))).toBe("unauthorized");
+    expect(await codeOf(call("POST", "/rooms/nope/invites", { role: "viewer" }, owner.cookie))).toBe("room_not_found");
+    expect(await codeOf(call("POST", "/rooms/r1/invites", { role: "viewer" }, guest.cookie))).toBe("forbidden");
+  });
+
+  test("host room → 200, url berisi publicAppUrl; ttlHours di luar batas / role asing (termasuk 'admin' lama) → 400", async () => {
+    const before = Date.now();
+    const res = await call("POST", "/rooms/r1/invites", { role: "participant", ttlHours: 1 }, owner.cookie);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { url: string; expiresAt: number };
+    expect(body.url).toStartWith("https://app.example.test/invite/");
+    expect(body.expiresAt).toBeGreaterThanOrEqual(before + 3600 * 1000 - 1000);
+    expect((await call("POST", "/rooms/r1/invites", { role: "viewer", ttlHours: 721 }, owner.cookie)).status).toBe(400);
+    for (const role of ["owner", "admin"]) expect((await call("POST", "/rooms/r1/invites", { role }, owner.cookie)).status).toBe(400);
+  });
+
+  test("admin global non-member → 200 (diperlakukan host)", async () => {
+    expect((await call("POST", "/rooms/r1/invites", { role: "host" }, admin.cookie)).status).toBe(200);
+  });
+});
 
 describe("GET /invites/preview", () => {
   test("tanpa sesi → 200 info undangan, currentUser null, effectiveRole = role undangan", async () => {
@@ -46,14 +72,13 @@ describe("GET /invites/preview", () => {
     expect(Object.keys(body).sort()).toEqual(["currentUser", "effectiveRole", "expiresAt", "role", "roomId", "roomTitle"]);
   });
 
-  test("bersesi: effectiveRole = max(role undangan, role existing); tidak mengubah DB", async () => {
-    const lower = (await (await preview(inviteFor("viewer"), cookieFor("guest"))).json()) as InvitePreview;
-    expect(lower.currentUser).toEqual({ id: "guest", name: "Guest", isAdmin: false });
+  test("bersesi: currentUser = SessionUser; effectiveRole = max(role undangan, role existing); tidak mengubah DB", async () => {
+    const lower = (await (await preview(inviteFor("viewer"), guest.cookie)).json()) as InvitePreview;
+    expect(lower.currentUser).toEqual(guest.user);
     expect(lower.effectiveRole).toBe("participant");
-    const higher = (await (await preview(inviteFor("admin"), cookieFor("guest"))).json()) as InvitePreview;
-    expect(higher.effectiveRole).toBe("admin");
-    const role = deps.db.query<{ role: string }, []>("SELECT role FROM room_members WHERE user_id = 'guest'").get()?.role;
-    expect(role).toBe("participant");
+    const higher = (await (await preview(inviteFor("host"), guest.cookie)).json()) as InvitePreview;
+    expect(higher.effectiveRole).toBe("host");
+    expect(roleOf(guest.user.id)).toBe("participant");
   });
 
   test("invalid / expired → 400 invite_invalid; room hilang → 404 room_not_found; tanpa query → 400 invalid_input", async () => {
@@ -65,55 +90,54 @@ describe("GET /invites/preview", () => {
     const gone = await preview(inviteFor("viewer", 60, "gone"));
     expect(gone.status).toBe(404);
     expect(((await gone.json()) as ApiError).code).toBe("room_not_found");
-    const missing = await call("GET", "/invites/preview");
-    expect(missing.status).toBe(400);
-    expect(((await missing.json()) as ApiError).code).toBe("invalid_input");
+    expect(await codeOf(call("GET", "/invites/preview"))).toBe("invalid_input");
   });
 });
 
-describe("POST /invites/accept (kontrak name + role efektif)", () => {
-  test("bersesi tanpa name → 200, identitas tetap, role efektif dikembalikan", async () => {
-    const res = await call("POST", "/invites/accept", { invite: inviteFor("viewer") }, cookieFor("guest"));
-    expect(res.status).toBe(200);
-    expect((await res.json()) as AcceptInviteResponse).toEqual({
-      user: { id: "guest", name: "Guest", isAdmin: false },
-      roomId: "r1",
-      role: "participant",
-    });
-  });
-
-  test("bersesi dengan name → name diabaikan", async () => {
-    const res = await call("POST", "/invites/accept", { invite: inviteFor("admin"), name: "Citra" }, cookieFor("guest"));
-    const body = (await res.json()) as AcceptInviteResponse;
-    expect(body.user.name).toBe("Guest");
-    expect(body.role).toBe("admin");
-  });
-
-  test("tanpa sesi tanpa name → 400 invalid_input path /name; dengan name → role undangan", async () => {
+describe("POST /invites/accept (wajib sesi)", () => {
+  test("tanpa sesi → 401 unauthorized, tidak ada user/member baru", async () => {
     const res = await call("POST", "/invites/accept", { invite: inviteFor("viewer") });
-    expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ code: "invalid_input", path: "/name" });
-    const ok = await call("POST", "/invites/accept", { invite: inviteFor("viewer"), name: "Citra" });
-    expect(((await ok.json()) as AcceptInviteResponse).role).toBe("viewer");
+    expect(res.status).toBe(401);
+    expect(((await res.json()) as ApiError).code).toBe("unauthorized");
+    expect(deps.db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM room_members").get()?.n).toBe(2);
   });
 
-  test("invite invalid → invite_invalid; room hilang → room_not_found", async () => {
-    const bad = await call("POST", "/invites/accept", { invite: "abc", name: "A" });
-    expect(((await bad.json()) as ApiError).code).toBe("invite_invalid");
-    const gone = await call("POST", "/invites/accept", { invite: inviteFor("viewer", 60, "gone"), name: "A" });
+  test("user baru (belum member) → jadi member dengan role undangan; url dari create bisa dipakai", async () => {
+    const newcomer = await createTestUser(deps, { email: "budi@example.test", name: "Budi" });
+    const created = await call("POST", "/rooms/r1/invites", { role: "participant" }, owner.cookie);
+    const invite = ((await created.json()) as { url: string }).url.split("/invite/")[1];
+    const res = await call("POST", "/invites/accept", { invite }, newcomer.cookie);
+    expect(res.status).toBe(200);
+    expect((await res.json()) as AcceptInviteResponse).toEqual({ user: newcomer.user, roomId: "r1", role: "participant" });
+    expect(roleOf(newcomer.user.id)).toBe("participant");
+  });
+
+  test("role naik bila undangan lebih tinggi, tidak pernah turun", async () => {
+    const up = await call("POST", "/invites/accept", { invite: inviteFor("host") }, guest.cookie);
+    expect(((await up.json()) as AcceptInviteResponse).role).toBe("host");
+    const down = await call("POST", "/invites/accept", { invite: inviteFor("viewer") }, owner.cookie);
+    expect(((await down.json()) as AcceptInviteResponse).role).toBe("host");
+    expect(roleOf(owner.user.id)).toBe("host");
+  });
+
+  test("field `name` lama diabaikan: identitas selalu dari sesi", async () => {
+    const res = await call("POST", "/invites/accept", { invite: inviteFor("viewer"), name: "Palsu" }, guest.cookie);
+    expect(((await res.json()) as AcceptInviteResponse).user.name).toBe("Guest");
+  });
+
+  test("invite expired / tamper → 400 invite_invalid; room hilang → 404 room_not_found", async () => {
+    expect(await codeOf(call("POST", "/invites/accept", { invite: inviteFor("viewer", -1) }, guest.cookie))).toBe("invite_invalid");
+    expect(await codeOf(call("POST", "/invites/accept", { invite: `${inviteFor("viewer")}x` }, guest.cookie))).toBe("invite_invalid");
+    const gone = await call("POST", "/invites/accept", { invite: inviteFor("viewer", 60, "gone") }, guest.cookie);
     expect(gone.status).toBe(404);
     expect(((await gone.json()) as ApiError).code).toBe("room_not_found");
   });
 });
 
-describe("kode error buat undangan + umum", () => {
-  test("401 unauthorized, 403 forbidden, 404 room_not_found, route tak dikenal → not_found", async () => {
-    const codeOf = async (res: Promise<Response>) => ((await (await res).json()) as ApiError).code;
-    expect(await codeOf(call("POST", "/rooms/r1/invites", { role: "viewer" }))).toBe("unauthorized");
-    expect(await codeOf(call("POST", "/rooms/r1/invites", { role: "viewer" }, cookieFor("guest")))).toBe("forbidden");
-    expect(await codeOf(call("POST", "/rooms/nope/invites", { role: "viewer" }, cookieFor("owner")))).toBe("room_not_found");
+describe("kode error umum", () => {
+  test("route tak dikenal → not_found; /me tanpa sesi → unauthorized; admin-login lama sudah tidak ada", async () => {
     expect(await codeOf(call("GET", "/tidak-ada"))).toBe("not_found");
-    expect(await codeOf(call("POST", "/auth/admin-login", { password: "salah" }))).toBe("invalid_credentials");
     expect(await codeOf(call("GET", "/me"))).toBe("unauthorized");
+    expect((await call("POST", "/auth/admin-login", { password: "x" })).status).toBe(404);
   });
 });

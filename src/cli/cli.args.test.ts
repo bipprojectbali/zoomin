@@ -55,6 +55,31 @@ describe("parseCliArgs", () => {
     expect(parseCliArgs(["docs", "api"])).toEqual({ kind: "docs", topic: "api" });
   });
 
+  test("user: list / promote --role admin|user / unban; super_admin & argumen salah ditolak", () => {
+    expect(parseCliArgs(["user", "list"])).toEqual({ kind: "user", overrides: {}, user: { action: "list" } });
+    expect(parseCliArgs(["user", "promote", "a@b.test", "--role", "admin", "--db", "x.sqlite"])).toEqual({
+      kind: "user",
+      overrides: { dbPath: "x.sqlite" },
+      user: { action: "promote", email: "a@b.test", role: "admin" },
+    });
+    expect(parseCliArgs(["user", "promote", "a@b.test", "--role=user"])).toMatchObject({ user: { role: "user" } });
+    expect(parseCliArgs(["user", "unban", "a@b.test"])).toEqual({ kind: "user", overrides: {}, user: { action: "unban", email: "a@b.test" } });
+    expect(parseCliArgs(["user", "--help"])).toEqual({ kind: "help", topic: "user" });
+    for (const argv of [
+      ["user"],
+      ["user", "hapus", "a@b.test"],
+      ["user", "promote", "a@b.test"],
+      ["user", "promote", "a@b.test", "--role", "super_admin"],
+      ["user", "promote", "bukan-email", "--role", "admin"],
+      ["user", "unban"],
+      ["user", "unban", "a@b.test", "--role", "admin"],
+      ["user", "list", "extra"],
+      ["user", "unban", "a@b.test", "extra"],
+      ["serve", "--role", "admin"],
+    ]) expect(parseCliArgs(argv)).toMatchObject({ kind: "error", exitCode: 2 });
+    expect(parseCliArgs(["user", "promote", "a@b.test", "--role", "super_admin"])).toMatchObject({ message: expect.stringContaining("SUPER_ADMIN_EMAILS") });
+  });
+
   test("env → env-example, menolak flag override", () => {
     expect(parseCliArgs(["env"])).toEqual({ kind: "env-example" });
     expect(parseCliArgs(["env", "-p", "1"]).kind).toBe("error");

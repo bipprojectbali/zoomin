@@ -32,8 +32,8 @@ function fakeRoomService(opts: { roomExists?: boolean; metadata?: string; failWi
 
 function setup(svc = fakeRoomService()) {
   const db = openDb(":memory:");
-  db.run("INSERT INTO users (id, name, created_at) VALUES ('u1', 'U1', 1)");
-  db.run("INSERT INTO rooms (id, title, created_by, created_at) VALUES ('r1', 'R1', 'u1', 1)");
+  // created_by nullable (0002): layout tidak bergantung pada user pembuat.
+  db.run("INSERT INTO rooms (id, title, created_by, created_at) VALUES ('r1', 'R1', NULL, 1)");
   const deps = { db, roomService: svc } as unknown as LayoutDeps;
   return { db, svc, deps };
 }

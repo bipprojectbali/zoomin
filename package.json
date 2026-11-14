@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun --hot src/server/main.ts",
     "build": "bun scripts/build.web.ts",
-    "start":"NODE_ENV=production bun src/server/main.ts",
+    "start": "NODE_ENV=production bun src/server/main.ts",
     "build:binary": "bun scripts/build.binary.ts",
     "build:binary:all": "bun scripts/build.binary.ts --all",
     "test": "bun test",
@@ -16,6 +16,7 @@
   "dependencies": {
     "@dnd-kit/react": "0.5.3",
     "@livekit/components-react": "^2.9.25",
+    "better-auth": "^1.7.23",
     "bun-plugin-tailwind": "^0.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

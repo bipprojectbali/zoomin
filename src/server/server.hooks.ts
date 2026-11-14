@@ -4,6 +4,8 @@ import { RoomServiceClient } from "livekit-server-sdk";
 import type { CliOverrides } from "../cli/cli.args";
 import { summarizeConfig } from "../cli/cli.check";
 import type { CliServerHooks } from "../cli/cli.run";
+import { createAuth } from "./auth.better";
+import { listUsersForCli, setUserRoleByEmail, unbanUserByEmail } from "./auth.user.repository";
 import { type Config, DEFAULT_DB_PATH, loadConfig } from "./config";
 import { connectDb, openDb, runMigrations } from "./db";
 import { createServer, displayUrl, installShutdown, lanAddress, loadTls, toHttpUrl } from "./main";
@@ -47,7 +49,7 @@ export function createServerHooks(env: Env = process.env, standalone = Bun.isSta
       const config = configFrom(resolveEnv(overrides, env, standalone), standalone);
       const db = openDb(config.dbPath);
       const roomService = new RoomServiceClient(toHttpUrl(config.livekitUrl), config.livekitApiKey, config.livekitApiSecret);
-      const server = createServer({ db, config, roomService }, config.port);
+      const server = createServer({ db, config, roomService, auth: createAuth({ db, config }) }, config.port);
       installShutdown(server, db);
       console.info(`zoomin: ${displayUrl(server.hostname ?? config.host, server.port ?? config.port, Boolean(config.tls))} (LiveKit ${config.livekitUrl}, env ${config.nodeEnv})`);
       const lan = config.host === "0.0.0.0" || config.host === "::" ? lanAddress() : undefined;
@@ -62,6 +64,18 @@ export function createServerHooks(env: Env = process.env, standalone = Bun.isSta
       const db = connectDb(dbPath);
       try {
         return { applied: runMigrations(db) };
+      } finally {
+        db.close();
+      }
+    },
+
+    async user(overrides, action) {
+      // Seperti migrate: hanya butuh DB (jalan darurat saat secret/Google belum benar). openDb menerapkan migrasi.
+      const db = openDb(resolveEnv(overrides, env, standalone).DB_PATH?.trim() || DEFAULT_DB_PATH);
+      try {
+        if (action.action === "list") return listUsersForCli(db);
+        if (action.action === "promote") return [setUserRoleByEmail(db, action.email, action.role)];
+        return [unbanUserByEmail(db, action.email)];
       } finally {
         db.close();
       }

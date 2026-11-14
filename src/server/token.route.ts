@@ -1,28 +1,25 @@
 import { Elysia, t } from "elysia";
-import { SAFE_ID_PATTERN, type Role, type TokenResponse } from "../shared/api.types";
+import { type RoomRole, SAFE_ID_PATTERN, type TokenResponse } from "../shared/api.types";
 import type { ApiDeps } from "./api.deps";
 import { apiError } from "./api.error";
-import { getSessionUser } from "./auth.session";
+import { authGuard, hasRole } from "./auth.guard";
 import { syncRoomLayout } from "./layout.service";
 import { getMembership, roomExists } from "./rooms.repository";
 import { createJoinToken } from "./token.service";
 
-const HTTP_UNAUTHORIZED = 401;
 const HTTP_FORBIDDEN = 403;
 const HTTP_NOT_FOUND = 404;
 
 /**
- * Plugin route POST /rooms/:roomId/token. identity = user sesi, role = room_members (admin global non-member →
- * admin). Body sengaja tidak dibaca: role/identity dari client tidak pernah dipercaya.
+ * Plugin route POST /rooms/:roomId/token. identity = user sesi, role = room_members (admin/super_admin global
+ * non-member → host, A7). Body sengaja tidak dibaca: role/identity dari client tidak pernah dipercaya.
  */
 export function tokenRoutes(deps: ApiDeps) {
-  return new Elysia({ name: "token" }).post(
+  return new Elysia({ name: "token" }).use(authGuard(deps)).post(
     "/rooms/:roomId/token",
-    async ({ request, params: { roomId }, status }) => {
-      const user = getSessionUser(request, deps.db, deps.config.sessionSecret);
-      if (!user) return status(HTTP_UNAUTHORIZED, apiError("unauthorized", "unauthorized"));
+    async ({ user, params: { roomId }, status }) => {
       if (!roomExists(deps.db, roomId)) return status(HTTP_NOT_FOUND, apiError("room_not_found", "room not found"));
-      const role: Role | null = getMembership(deps.db, roomId, user.id) ?? (user.isAdmin ? "admin" : null);
+      const role: RoomRole | null = getMembership(deps.db, roomId, user.id) ?? (hasRole(user, "admin") ? "host" : null);
       if (!role) return status(HTTP_FORBIDDEN, apiError("forbidden", "not a member of this room"));
 
       // Siapkan room LiveKit + metadata layout dari SQLite sebelum client join (late joiner langsung dapat layout).
@@ -31,6 +28,6 @@ export function tokenRoutes(deps: ApiDeps) {
       const res: TokenResponse = { token, url: deps.config.publicLivekitUrl, role };
       return res;
     },
-    { params: t.Object({ roomId: t.String({ pattern: SAFE_ID_PATTERN }) }) },
+    { auth: "user", params: t.Object({ roomId: t.String({ pattern: SAFE_ID_PATTERN }) }) },
   );
 }

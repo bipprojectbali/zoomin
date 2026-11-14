@@ -1,5 +1,5 @@
 import pkg from "../../package.json" with { type: "json" };
-import { type CliOverrides, parseCliArgs } from "./cli.args";
+import { type CliOverrides, parseCliArgs, type UserAction } from "./cli.args";
 import { DOCS_TOPICS, ENV_EXAMPLE } from "./cli.docs";
 import { COMMAND_HELP, GLOBAL_HELP } from "./cli.help";
 
@@ -14,12 +14,23 @@ export interface CliIo {
   env: Record<string, string | undefined>;
 }
 
+/** Satu baris user untuk `zoomin user` (tanpa data sensitif selain email, yang memang dibutuhkan operator). */
+export type CliUserRow = { id: string; email: string; name: string; role: string; banned: boolean; createdAt: string };
+
 /** Aksi server yang disediakan main.ts; CLI hanya memanggil dan mencetak hasilnya. */
 export interface CliServerHooks {
   /** Start server, resolve saat server mati. */
   serve(overrides: CliOverrides): Promise<void>;
   migrate(overrides: CliOverrides): Promise<{ applied: string[] }>;
   check(overrides: CliOverrides): Promise<{ ok: true; summary: Record<string, string> } | { ok: false; errors: string[] }>;
+  /** `zoomin user`: list → semua baris (dibatasi hooks); promote/unban → [baris setelah diubah]. Throw bila email tak ada. */
+  user(overrides: CliOverrides, action: UserAction): Promise<CliUserRow[]>;
+}
+
+/** Tabel teks kolom rata kiri. */
+function table(rows: string[][]): string {
+  const widths = rows[0]?.map((_, i) => Math.max(...rows.map((r) => r[i]?.length ?? 0))) ?? [];
+  return rows.map((r) => r.map((c, i) => c.padEnd(widths[i] ?? 0)).join("  ").trimEnd()).join("\n");
 }
 
 /** Warna ANSI hanya bila output TTY dan NO_COLOR tidak diset (no-color.org: nilai non-kosong). */
@@ -84,6 +95,23 @@ export async function runCli(argv: string[], io: CliIo, hooks: CliServerHooks): 
         const width = Math.max(...Object.keys(result.summary).map((k) => k.length));
         const rows = Object.entries(result.summary).map(([k, v]) => `  ${k.padEnd(width)}  ${v}`);
         io.out(`${color.green("Konfigurasi valid.")}\n${rows.join("\n")}\n`);
+        return 0;
+      }
+      case "user": {
+        const rows = await hooks.user(command.overrides, command.user);
+        const action = command.user;
+        if (action.action === "list") {
+          if (!rows.length) {
+            io.out("Belum ada user.\n");
+            return 0;
+          }
+          const header = ["EMAIL", "PERAN", "STATUS", "NAMA", "DIBUAT", "ID"];
+          io.out(`${table([header, ...rows.map((u) => [u.email, u.role, u.banned ? "diblokir" : "aktif", u.name, u.createdAt, u.id])])}\n`);
+        } else if (action.action === "promote") {
+          io.out(`${color.green("OK")} peran ${action.email} sekarang ${rows[0]?.role ?? action.role}\n`);
+        } else {
+          io.out(`${color.green("OK")} ${action.email} tidak lagi diblokir\n`);
+        }
         return 0;
       }
     }

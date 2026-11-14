@@ -2,11 +2,9 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { RoomServiceClient } from "livekit-server-sdk";
+import { createTestDeps } from "../../test/auth.helpers";
 import type { ApiDeps } from "./api.deps";
-import { loadConfig } from "./config";
-import { openDb } from "./db";
-import { createServer, toHttpUrl } from "./main";
+import { createServer } from "./main";
 import { DEFAULT_WEB_DIR, staticRoutes, WEB_DIST_DIR } from "./static.serve";
 
 // Dist palsu (test-only): meniru output scripts/build.web.ts.
@@ -18,13 +16,8 @@ writeFileSync(join(dist, "index-abc123.js.map"), '{"sources":["secret.tsx"]}');
 mkdirSync(join(dist, "sub"));
 writeFileSync(join(dist, "sub", "logo-aa11.svg"), "<svg/>");
 
-const base = loadConfig({ DB_PATH: ":memory:", HOST: "127.0.0.1" });
-const config = { ...base, nodeEnv: "production" };
-const deps: ApiDeps = {
-  db: openDb(":memory:"),
-  config,
-  roomService: new RoomServiceClient(toHttpUrl(config.livekitUrl), config.livekitApiKey, config.livekitApiSecret),
-};
+const base = createTestDeps();
+const deps: ApiDeps = { ...base, config: { ...base.config, nodeEnv: "production" } };
 const server = createServer(deps, 0, dist);
 afterAll(() => {
   server.stop(true);

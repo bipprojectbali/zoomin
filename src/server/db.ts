@@ -4,11 +4,15 @@ import { dirname } from "node:path";
 // Migrasi di-embed sebagai teks (di-inline oleh `bun build --compile`), jadi runtime tidak membaca migrations/ dari disk.
 // File migrasi baru: tambahkan import + entri MIGRATIONS (db.test.ts gagal bila daftar tak sinkron dengan folder).
 import m0001 from "../../migrations/0001_init.sql" with { type: "text" };
+import m0002 from "../../migrations/0002_auth.sql" with { type: "text" };
 
 export type Migration = { name: string; sql: string };
 
 /** Migrasi SQL bernomor, berurutan nama file. */
-export const MIGRATIONS: readonly Migration[] = [{ name: "0001_init.sql", sql: m0001 }];
+export const MIGRATIONS: readonly Migration[] = [
+  { name: "0001_init.sql", sql: m0001 },
+  { name: "0002_auth.sql", sql: m0002 },
+];
 
 /** Membuka koneksi SQLite (FK aktif, WAL untuk file) tanpa menjalankan migrasi. */
 export function connectDb(path: string): Database {

@@ -15,8 +15,9 @@ const binary = join(outdir, `zoomin-${host}${process.platform === "win32" ? ".ex
 const SECRETS = {
   LIVEKIT_API_KEY: "bin-test-key", // test-only
   LIVEKIT_API_SECRET: "bin-test-secret-value", // test-only
-  SESSION_SECRET: "bin-test-session-secret-0123456789abcdef", // test-only
-  ADMIN_PASSWORD: "bin-test-admin-pass", // test-only
+  BETTER_AUTH_SECRET: "bin-test-auth-secret-0123456789abcdef", // test-only
+  GOOGLE_CLIENT_ID: "bin-test-google-id", // test-only
+  GOOGLE_CLIENT_SECRET: "bin-test-google-secret", // test-only
 };
 const BASE_ENV = { PATH: process.env.PATH ?? "", HOME: cwd, NO_COLOR: "1" };
 
@@ -41,7 +42,7 @@ describe("single binary", () => {
     expect(run(["--version"])).toMatchObject({ code: 0, out: expect.stringContaining("zoomin 0.1.0") });
     expect(run(["--help"])).toMatchObject({ code: 0, out: expect.stringContaining("migrate") });
     expect(run(["--docs", "list"])).toMatchObject({ code: 0, out: expect.stringContaining("deploy") });
-    expect(run(["env"])).toMatchObject({ code: 0, out: expect.stringContaining("SESSION_SECRET=") });
+    expect(run(["env"])).toMatchObject({ code: 0, out: expect.stringContaining("BETTER_AUTH_SECRET=") });
   });
 
   test("check: env valid → exit 0, secret tidak dicetak", () => {
@@ -52,16 +53,18 @@ describe("single binary", () => {
   });
 
   test("check: tanpa secret produksi → exit 1 + petunjuk, nilai yang ada tidak bocor", () => {
-    const r = run(["check"], { SESSION_SECRET: SECRETS.SESSION_SECRET });
+    const r = run(["check"], { BETTER_AUTH_SECRET: SECRETS.BETTER_AUTH_SECRET });
     expect(r.code).toBe(1);
     expect(r.err).toContain("LIVEKIT_API_KEY wajib diset");
     expect(r.err).toContain("zoomin env > .env");
-    expect(r.out + r.err).not.toContain(SECRETS.SESSION_SECRET);
+    expect(r.out + r.err).not.toContain(SECRETS.BETTER_AUTH_SECRET);
   });
 
-  test("migrate --db: pertama menerapkan 0001, kedua sudah terbaru (tanpa secret)", () => {
+  test("migrate --db: pertama menerapkan 0001+0002, kedua sudah terbaru (tanpa secret)", () => {
     const db = join(work, "migrate.sqlite");
-    expect(run(["migrate", "--db", db])).toMatchObject({ code: 0, out: expect.stringContaining("0001_init.sql") });
+    const first = run(["migrate", "--db", db]);
+    expect(first.code).toBe(0);
+    for (const name of ["0001_init.sql", "0002_auth.sql"]) expect(first.out).toContain(name);
     expect(run(["migrate", "--db", db])).toMatchObject({ code: 0, out: expect.stringContaining("sudah terbaru") });
   });
 
@@ -77,6 +80,8 @@ describe("single binary", () => {
       const base = `http://127.0.0.1:${port}`;
       await waitFor(`${base}/api/health`);
       expect((await fetch(`${base}/api/health`)).status).toBe(200);
+      // Better Auth (adapter bun:sqlite) jalan di binary hasil compile.
+      expect(await (await fetch(`${base}/api/auth/ok`)).json()).toEqual({ ok: true });
 
       const index = await fetch(`${base}/`);
       expect(index.status).toBe(200);

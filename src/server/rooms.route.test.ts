@@ -1,26 +1,19 @@
 import { beforeAll, describe, expect, test } from "bun:test";
-import { RoomServiceClient } from "livekit-server-sdk";
+import { createTestDeps, createTestUser, TEST_SUPER_ADMIN_EMAIL } from "../../test/auth.helpers";
 import type { ApiError, Page, RoomSummary } from "../shared/api.types";
 import { createApi } from "./api";
-import type { ApiDeps } from "./api.deps";
-import { createSessionCookie } from "./auth.session";
-import { loadConfig } from "./config";
-import { openDb } from "./db";
 import { createRoom } from "./rooms.repository";
 
-const config = loadConfig({});
-const db = openDb(":memory:");
-// Tidak dipanggil route rooms; hanya memenuhi tipe.
-const deps: ApiDeps = { db, config, roomService: new RoomServiceClient("http://127.0.0.1:1", "k", "s") };
+const deps = createTestDeps();
+const { db } = deps;
 const app = createApi(deps);
 
-function addUser(id: string, isAdmin = false): string {
-  db.query("INSERT INTO users (id, name, is_admin, created_at) VALUES (?, ?, ?, ?)").run(id, id, isAdmin ? 1 : 0, 0);
-  return createSessionCookie(id, config.sessionSecret, 60, false).split(";")[0]!;
-}
-
-const ADMIN = addUser("admin", true);
-const ALICE = addUser("alice");
+const admin = await createTestUser(deps, { email: "admin@example.test", role: "admin" });
+const alice = await createTestUser(deps, { email: "alice@example.test" });
+const ADMIN = admin.cookie;
+const ADMIN_ID = admin.user.id;
+const ALICE = alice.cookie;
+const ALICE_ID = alice.user.id;
 
 function call(method: string, path: string, cookie?: string, body?: unknown) {
   const headers: Record<string, string> = { "content-type": "application/json" };
@@ -36,8 +29,21 @@ describe("GET/POST /api/rooms", () => {
     expect((await call("POST", "/rooms", undefined, { id: "x", title: "X" })).status).toBe(401);
   });
 
-  test("non-admin POST → 403", async () => {
-    expect((await call("POST", "/rooms", ALICE, { id: "x", title: "X" })).status).toBe(403);
+  test("user POST → 403 insufficient_role; super_admin boleh", async () => {
+    const res = await call("POST", "/rooms", ALICE, { id: "x", title: "X" });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as ApiError).code).toBe("insufficient_role");
+    const root = await createTestUser(deps, { email: TEST_SUPER_ADMIN_EMAIL });
+    expect(root.user.role).toBe("super_admin");
+    expect((await call("POST", "/rooms", root.cookie, { id: "root-room", title: "Root" })).status).toBe(200);
+  });
+
+  test("user di-ban → 403 banned", async () => {
+    const banned = await createTestUser(deps, { email: "banned@example.test" });
+    db.query(`UPDATE "user" SET banned = 1 WHERE id = ?`).run(banned.user.id);
+    const res = await call("GET", "/rooms", banned.cookie);
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as ApiError).code).toBe("banned");
   });
 
   test.each([
@@ -55,13 +61,13 @@ describe("GET/POST /api/rooms", () => {
     expect(err.code).toBe("invalid_input");
   });
 
-  test("admin POST → room + creator jadi admin; duplikat → 409", async () => {
+  test("admin POST → room + creator jadi host; duplikat → 409", async () => {
     const res = await call("POST", "/rooms", ADMIN, { id: "dup-room", title: "Dup" });
     expect(res.status).toBe(200);
     const room = (await res.json()) as RoomSummary;
-    expect(room).toMatchObject({ id: "dup-room", title: "Dup", role: "admin" });
-    expect(db.query("SELECT role FROM room_members WHERE room_id = ? AND user_id = ?").get("dup-room", "admin")).toEqual({
-      role: "admin",
+    expect(room).toMatchObject({ id: "dup-room", title: "Dup", role: "host" });
+    expect(db.query("SELECT role FROM room_members WHERE room_id = ? AND user_id = ?").get("dup-room", ADMIN_ID)).toEqual({
+      role: "host",
     });
     const dup = await call("POST", "/rooms", ADMIN, { id: "dup-room", title: "Lagi" });
     expect(dup.status).toBe(409);
@@ -69,7 +75,7 @@ describe("GET/POST /api/rooms", () => {
   });
 
   test("paginasi 25 room, limit 10 → 3 halaman tanpa duplikat, nextCursor null di akhir", async () => {
-    for (let i = 0; i < 25; i++) createRoom(db, { id: `page-${String(i).padStart(2, "0")}`, title: `P${i}`, createdBy: "admin" });
+    for (let i = 0; i < 25; i++) createRoom(db, { id: `page-${String(i).padStart(2, "0")}`, title: `P${i}`, createdBy: ADMIN_ID });
     const total = (db.query("SELECT COUNT(*) AS n FROM rooms").get() as { n: number }).n;
     const seen: string[] = [];
     let cursor: string | null = null;
@@ -97,9 +103,9 @@ describe("GET/POST /api/rooms", () => {
   });
 
   test("user biasa hanya melihat room miliknya; admin global melihat semua dengan role null bila bukan member", async () => {
-    createRoom(db, { id: "alice-room", title: "Alice", createdBy: "admin" });
-    db.query("INSERT INTO room_members (room_id, user_id, role) VALUES ('alice-room', 'alice', 'viewer')").run();
-    db.query("DELETE FROM room_members WHERE room_id = 'alice-room' AND user_id = 'admin'").run();
+    createRoom(db, { id: "alice-room", title: "Alice", createdBy: ADMIN_ID });
+    db.query("INSERT INTO room_members (room_id, user_id, role) VALUES ('alice-room', ?, 'viewer')").run(ALICE_ID);
+    db.query("DELETE FROM room_members WHERE room_id = 'alice-room' AND user_id = ?").run(ADMIN_ID);
 
     const mine = (await (await call("GET", "/rooms?limit=100", ALICE)).json()) as Page<RoomSummary>;
     expect(mine.items.map((r) => [r.id, r.role])).toEqual([["alice-room", "viewer"]]);
@@ -107,17 +113,17 @@ describe("GET/POST /api/rooms", () => {
 
     const all = (await (await call("GET", "/rooms?limit=100", ADMIN)).json()) as Page<RoomSummary>;
     expect(all.items.find((r) => r.id === "alice-room")?.role).toBeNull();
-    expect(all.items.find((r) => r.id === "dup-room")?.role).toBe("admin");
+    expect(all.items.find((r) => r.id === "dup-room")?.role).toBe("host");
   });
 });
 
 describe("GET /api/rooms/:roomId", () => {
   let BOB = "";
-  beforeAll(() => {
-    BOB = addUser("bob");
-    createRoom(db, { id: "detail-room", title: "Rapat Detail", createdBy: "admin" });
-    db.query("INSERT INTO room_members (room_id, user_id, role) VALUES ('detail-room', 'alice', 'participant')").run();
-    db.query("DELETE FROM room_members WHERE room_id = 'detail-room' AND user_id = 'admin'").run();
+  beforeAll(async () => {
+    BOB = (await createTestUser(deps, { email: "bob@example.test" })).cookie;
+    createRoom(db, { id: "detail-room", title: "Rapat Detail", createdBy: ADMIN_ID });
+    db.query("INSERT INTO room_members (room_id, user_id, role) VALUES ('detail-room', ?, 'participant')").run(ALICE_ID);
+    db.query("DELETE FROM room_members WHERE room_id = 'detail-room' AND user_id = ?").run(ADMIN_ID);
   });
   const codeOf = async (res: Response) => ((await res.json()) as ApiError).code;
 

@@ -52,13 +52,15 @@ zoomin check               # validasi konfigurasi
 zoomin                     # jalankan server, buka http://localhost:3000
 \`\`\`
 
-Login admin dengan \`ADMIN_PASSWORD\` (default dev: \`admin\`).
+Login memakai akun Google (\`GOOGLE_CLIENT_ID\`/\`GOOGLE_CLIENT_SECRET\`). Email di \`SUPER_ADMIN_EMAILS\` otomatis
+menjadi super_admin; angkat admin dari halaman /dev atau \`zoomin user promote <email> --role admin\`.
 
 ## Perintah
 
 - \`zoomin [serve]\` jalankan server (default).
 - \`zoomin migrate\` terapkan migrasi SQLite lalu keluar.
 - \`zoomin check\` validasi konfigurasi; exit 1 bila tidak valid. Secret tidak pernah dicetak.
+- \`zoomin user list|promote <email> --role admin|user|unban <email>\` kelola akun darurat langsung di DB.
 - \`zoomin env\` cetak contoh \`.env\`.
 - \`zoomin --docs <topik>\` dokumentasi; \`zoomin <perintah> --help\` bantuan per perintah.
 
@@ -74,7 +76,7 @@ Login admin dengan \`ADMIN_PASSWORD\` (default dev: \`admin\`).
 /** Topik dokumentasi → isi. Fungsi agar topik berat (env) baru dihitung saat diminta. */
 export const DOCS_TOPICS: Record<string, () => string> = {
   usage: () => USAGE,
-  env: () => `# Variabel env\n\n${envTable()}\n\nDi produksi server gagal start bila variabel wajib kosong; SESSION_SECRET minimal 32 karakter.`,
+  env: () => `# Variabel env\n\n${envTable()}\n\nDi produksi server gagal start bila variabel wajib kosong; BETTER_AUTH_SECRET minimal 32 karakter.`,
   deploy: () => deployReadme,
   api: () => section(readme, "API"),
   readme: () => readme,

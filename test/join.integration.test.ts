@@ -1,31 +1,26 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Room, TrackPublishOptions, TrackSource } from "@livekit/rtc-node";
-import { RoomServiceClient } from "livekit-server-sdk";
 import type { TokenResponse } from "../src/shared/api.types";
 import { createApi } from "../src/server/api";
-import { createSessionCookie } from "../src/server/auth.session";
-import { loadConfig } from "../src/server/config";
-import { openDb } from "../src/server/db";
-import { toHttpUrl } from "../src/server/main";
 import { createRoom } from "../src/server/rooms.repository";
+import { createTestDeps, createTestUser } from "./auth.helpers";
 import { startSyntheticAudio, startSyntheticVideo } from "./synthetic-media";
 
 // Butuh LiveKit dev nyata (`livekit-server --dev`, ws://127.0.0.1:7880, devkey/secret).
 const VIEWER_PUBLISH_TIMEOUT_MS = 20_000;
 
-const config = loadConfig({});
-const db = openDb(":memory:");
-const roomService = new RoomServiceClient(toHttpUrl(config.livekitUrl), config.livekitApiKey, config.livekitApiSecret);
-const app = createApi({ db, config, roomService });
+const deps = createTestDeps();
+const { db, roomService } = deps;
+const app = createApi(deps);
 const roomId = `join-${crypto.randomUUID().slice(0, 8)}`;
 const participant = new Room();
 const viewer = new Room();
 const stops: (() => Promise<void>)[] = [];
 
-function addMember(userId: string, role: "participant" | "viewer"): string {
-  db.query("INSERT INTO users (id, name, is_admin, created_at) VALUES (?, ?, 0, 0)").run(userId, userId);
-  db.query("INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, ?)").run(roomId, userId, role);
-  return createSessionCookie(userId, config.sessionSecret, 60, false).split(";")[0]!;
+async function addMember(alias: string, role: "participant" | "viewer"): Promise<string> {
+  const { user, cookie } = await createTestUser(deps, { email: `${alias}@example.test`, name: alias });
+  db.query("INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, ?)").run(roomId, user.id, role);
+  return cookie;
 }
 
 async function fetchToken(cookie: string): Promise<TokenResponse> {
@@ -43,9 +38,9 @@ function publishMic(room: Room) {
 }
 
 beforeAll(async () => {
-  db.query("INSERT INTO users (id, name, is_admin, created_at) VALUES ('admin', 'Admin', 1, 0)").run();
-  createRoom(db, { id: roomId, title: "Join IT", createdBy: "admin" });
-  const [p, v] = await Promise.all([fetchToken(addMember("p1", "participant")), fetchToken(addMember("v1", "viewer"))]);
+  const admin = await createTestUser(deps, { email: "admin@example.test", role: "admin" });
+  createRoom(db, { id: roomId, title: "Join IT", createdBy: admin.user.id });
+  const [p, v] = await Promise.all([fetchToken(await addMember("p1", "participant")), fetchToken(await addMember("v1", "viewer"))]);
   expect([p.role, v.role]).toEqual(["participant", "viewer"]);
   await participant.connect(p.url, p.token);
   await viewer.connect(v.url, v.token);

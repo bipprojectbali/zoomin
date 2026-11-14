@@ -17,6 +17,7 @@ export const GLOBAL_HELP = `zoomin - ruang meeting self-hosted di atas LiveKit
   serve           Jalankan server (default bila tanpa perintah)
   migrate         Terapkan migrasi SQLite lalu keluar
   check           Validasi konfigurasi tanpa menjalankan server
+  user            Kelola akun darurat: list | promote <email> --role admin|user | unban <email>
   env             Cetak contoh file .env
   docs [topik]    Cetak dokumentasi (sama dengan --docs)
   help [command]  Bantuan umum atau per perintah
@@ -32,6 +33,7 @@ ${SERVE_OPTIONS}
   zoomin env > .env                   Buat file .env awal
   zoomin check --env-file /etc/zoomin/zoomin.env
   zoomin migrate --db ./data/zoomin.sqlite
+  zoomin user promote ana@example.com --role admin
   zoomin serve --help                 Bantuan perintah serve
 
 ${DOCS_HINT}`;
@@ -67,6 +69,24 @@ ${SERVE_OPTIONS}
 
 # Examples
   NODE_ENV=production zoomin check --env-file /etc/zoomin/zoomin.env`,
+  user: `zoomin user - kelola akun langsung di DB (jalan darurat, hanya di server)
+Peran super_admin tidak bisa diatur di sini: selalu dari SUPER_ADMIN_EMAILS (disinkronkan saat login).
+
+# Usage
+  zoomin user list [--db <path>] [--env-file <path>]
+  zoomin user promote <email> --role admin|user
+  zoomin user unban <email>
+
+# Options
+      --role <peran>    Peran global baru untuk promote: admin atau user
+      --db <path>       Path file SQLite, menimpa DB_PATH
+      --env-file <path> Muat variabel env dari file ini
+
+# Examples
+  zoomin user list --env-file /etc/zoomin/zoomin.env
+  zoomin user promote ana@example.com --role admin
+  zoomin user promote ana@example.com --role user     Turunkan admin jadi user
+  zoomin user unban budi@example.com`,
   env: `zoomin env - cetak contoh file .env (isi .env.example) ke stdout
 
 # Usage

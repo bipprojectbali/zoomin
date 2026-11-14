@@ -3,20 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { t } from "elysia";
-import { RoomServiceClient } from "livekit-server-sdk";
+import { createTestDeps } from "../../test/auth.helpers";
 import { createApi } from "./api";
-import type { ApiDeps } from "./api.deps";
-import { loadConfig } from "./config";
-import { openDb } from "./db";
 import { createServer, displayUrl, installShutdown, shutdown, toHttpUrl } from "./main";
 
-const config = loadConfig({ DB_PATH: ":memory:", HOST: "127.0.0.1" });
-const deps: ApiDeps = {
-  db: openDb(":memory:"),
-  config,
-  // Tidak dipanggil di test ini; hanya memenuhi tipe.
-  roomService: new RoomServiceClient(toHttpUrl(config.livekitUrl), config.livekitApiKey, config.livekitApiSecret),
-};
+const deps = createTestDeps();
+const { config } = deps;
 const server = createServer(deps, 0);
 afterAll(() => server.stop(true));
 
@@ -32,6 +24,31 @@ describe("main server", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
     expect(await res.text()).toContain('<div id="root">');
+  });
+
+  test("GET /api/auth/ok → handler Better Auth terpasang di Bun.serve", async () => {
+    const res = await fetch(new URL("/api/auth/ok", server.url));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
+  test("POST /api/auth/sign-in/social google → URL redirect ke accounts.google.com dengan redirect_uri callback", async () => {
+    const res = await fetch(new URL("/api/auth/sign-in/social", server.url), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider: "google", callbackURL: "/app" }),
+    });
+    expect(res.status).toBe(200);
+    const { url } = (await res.json()) as { url: string };
+    const target = new URL(url);
+    expect(target.host).toBe("accounts.google.com");
+    expect(target.searchParams.get("redirect_uri")).toBe(`${config.authUrl}/api/auth/callback/google`);
+    expect(res.headers.getSetCookie().some((c) => c.includes("state"))).toBe(true);
+  });
+
+  test("/api/auth/admin/* (plugin admin) diblok dari HTTP → 404", async () => {
+    expect((await fetch(new URL("/api/auth/admin/list-users", server.url))).status).toBe(404);
+    expect((await fetch(new URL("/api/auth/admin/set-role", server.url), { method: "POST", body: "{}" })).status).toBe(404);
   });
 
   test("GET /api/tidak-ada → 404, bukan HTML", async () => {

@@ -21,7 +21,7 @@ describe("auth.invite", () => {
     const inv = createInvite({ roomId: "r1", role: "viewer", ttlSeconds: 60 }, SECRET, NOW);
     const [data, sig] = inv.split(".") as [string, string];
     const upgraded = Buffer.from(
-      JSON.stringify({ ...JSON.parse(Buffer.from(data, "base64url").toString()), role: "admin" }),
+      JSON.stringify({ ...JSON.parse(Buffer.from(data, "base64url").toString()), role: "host" }),
     ).toString("base64url");
     expect(verifyInvite(`${upgraded}.${sig}`, SECRET, NOW)).toBeNull();
     // Karakter pengganti harus pasti beda: sig acak (nonce) dan karakter terakhirnya 'A' dengan peluang 1/16.
@@ -44,7 +44,7 @@ describe("auth.invite", () => {
     expect(verifyInvite(badRoom, SECRET, NOW)).toBeNull();
   });
 
-  test("signature undangan bukan signature cookie sesi (kunci turunan)", () => {
+  test("signature undangan bukan HMAC mentah BETTER_AUTH_SECRET (kunci turunan)", () => {
     const inv = createInvite({ roomId: "r1", role: "viewer", ttlSeconds: 60 }, SECRET, NOW);
     const [data, sig] = inv.split(".") as [string, string];
     expect(createHmac("sha256", SECRET).update(data).digest("base64url")).not.toBe(sig);

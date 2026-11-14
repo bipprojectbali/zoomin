@@ -12,14 +12,10 @@ import {
   TrackSource,
   VideoStream,
 } from "@livekit/rtc-node";
-import { RoomServiceClient } from "livekit-server-sdk";
-import type { Role, TokenResponse } from "../src/shared/api.types";
+import type { RoomRole, TokenResponse } from "../src/shared/api.types";
 import { CAMERA_TRACK, MIC_TRACK, createScreenNamer, parseTrackName } from "../src/shared/track.naming";
 import { createApi } from "../src/server/api";
-import { createSessionCookie } from "../src/server/auth.session";
-import { loadConfig } from "../src/server/config";
-import { openDb } from "../src/server/db";
-import { toHttpUrl } from "../src/server/main";
+import { createTestDeps, createTestUser } from "./auth.helpers";
 import { centerRgb, type Rgb, rgbClose, startSyntheticAudio, startSyntheticVideo } from "./synthetic-media";
 
 const MIN_FRAMES = 20;
@@ -28,16 +24,17 @@ const TRACK_TIMEOUT_MS = 10_000;
 const TEST_TIMEOUT_MS = 40_000;
 const HTTP_OK = 200;
 
-const config = loadConfig({ DB_PATH: ":memory:" });
-const db = openDb(":memory:");
-const roomService = new RoomServiceClient(toHttpUrl(config.livekitUrl), config.livekitApiKey, config.livekitApiSecret);
-const app = createApi({ db, config, roomService });
+const deps = createTestDeps();
+const { db } = deps;
+const app = createApi(deps);
 
-// test-only: user tetap untuk semua skenario.
-const USERS = ["presenter", "user-a", "user-b", "viewer1"];
-for (const id of USERS) {
-  db.query("INSERT INTO users (id, name, is_admin, created_at) VALUES (?, ?, 0, ?)").run(id, id, Date.now());
-}
+// test-only: user tetap untuk semua skenario (alias → user Better Auth + cookie sesi; identity LiveKit = user.id).
+const USERS = ["presenter", "user-a", "user-b", "viewer1"] as const;
+type Alias = (typeof USERS)[number];
+const ACCOUNTS = Object.fromEntries(
+  await Promise.all(USERS.map(async (a) => [a, await createTestUser(deps, { email: `${a}@example.test`, name: a })] as const)),
+) as Record<Alias, Awaited<ReturnType<typeof createTestUser>>>;
+const idOf = (alias: Alias) => ACCOUNTS[alias].user.id;
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -48,23 +45,23 @@ afterEach(async () => {
 afterAll(() => db.close());
 
 /** Room SQLite baru (id acak) + keanggotaan; mengembalikan id room. */
-function createRoom(members: Record<string, Role>): string {
+function createRoom(members: Partial<Record<Alias, RoomRole>>): string {
   const roomId = `ms-${crypto.randomUUID()}`;
   db.query("INSERT INTO rooms (id, title, created_by, created_at) VALUES (?, ?, ?, ?)").run(
     roomId,
     "multishare",
-    "presenter",
+    idOf("presenter"),
     Date.now(),
   );
-  for (const [userId, role] of Object.entries(members)) {
-    db.query("INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, ?)").run(roomId, userId, role);
+  for (const [alias, role] of Object.entries(members)) {
+    db.query("INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, ?)").run(roomId, idOf(alias as Alias), role);
   }
   return roomId;
 }
 
 /** Token lewat endpoint produk dengan cookie sesi user. */
-async function fetchToken(roomId: string, userId: string): Promise<TokenResponse> {
-  const cookie = createSessionCookie(userId, config.sessionSecret, undefined, false).split(";")[0]!;
+async function fetchToken(roomId: string, userId: Alias): Promise<TokenResponse> {
+  const { cookie } = ACCOUNTS[userId];
   const res = await app.handle(
     new Request(`http://localhost/api/rooms/${roomId}/token`, { method: "POST", headers: { cookie } }),
   );
@@ -79,7 +76,7 @@ interface Subscribed {
 }
 
 /** Join dengan token endpoint; listener TrackSubscribed dipasang sebelum connect agar tak ada event terlewat. */
-async function joinRoom(roomId: string, userId: string) {
+async function joinRoom(roomId: string, userId: Alias) {
   const { token, url } = await fetchToken(roomId, userId);
   const room = new Room();
   const subscribed: Subscribed[] = [];
@@ -156,7 +153,7 @@ test(
     const got = await viewer.waitFor(5);
     const byName = new Map(got.map((s) => [s.pub.name!, s]));
     expect([...byName.keys()].sort()).toEqual([CAMERA_TRACK, MIC_TRACK, "screen-1", "screen-2", "screen-3"]);
-    expect(got.every((s) => s.identity === "presenter")).toBe(true);
+    expect(got.every((s) => s.identity === idOf("presenter"))).toBe(true);
     expect([...byName.keys()].map((n) => parseTrackName(n)?.kind).sort()).toEqual([
       "camera",
       "mic",
@@ -188,8 +185,8 @@ test(
     const roomId = createRoom({ "user-a": "participant", "user-b": "participant", viewer1: "viewer" });
     const viewer = await joinRoom(roomId, "viewer1");
     const sharers = [
-      { identity: "user-a", color: [255, 0, 255] as Rgb },
-      { identity: "user-b", color: [0, 255, 255] as Rgb },
+      { identity: "user-a" as const, color: [255, 0, 255] as Rgb },
+      { identity: "user-b" as const, color: [0, 255, 255] as Rgb },
     ];
     for (const s of sharers) {
       const p = await joinRoom(roomId, s.identity);
@@ -199,7 +196,7 @@ test(
 
     const got = await viewer.waitFor(2);
     for (const s of sharers) {
-      const entry = got.find((g) => g.identity === s.identity);
+      const entry = got.find((g) => g.identity === idOf(s.identity));
       expect(entry).toBeDefined();
       expect(entry!.pub.name).toBe("screen-1");
       expect(entry!.pub.source).toBe(TrackSource.SOURCE_SCREENSHARE);

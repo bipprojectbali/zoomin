@@ -11,9 +11,17 @@ export type Config = {
   publicLivekitUrl: string;
   livekitApiKey: string;
   livekitApiSecret: string;
-  /** Kunci HMAC cookie sesi, minimal SESSION_SECRET_MIN_LENGTH karakter. */
-  sessionSecret: string;
-  adminPassword: string;
+  /** BETTER_AUTH_SECRET: kunci Better Auth (cookie sesi, state OAuth) + tanda tangan undangan; minimal AUTH_SECRET_MIN_LENGTH. */
+  authSecret: string;
+  /** Base URL Better Auth (BETTER_AUTH_URL); default = publicAppUrl (A14). Redirect Google: <authUrl>/api/auth/callback/google. */
+  authUrl: string;
+  /** Kredensial OAuth Google (GOOGLE_CLIENT_ID/SECRET); kosong di dev = provider Google tidak dipasang. */
+  googleClientId: string;
+  googleClientSecret: string;
+  /** SUPER_ADMIN_EMAILS: email (lowercase, trim) yang selalu disinkronkan jadi super_admin (A4). */
+  superAdminEmails: string[];
+  /** Jalur login test-only POST /api/test/login (A12): ZOOMIN_TEST_AUTH=1 dan BUKAN production. */
+  testAuth: boolean;
   /** Base URL app untuk link undangan. */
   publicAppUrl: string;
   /** Path sertifikat + kunci TLS (PEM). Diset → server HTTPS; kosong → HTTP. */
@@ -22,9 +30,9 @@ export type Config = {
   trustProxy: boolean;
 };
 
-export const SESSION_SECRET_MIN_LENGTH = 32;
+export const AUTH_SECRET_MIN_LENGTH = 32;
 /** Env yang wajib diset di production (loadConfig throw bila kosong). Sumber tunggal untuk docs/CLI. */
-export const REQUIRED_IN_PRODUCTION = ["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "SESSION_SECRET", "ADMIN_PASSWORD"] as const;
+export const REQUIRED_IN_PRODUCTION = ["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] as const;
 const DEFAULT_PORT = 3000;
 const DEFAULT_HOST = "0.0.0.0";
 export const DEFAULT_DB_PATH = "./data/zoomin.sqlite";
@@ -51,11 +59,15 @@ export function loadConfig(env: Env = process.env): Config {
 
   const livekitApiKey = pick("LIVEKIT_API_KEY", "devkey"); // test-only dev default
   const livekitApiSecret = pick("LIVEKIT_API_SECRET", "secret"); // test-only dev default
-  const sessionSecret = pick("SESSION_SECRET", "dev-session-secret-0123456789abcdef"); // test-only dev default
-  const adminPassword = pick("ADMIN_PASSWORD", "admin"); // test-only dev default
-  if (sessionSecret.length < SESSION_SECRET_MIN_LENGTH) {
-    throw new Error(`loadConfig: SESSION_SECRET minimal ${SESSION_SECRET_MIN_LENGTH} karakter (sekarang ${sessionSecret.length})`);
+  const authSecret = pick("BETTER_AUTH_SECRET", "dev-better-auth-secret-0123456789abcdef"); // test-only dev default
+  if (authSecret.length < AUTH_SECRET_MIN_LENGTH) {
+    throw new Error(`loadConfig: BETTER_AUTH_SECRET minimal ${AUTH_SECRET_MIN_LENGTH} karakter (sekarang ${authSecret.length})`);
   }
+  const googleClientId = pick("GOOGLE_CLIENT_ID", "");
+  const googleClientSecret = pick("GOOGLE_CLIENT_SECRET", "");
+  // A14: satu URL cukup; yang kosong mengikuti yang lain agar redirect OAuth & link undangan tidak drift.
+  const appUrl = env.PUBLIC_APP_URL?.trim();
+  const authUrl = env.BETTER_AUTH_URL?.trim();
 
   const certPath = env.TLS_CERT_PATH?.trim();
   const keyPath = env.TLS_KEY_PATH?.trim();
@@ -73,9 +85,14 @@ export function loadConfig(env: Env = process.env): Config {
     publicLivekitUrl: env.PUBLIC_LIVEKIT_URL?.trim() || livekitUrl,
     livekitApiKey,
     livekitApiSecret,
-    sessionSecret,
-    adminPassword,
-    publicAppUrl: env.PUBLIC_APP_URL?.trim() || DEFAULT_PUBLIC_APP_URL,
+    authSecret,
+    authUrl: authUrl || appUrl || DEFAULT_PUBLIC_APP_URL,
+    googleClientId,
+    googleClientSecret,
+    superAdminEmails: (env.SUPER_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean),
+    // Production selalu mematikan jalur test walau flag diset (A12).
+    testAuth: !isProd && env.ZOOMIN_TEST_AUTH?.trim() === "1",
+    publicAppUrl: appUrl || authUrl || DEFAULT_PUBLIC_APP_URL,
     tls: certPath && keyPath ? { certPath, keyPath } : undefined,
     trustProxy: env.TRUST_PROXY?.trim() === "true",
   };

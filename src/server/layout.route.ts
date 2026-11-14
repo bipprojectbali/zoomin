@@ -1,50 +1,48 @@
-import type { Database } from "bun:sqlite";
 import { Elysia, t } from "elysia";
-import type { ApiError, LayoutConflictError as LayoutConflictBody, Role, SessionUser } from "../shared/api.types";
+import type { ApiError, LayoutConflictError as LayoutConflictBody, RoomRole, SessionUser } from "../shared/api.types";
 import { LayoutValidationError, parseLayout } from "../shared/layout.model";
 import type { ApiDeps } from "./api.deps";
 import { apiError } from "./api.error";
-import { getSessionUser } from "./auth.session";
+import { getSessionState, hasRole, requireRole } from "./auth.guard";
 import { getLayout, LayoutConflictError, putLayout } from "./layout.service";
 
 const HTTP_BAD_REQUEST = 400;
-const HTTP_UNAUTHORIZED = 401;
 const HTTP_FORBIDDEN = 403;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 
-type Access = { ok: true; user: SessionUser; role: Role | null } | { ok: false; status: number; body: ApiError };
+type Access = { ok: true; user: SessionUser; role: RoomRole | null } | { ok: false; status: number; body: ApiError };
 
-/** Sesi + keberadaan room + role member; admin global boleh akses walau bukan member (role null). */
-function checkAccess(request: Request, db: Database, secret: string, roomId: string): Access {
-  const user = getSessionUser(request, db, secret);
-  if (!user) return { ok: false, status: HTTP_UNAUTHORIZED, body: apiError("unauthorized", "unauthorized") };
-  const row = db
-    .query<{ role: Role | null }, [string, string]>(
+/** Sesi + keberadaan room + role member; admin/super_admin global boleh akses walau bukan member (diperlakukan host). */
+async function checkAccess(request: Request, deps: ApiDeps, roomId: string): Promise<Access> {
+  const access = requireRole(await getSessionState(request, deps), "user");
+  if (!access.ok) return access;
+  const { user } = access;
+  const row = deps.db
+    .query<{ role: RoomRole | null }, [string, string]>(
       "SELECT m.role AS role FROM rooms r LEFT JOIN room_members m ON m.room_id = r.id AND m.user_id = ? WHERE r.id = ?",
     )
     .get(user.id, roomId);
   if (!row) return { ok: false, status: HTTP_NOT_FOUND, body: apiError("room_not_found", "room not found") };
-  if (!row.role && !user.isAdmin) return { ok: false, status: HTTP_FORBIDDEN, body: apiError("forbidden", "forbidden") };
+  if (!row.role && !hasRole(user, "admin")) return { ok: false, status: HTTP_FORBIDDEN, body: apiError("forbidden", "forbidden") };
   return { ok: true, user, role: row.role };
 }
 
 /** Plugin route layout (lihat kontrak di src/shared/api.types.ts). */
 export function layoutRoutes(deps: ApiDeps) {
-  const secret = deps.config.sessionSecret;
   return new Elysia({ name: "layout" })
-    .get("/rooms/:roomId/layout", ({ request, params, status }) => {
-      const access = checkAccess(request, deps.db, secret, params.roomId);
+    .get("/rooms/:roomId/layout", async ({ request, params, status }) => {
+      const access = await checkAccess(request, deps, params.roomId);
       if (!access.ok) return status(access.status, access.body);
       return getLayout(deps.db, params.roomId);
     })
     .put(
       "/rooms/:roomId/layout",
       async ({ request, params, body, status }) => {
-        const access = checkAccess(request, deps.db, secret, params.roomId);
+        const access = await checkAccess(request, deps, params.roomId);
         if (!access.ok) return status(access.status, access.body);
-        if (access.role !== "admin" && !access.user.isAdmin) {
-          return status(HTTP_FORBIDDEN, apiError("forbidden", "room admin only"));
+        if (access.role !== "host" && !hasRole(access.user, "admin")) {
+          return status(HTTP_FORBIDDEN, apiError("forbidden", "room host only"));
         }
         let layout;
         try {

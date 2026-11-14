@@ -3,9 +3,13 @@ import { parseArgs } from "node:util";
 /** Override config dari flag CLI; hooks server yang menerapkannya ke config. */
 export type CliOverrides = { port?: number; host?: string; dbPath?: string; envFile?: string };
 
+/** Sub-perintah `zoomin user` (A11, jalan darurat langsung ke DB). super_admin tidak bisa diset di sini (A4). */
+export type UserAction = { action: "list" } | { action: "promote"; email: string; role: "admin" | "user" } | { action: "unban"; email: string };
+
 /** Hasil parsing argv: perintah yang harus dijalankan runCli. */
 export type CliCommand =
   | { kind: "serve"; overrides: CliOverrides }
+  | { kind: "user"; overrides: CliOverrides; user: UserAction }
   | { kind: "migrate"; overrides: CliOverrides }
   | { kind: "check"; overrides: CliOverrides }
   | { kind: "env-example" }
@@ -15,8 +19,9 @@ export type CliCommand =
   | { kind: "error"; message: string; exitCode: 2 };
 
 /** Nama perintah yang dikenal (dipakai juga oleh teks bantuan). */
-export const COMMANDS = ["serve", "migrate", "check", "env", "docs", "help"] as const;
-const OVERRIDE_COMMANDS = new Set(["serve", "migrate", "check"]);
+export const COMMANDS = ["serve", "migrate", "check", "user", "env", "docs", "help"] as const;
+const OVERRIDE_COMMANDS = new Set(["serve", "migrate", "check", "user"]);
+const PROMOTE_ROLES = ["admin", "user"] as const;
 const HINT = "Jalankan `zoomin --help` untuk daftar perintah dan opsi.";
 
 const OPTIONS = {
@@ -24,6 +29,7 @@ const OPTIONS = {
   host: { type: "string", short: "H" },
   db: { type: "string" },
   "env-file": { type: "string" },
+  role: { type: "string" },
   version: { type: "boolean", short: "v" },
   help: { type: "boolean", short: "h" },
   // Boolean, topik diambil dari positional: parseArgs tidak mendukung nilai opsional (`-d` vs `-d env`).
@@ -63,7 +69,10 @@ export function parseCliArgs(argv: string[]): CliCommand {
     if (rest.length > 1) return error(`Argumen berlebih: ${rest.slice(1).join(" ")}`);
     return { kind: command, topic: rest[0] };
   }
-  if (rest.length) return error(`Argumen berlebih untuk \`${command}\`: ${rest.join(" ")}`);
+  if (command !== "user" && values.role !== undefined) return error("Opsi --role hanya untuk `zoomin user promote`");
+  const user = command === "user" ? parseUserAction(rest, values.role) : undefined;
+  if (typeof user === "string") return error(user);
+  if (command !== "user" && rest.length) return error(`Argumen berlebih untuk \`${command}\`: ${rest.join(" ")}`);
 
   const hasOverride = values.port !== undefined || values.host !== undefined || values.db !== undefined || values["env-file"] !== undefined;
   if (!OVERRIDE_COMMANDS.has(command)) {
@@ -82,7 +91,20 @@ export function parseCliArgs(argv: string[]): CliCommand {
   for (const [flag, value] of [["--host", values.host], ["--db", values.db], ["--env-file", values["env-file"]]] as const) {
     if (value !== undefined && !value.trim()) return error(`Nilai ${flag} tidak boleh kosong`);
   }
+  if (user) return { kind: "user", overrides, user };
   return { kind: command as "serve" | "migrate" | "check", overrides };
+}
+
+/** `user list | promote <email> --role admin|user | unban <email>` → UserAction, atau pesan error. */
+function parseUserAction(args: string[], role: string | undefined): UserAction | string {
+  const [action, email, ...extra] = args;
+  if (extra.length) return `Argumen berlebih untuk \`user ${action}\`: ${extra.join(" ")}`;
+  if (action === "list") return email === undefined && role === undefined ? { action } : "`user list` tidak menerima email/--role";
+  if (action !== "promote" && action !== "unban") return `Sub-perintah user tidak dikenal: ${action ?? "(kosong)"} (list|promote|unban)`;
+  if (!email || !email.includes("@")) return `\`user ${action}\` butuh email yang valid`;
+  if (action === "unban") return role === undefined ? { action, email } : "`user unban` tidak menerima --role";
+  if (!PROMOTE_ROLES.includes(role as "admin")) return "`user promote` butuh --role admin|user (super_admin hanya dari SUPER_ADMIN_EMAILS)";
+  return { action, email, role: role as "admin" | "user" };
 }
 
 /** Pesan error parseArgs (Inggris) → Bahasa Indonesia; opsi yang bermasalah tetap disebut. */

@@ -1,18 +1,25 @@
 // Kontrak API HTTP server <-> web. Tipe saja (plus satu konstanta pola), tanpa logika.
-// Semua endpoint JSON, prefix /api, sesi via cookie `zm_session`.
+// Semua endpoint JSON, prefix /api, sesi = cookie Better Auth (login Google, RND/plan/05-auth-roles.md).
 //
-// GET  /api/me                                  -> { user: SessionUser }                 | 401
-// POST /api/auth/admin-login  AdminLoginBody    -> { user: SessionUser } + cookie        | 401
-// POST /api/auth/logout                         -> 204
-// POST /api/rooms/:roomId/invites CreateInviteBody (admin room / admin global) -> CreateInviteResponse
+// /api/auth/*                                   -> handler Better Auth (sign-in/social, callback/google, sign-out, ...)
+//                                                  /api/auth/admin/* diblok dari HTTP: aksi admin lewat /api/admin/*.
+// GET    /api/me                                -> { user: SessionUser }                 | 401 | 403 banned
+// PATCH  /api/me  ProfileUpdateBody             -> { user: SessionUser }
+// DELETE /api/me                                -> 204 (super_admin → 403 insufficient_role)
+// GET    /api/me/sessions                       -> { items: MySession[] }
+// DELETE /api/me/sessions                       -> 204 (semua sesi selain yang dipakai)
+// DELETE /api/me/sessions/:id                   -> 204
+// POST   /api/test/login TestLoginBody          -> { user } + cookie (HANYA dev + ZOOMIN_TEST_AUTH=1; selain itu 404)
+// POST /api/rooms/:roomId/invites CreateInviteBody (host room / admin global) -> CreateInviteResponse
 // GET  /api/invites/preview?invite=            -> InvitePreview (sesi opsional)         | 400 invite_invalid | 404 room_not_found
-// POST /api/invites/accept    AcceptInviteBody  -> AcceptInviteResponse + cookie
+// POST /api/invites/accept    AcceptInviteBody  -> AcceptInviteResponse (wajib sesi)     | 401
 // GET  /api/rooms?limit=&cursor=                -> Page<RoomSummary> (limit default 20, max 100)
-// POST /api/rooms             CreateRoomBody (admin global) -> RoomSummary (creator jadi member role admin)
-// GET  /api/rooms/:roomId                       -> RoomSummary (member / admin global)   | 401 | 403 | 404 room_not_found
+// POST /api/rooms             CreateRoomBody (admin+) -> RoomSummary (creator jadi host) | 403 insufficient_role
+// GET  /api/rooms/:roomId                       -> RoomSummary (member / admin+)         | 401 | 403 | 404 room_not_found
 // POST /api/rooms/:roomId/token                 -> TokenResponse
 // GET  /api/rooms/:roomId/layout                -> LayoutResponse
 // PUT  /api/rooms/:roomId/layout PutLayoutBody  -> PutLayoutResponse | 409 LayoutConflictError
+// Admin (admin+) & dev (super_admin): lihat tabel endpoint di RND/plan/05-auth-roles.md dan fungsi di src/web/api.client.ts.
 
 import type { LayoutState } from "./layout.model";
 
@@ -25,11 +32,81 @@ export const SAFE_ID_PATTERN = "^[A-Za-z0-9_-]{1,64}$";
  */
 export const SAFE_ID_HTML_PATTERN = "[A-Za-z0-9_\\-]{1,64}";
 
-/** Role anggota di satu room. */
-export type Role = "admin" | "participant" | "viewer";
+/** Peran global akun (A3). super_admin hanya dari env SUPER_ADMIN_EMAILS (A4). */
+export type GlobalRole = "user" | "admin" | "super_admin";
 
-/** User yang sedang login (dari cookie sesi). */
-export type SessionUser = { id: string; name: string; isAdmin: boolean };
+/** Peran anggota di satu room (A3); `host` menggantikan peran room `admin` lama. */
+export type RoomRole = "host" | "participant" | "viewer";
+
+/** @deprecated pakai RoomRole; alias sementara sampai web selesai migrasi (gelombang 2). */
+export type Role = RoomRole;
+
+/** User yang sedang login (dari sesi Better Auth). */
+export type SessionUser = { id: string; name: string; email: string; image: string | null; role: GlobalRole };
+
+/** User di panel admin. Waktu = epoch ms. */
+export type AdminUser = SessionUser & {
+  banned: boolean;
+  banReason: string | null;
+  banExpires: number | null;
+  createdAt: number;
+  lastActiveAt: number | null;
+};
+
+/** Aksi admin/dev yang wajib diaudit (A8). */
+export type AuditAction =
+  | "user.ban"
+  | "user.unban"
+  | "user.delete"
+  | "user.role"
+  | "user.sessions.revoke"
+  | "room.create"
+  | "room.delete"
+  | "setting.update";
+
+/** Satu baris audit log. */
+export type AuditEntry = {
+  id: string;
+  at: number;
+  actorId: string;
+  actorEmail: string;
+  action: AuditAction;
+  targetType: "user" | "room" | "setting" | "session";
+  targetId: string;
+  detail: Record<string, unknown>;
+};
+
+/** Setting proyek (tabel app_settings); allowedEmailDomains kosong = semua domain boleh (A9). */
+export type AppSettings = { allowedEmailDomains: string[] };
+
+/** Respons GET /api/dev/health. */
+export type SystemHealth = {
+  version: string;
+  bun: string;
+  uptimeSec: number;
+  nodeEnv: string;
+  livekit: { url: string; ok: boolean; latencyMs: number | null; error: string | null };
+  db: { users: number; rooms: number; activeRooms: number; sizeBytes: number | null };
+  superAdminEmailsConfigured: number;
+};
+
+/** Body PATCH /api/me: name 1–60 (trim); image URL https atau null (kembali ke foto Google). */
+export type ProfileUpdateBody = { name?: string; image?: string | null };
+
+/** Body POST /api/admin/users/:id/ban: reason 3–200; tanpa expiresInHours = permanen. */
+export type BanUserBody = { reason: string; expiresInHours?: number };
+
+/** Body PUT /api/dev/users/:id/role; super_admin tidak bisa diset lewat API. */
+export type SetRoleBody = { role: "user" | "admin" };
+
+/** Satu sesi milik user (GET /api/me/sessions). Waktu = epoch ms. */
+export type MySession = { id: string; current: boolean; userAgent: string | null; ip: string | null; createdAt: number; expiresAt: number };
+
+/** Body POST /api/test/login (test-only, A12). */
+export type TestLoginBody = { email: string; name?: string };
+
+/** Ringkasan room di panel admin. */
+export type AdminRoomSummary = RoomSummary & { members: number; active: boolean; participants: number };
 
 /** Kode error mesin-terbaca; web menerjemahkan `code` ke pesan user, `error` hanya teks teknis. */
 export type ApiErrorCode =
@@ -40,9 +117,13 @@ export type ApiErrorCode =
   | "room_exists"
   | "invalid_input"
   | "invite_invalid"
-  | "invalid_credentials"
   | "rate_limited"
-  | "layout_conflict";
+  | "layout_conflict"
+  | "banned"
+  | "email_domain_not_allowed"
+  | "cannot_modify_self"
+  | "insufficient_role"
+  | "user_not_found";
 
 /** Bentuk body error semua endpoint; `path` = field yang gagal validasi. */
 export type ApiError = { error: string; code?: ApiErrorCode; path?: string };
@@ -52,42 +133,39 @@ export type RoomSummary = {
   id: string;
   title: string;
   /** null = admin global yang bukan member room ini. */
-  role: Role | null;
+  role: RoomRole | null;
   createdAt: number;
 };
 
 /** Halaman hasil list ber-cursor. */
 export type Page<T> = { items: T[]; nextCursor: string | null };
 
-/** Respons /api/me dan login. */
+/** Respons /api/me. */
 export type UserResponse = { user: SessionUser };
 
-/** Body POST /api/auth/admin-login. */
-export type AdminLoginBody = { password: string };
-
 /** Body POST /api/rooms/:roomId/invites. */
-export type CreateInviteBody = { role: Role; ttlHours?: number };
+export type CreateInviteBody = { role: RoomRole; ttlHours?: number };
 
 /** Respons pembuatan undangan. */
 export type CreateInviteResponse = { url: string; expiresAt: number };
 
-/** Body POST /api/invites/accept; `name` wajib (1-60, trim) bila tanpa sesi, diabaikan bila bersesi. */
-export type AcceptInviteBody = { invite: string; name?: string };
+/** Body POST /api/invites/accept (wajib sesi). */
+export type AcceptInviteBody = { invite: string };
 
-/** Respons terima undangan (cookie sesi ikut diset); `role` = role efektif di room. */
-export type AcceptInviteResponse = { user: SessionUser; roomId: string; role: Role };
+/** Respons terima undangan; `role` = role efektif di room. */
+export type AcceptInviteResponse = { user: SessionUser; roomId: string; role: RoomRole };
 
 /** Respons GET /api/invites/preview. */
 export type InvitePreview = {
   roomId: string;
   roomTitle: string;
   /** Role yang tertulis di undangan. */
-  role: Role;
+  role: RoomRole;
   /** Kedaluwarsa undangan, epoch ms. */
   expiresAt: number;
   currentUser: SessionUser | null;
   /** Role yang akan didapat bila diterima: max(role undangan, role existing) bila bersesi. */
-  effectiveRole: Role;
+  effectiveRole: RoomRole;
 };
 
 /** Query GET /api/rooms. */
@@ -97,7 +175,7 @@ export type ListRoomsQuery = { limit?: number; cursor?: string };
 export type CreateRoomBody = { id: string; title: string };
 
 /** Respons POST /api/rooms/:roomId/token. */
-export type TokenResponse = { token: string; url: string; role: Role };
+export type TokenResponse = { token: string; url: string; role: RoomRole };
 
 /** Respons GET /api/rooms/:roomId/layout; layout null = belum pernah diset. */
 export type LayoutResponse = { version: number; layout: LayoutState | null };

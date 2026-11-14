@@ -1,12 +1,12 @@
 import { AccessToken, TrackSource, type VideoGrant } from "livekit-server-sdk";
-import { SAFE_ID_PATTERN, type Role } from "../shared/api.types";
+import { type RoomRole, SAFE_ID_PATTERN } from "../shared/api.types";
 import type { Config } from "./config";
 
 /** Masa berlaku token join: 2 jam. */
 export const JOIN_TOKEN_TTL_SECONDS = 2 * 60 * 60;
 
 const SAFE_ID = new RegExp(SAFE_ID_PATTERN);
-const ROLES: readonly Role[] = ["admin", "participant", "viewer"];
+const ROLES: readonly RoomRole[] = ["host", "participant", "viewer"];
 const PUBLISH_SOURCES = [
   TrackSource.CAMERA,
   TrackSource.MICROPHONE,
@@ -15,14 +15,15 @@ const PUBLISH_SOURCES = [
 ];
 
 /** Input token join; identity = user.id, role dari room_members (bukan dari client). */
-export type JoinTokenInput = { room: string; identity: string; name?: string; role: Role };
+export type JoinTokenInput = { room: string; identity: string; name?: string; role: RoomRole };
 
 /**
- * Pemetaan role -> VideoGrant (tanpa field `room`).
+ * Pemetaan role -> VideoGrant (tanpa field `room`). host = grant participant; hak layout/undangan host ditegakkan
+ * server lewat API (PUT layout, POST invites), bukan lewat grant LiveKit.
  * Sengaja tanpa `roomAdmin` (pemegangnya bisa UpdateRoomMetadata langsung, melewati validasi layout) dan tanpa
  * `canUpdateOwnMetadata`; `canPublishData` false sampai ada fitur yang butuh (01-arsitektur §Keamanan).
  */
-export function grantsForRole(role: Role): VideoGrant {
+export function grantsForRole(role: RoomRole): VideoGrant {
   const base: VideoGrant = { roomJoin: true, canSubscribe: true, canPublishData: false };
   if (role === "viewer") return { ...base, canPublish: false };
   return { ...base, canPublish: true, canPublishSources: PUBLISH_SOURCES };

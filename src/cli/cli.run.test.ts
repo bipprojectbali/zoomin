@@ -15,6 +15,7 @@ const noopHooks: CliServerHooks = {
   serve: async () => {},
   migrate: async () => ({ applied: [] }),
   check: async () => ({ ok: true, summary: {} }),
+  user: async () => [],
 };
 
 async function run(argv: string[], hooks: CliServerHooks = noopHooks, opts?: Parameters<typeof fakeIo>[0]) {
@@ -40,10 +41,11 @@ describe("runCli", () => {
     }
   });
 
-  test.each(["serve", "migrate", "check", "env", "docs", "help"])("bantuan per perintah: %s", async (cmd) => {
+  test.each(["serve", "migrate", "check", "user", "env", "docs", "help"])("bantuan per perintah: %s", async (cmd) => {
     const { code, stdout } = await run([cmd, "--help"]);
     expect(code).toBe(0);
     expect(stdout).toStartWith(`zoomin ${cmd} - `);
+    if (cmd === "user") for (const flag of ["--role", "--db", "--env-file"]) expect(stdout).toContain(flag);
     if (cmd === "serve" || cmd === "check") for (const flag of ["--port", "--host", "--db", "--env-file"]) expect(stdout).toContain(flag);
   });
 
@@ -62,8 +64,9 @@ describe("runCli", () => {
   test("isi docs: default usage, env memuat semua var, api memuat endpoint", async () => {
     expect((await run(["-d"])).stdout).toContain("Quick start");
     const env = (await run(["-d", "env"])).stdout;
-    for (const v of ["PORT", "HOST", "DB_PATH", "SESSION_SECRET", "TRUST_PROXY", "TLS_KEY_PATH"]) expect(env).toContain(`\`${v}\``);
-    expect(env).toMatch(/`SESSION_SECRET` \| \(kosong\) \| ya/);
+    for (const v of ["PORT", "HOST", "DB_PATH", "BETTER_AUTH_SECRET", "SUPER_ADMIN_EMAILS", "TRUST_PROXY", "TLS_KEY_PATH"]) expect(env).toContain(`\`${v}\``);
+    expect(env).toMatch(/`BETTER_AUTH_SECRET` \| \(kosong\) \| ya/);
+    expect(env).not.toContain("ADMIN_PASSWORD");
     expect((await run(["docs", "api"])).stdout).toContain("/api/rooms/:roomId/token");
     expect((await run(["-d", "deploy"])).stdout).toContain("Caddy");
   });
@@ -77,7 +80,8 @@ describe("runCli", () => {
   test("env mencetak .env.example", async () => {
     const { code, stdout } = await run(["env"]);
     expect(code).toBe(0);
-    expect(stdout).toContain("SESSION_SECRET=");
+    expect(stdout).toContain("BETTER_AUTH_SECRET=");
+    expect(stdout).not.toContain("SESSION_SECRET=");
   });
 
   test("argumen salah → stderr + exit 2, hooks tidak dipanggil", async () => {
@@ -103,19 +107,46 @@ describe("runCli", () => {
   });
 
   test("check invalid → exit 1 dengan daftar error", async () => {
-    const { code, stderr } = await run(["check"], { ...noopHooks, check: async () => ({ ok: false, errors: ["SESSION_SECRET kurang"] }) });
+    const { code, stderr } = await run(["check"], { ...noopHooks, check: async () => ({ ok: false, errors: ["BETTER_AUTH_SECRET kurang"] }) });
     expect(code).toBe(1);
-    expect(stderr).toContain("SESSION_SECRET kurang");
+    expect(stderr).toContain("BETTER_AUTH_SECRET kurang");
   });
 
   test("check tidak pernah mencetak nilai secret", async () => {
-    const secrets = { LIVEKIT_API_KEY: "lkkey-UNIQ-7f3a91", LIVEKIT_API_SECRET: "lksec-UNIQ-b2c8d4", SESSION_SECRET: "sess-UNIQ-0123456789abcdef0123456789", ADMIN_PASSWORD: "adm-UNIQ-e5f6a7" };
-    const config = loadConfig({ NODE_ENV: "production", PORT: "3100", ...secrets });
+    const secrets = {
+      LIVEKIT_API_KEY: "lkkey-UNIQ-7f3a91",
+      LIVEKIT_API_SECRET: "lksec-UNIQ-b2c8d4",
+      BETTER_AUTH_SECRET: "ba-UNIQ-0123456789abcdef0123456789",
+      GOOGLE_CLIENT_ID: "gid-UNIQ-1a2b3c",
+      GOOGLE_CLIENT_SECRET: "gsec-UNIQ-4d5e6f",
+    }; // test-only
+    const config = loadConfig({ NODE_ENV: "production", PORT: "3100", SUPER_ADMIN_EMAILS: "boss-UNIQ@example.test", ...secrets });
     const { code, stdout, stderr } = await run(["check"], { ...noopHooks, check: async () => ({ ok: true, summary: summarizeConfig(config) }) });
     expect(code).toBe(0);
     for (const value of Object.values(secrets)) expect(stdout + stderr).not.toContain(value);
-    expect(stdout).toMatch(/SESSION_SECRET\s+diset/);
+    expect(stdout).toMatch(/BETTER_AUTH_SECRET\s+diset/);
+    expect(stdout).toMatch(/SUPER_ADMIN_EMAILS\s+1 email/);
+    expect(stdout).not.toContain("boss-UNIQ");
     for (const field of ["3100", "0.0.0.0", "production", "TLS", "TRUST_PROXY", "PUBLIC_APP_URL", "LIVEKIT_URL"]) expect(stdout).toContain(field);
+  });
+
+  test("user list/promote/unban: meneruskan aksi + overrides ke hooks dan mencetak hasil", async () => {
+    const calls: unknown[] = [];
+    const row = { id: "u1", email: "ana@example.test", name: "Ana", role: "admin", banned: false, createdAt: "2026-01-01T00:00:00.000Z" };
+    const hooks: CliServerHooks = { ...noopHooks, user: async (o, a) => (calls.push([o, a]), [row]) };
+    const list = await run(["user", "list", "--db", "x.sqlite"], hooks);
+    expect(list.code).toBe(0);
+    for (const s of ["EMAIL", "PERAN", "ana@example.test", "admin", "aktif"]) expect(list.stdout).toContain(s);
+    expect((await run(["user", "promote", "ana@example.test", "--role", "admin"], hooks)).stdout).toContain("ana@example.test sekarang admin");
+    expect((await run(["user", "unban", "ana@example.test"], hooks)).stdout).toContain("tidak lagi diblokir");
+    expect(calls).toEqual([
+      [{ dbPath: "x.sqlite" }, { action: "list" }],
+      [{}, { action: "promote", email: "ana@example.test", role: "admin" }],
+      [{}, { action: "unban", email: "ana@example.test" }],
+    ]);
+    expect((await run(["user", "list"])).stdout).toContain("Belum ada user");
+    const failed = await run(["user", "unban", "x@y.test"], { ...noopHooks, user: async () => Promise.reject(new Error("user dengan email x@y.test tidak ditemukan")) });
+    expect([failed.code, failed.stderr.includes("zoomin user gagal: user dengan email x@y.test tidak ditemukan")]).toEqual([1, true]);
   });
 
   test("warna ANSI hanya bila TTY dan NO_COLOR tidak diset", async () => {
