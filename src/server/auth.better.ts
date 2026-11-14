@@ -70,7 +70,7 @@ export function syncedRole(email: string, current: string | null | undefined, su
 function assertEmailAllowed(db: Database, email: string, superAdminEmails: readonly string[]): void {
   if (superAdminEmails.includes(email.toLowerCase())) return;
   if (!isEmailDomainAllowed(email, getAllowedEmailDomains(db))) {
-    throw new APIError("FORBIDDEN", { code: EMAIL_DOMAIN_NOT_ALLOWED, message: "Domain email ini tidak diizinkan untuk login." });
+    throw new APIError("FORBIDDEN", { code: EMAIL_DOMAIN_NOT_ALLOWED, message: "This email domain is not allowed to sign in." });
   }
 }
 

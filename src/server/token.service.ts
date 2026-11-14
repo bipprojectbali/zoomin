@@ -48,9 +48,9 @@ export async function createJoinToken(
   { room, identity, name, role, image }: JoinTokenInput,
   config: Pick<Config, "livekitApiKey" | "livekitApiSecret">,
 ): Promise<string> {
-  if (!SAFE_ID.test(room)) throw new Error(`createJoinToken: room tidak valid (${JSON.stringify(room)})`);
-  if (!SAFE_ID.test(identity)) throw new Error(`createJoinToken: identity tidak valid (${JSON.stringify(identity)})`);
-  if (!ROLES.includes(role)) throw new Error(`createJoinToken: role tidak dikenal (${JSON.stringify(role)})`);
+  if (!SAFE_ID.test(room)) throw new Error(`createJoinToken: invalid room (${JSON.stringify(room)})`);
+  if (!SAFE_ID.test(identity)) throw new Error(`createJoinToken: invalid identity (${JSON.stringify(identity)})`);
+  if (!ROLES.includes(role)) throw new Error(`createJoinToken: unknown role (${JSON.stringify(role)})`);
 
   const at = new AccessToken(config.livekitApiKey, config.livekitApiSecret, {
     identity,

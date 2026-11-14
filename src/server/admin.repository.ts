@@ -49,7 +49,7 @@ const encodeCursor = (r: Pick<Row, "createdAt" | "id">) => Buffer.from(`${r.crea
 function decodeCursor(cursor: string): { createdAt: string; id: string } {
   const [createdAt, id, extra] = Buffer.from(cursor, "base64url").toString("utf8").split("|");
   if (!createdAt || !id || extra !== undefined || Number.isNaN(Date.parse(createdAt))) {
-    throw new InvalidCursorError(`listAdminUsers: cursor tidak valid (${JSON.stringify(cursor)})`);
+    throw new InvalidCursorError(`listAdminUsers: invalid cursor (${JSON.stringify(cursor)})`);
   }
   return { createdAt, id };
 }

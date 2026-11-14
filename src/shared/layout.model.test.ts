@@ -49,24 +49,24 @@ describe("parseLayout", () => {
   });
 
   const invalid: [string, unknown, string, RegExp][] = [
-    ["bukan object", [], "$", /harus object/],
+    ["bukan object", [], "$", /must be an object/],
     ["template asing", { ...base, template: "pip" }, "template", /"pip"/],
     ["version negatif", { ...base, version: -1 }, "version", /integer/],
     ["version pecahan", { ...base, version: 1.5 }, "version", /integer/],
-    ["slots bukan array", { ...base, slots: {} }, "slots", /harus array/],
-    ["identity kosong", { ...base, slots: [{ trackRef: ref("") }] }, "slots[0].trackRef.identity", /non-kosong/],
-    ["trackName kosong", { ...base, slots: [{ trackRef: ref("a"), }, { trackRef: ref("b", "") }] }, "slots[1].trackRef.trackName", /non-kosong/],
-    ["slot bukan object", { ...base, slots: [null] }, "slots[0]", /harus object/],
-    ["trackRef hilang", { ...base, slots: [{}] }, "slots[0].trackRef", /harus object/],
+    ["slots bukan array", { ...base, slots: {} }, "slots", /must be an array/],
+    ["identity kosong", { ...base, slots: [{ trackRef: ref("") }] }, "slots[0].trackRef.identity", /non-empty/],
+    ["trackName kosong", { ...base, slots: [{ trackRef: ref("a"), }, { trackRef: ref("b", "") }] }, "slots[1].trackRef.trackName", /non-empty/],
+    ["slot bukan object", { ...base, slots: [null] }, "slots[0]", /must be an object/],
+    ["trackRef hilang", { ...base, slots: [{}] }, "slots[0].trackRef", /must be an object/],
     ["size asing", { ...base, slots: [{ trackRef: ref("a"), size: "huge" }] }, "slots[0].size", /huge/],
-    ["duplikat", { ...base, slots: [{ trackRef: ref("a") }, { trackRef: ref("a") }] }, "slots[1].trackRef", /duplikat/],
-    ["updatedBy hilang", { ...base, updatedBy: undefined }, "updatedBy", /non-kosong/],
+    ["duplikat", { ...base, slots: [{ trackRef: ref("a") }, { trackRef: ref("a") }] }, "slots[1].trackRef", /duplicate/],
+    ["updatedBy hilang", { ...base, updatedBy: undefined }, "updatedBy", /non-empty/],
     ["updatedAt string", { ...base, updatedAt: "now" }, "updatedAt", /epoch/],
     [
       "slot terlalu banyak",
       { ...base, slots: Array.from({ length: LAYOUT_MAX_SLOTS + 1 }, (_, i) => ({ trackRef: ref(`p${i}`) })) },
       "slots",
-      /maks/,
+      /at most/,
     ],
   ];
   for (const [name, value, path, msg] of invalid) {
@@ -79,12 +79,12 @@ describe("parseLayout", () => {
 
   test("tolak JSON rusak dengan LayoutValidationError", () => {
     expect(() => parseLayout("{oops")).toThrow(LayoutValidationError);
-    expect(() => parseLayout("{oops")).toThrow(/bukan JSON valid/);
+    expect(() => parseLayout("{oops")).toThrow(/not valid JSON/);
     expect(pathOf(() => parseLayout("{oops"))).toBe("$");
   });
 
   test("tolak input melebihi batas ukuran", () => {
-    expect(() => parseLayout(" ".repeat(LAYOUT_MAX_BYTES + 1))).toThrow(/melebihi/);
+    expect(() => parseLayout(" ".repeat(LAYOUT_MAX_BYTES + 1))).toThrow(/exceeds/);
   });
 
   test("message error menyertakan path", () => {
@@ -109,13 +109,13 @@ describe("parseLayout panelSizes", () => {
   });
 
   const invalid: [string, unknown, string, RegExp][] = [
-    ["bukan array", { ...sbs, panelSizes: 100 }, "panelSizes", /harus array/],
-    ["jumlah kurang", { ...sbs, panelSizes: [50, 50] }, "panelSizes", /butuh 3/],
-    ["jumlah lebih", { ...sbs, panelSizes: [25, 25, 25, 25] }, "panelSizes", /butuh 3/],
-    ["focus 3 panel", { ...base, template: "focus", panelSizes: [50, 25, 25] }, "panelSizes", /butuh 2/],
-    ["grid tidak memakai", { ...base, panelSizes: [50, 50] }, "panelSizes", /tidak memakai/],
+    ["bukan array", { ...sbs, panelSizes: 100 }, "panelSizes", /must be an array/],
+    ["jumlah kurang", { ...sbs, panelSizes: [50, 50] }, "panelSizes", /needs 3/],
+    ["jumlah lebih", { ...sbs, panelSizes: [25, 25, 25, 25] }, "panelSizes", /needs 3/],
+    ["focus 3 panel", { ...base, template: "focus", panelSizes: [50, 25, 25] }, "panelSizes", /needs 2/],
+    ["grid tidak memakai", { ...base, panelSizes: [50, 50] }, "panelSizes", /does not use/],
     ["total kurang", { ...sbs, panelSizes: [40, 25, 25] }, "panelSizes", /total 90/],
-    ["total lebih di luar toleransi", { ...sbs, panelSizes: [50.6, 25, 25] }, "panelSizes", /harus 100/],
+    ["total lebih di luar toleransi", { ...sbs, panelSizes: [50.6, 25, 25] }, "panelSizes", /must be 100/],
     ["nol", { ...sbs, panelSizes: [50, 50, 0] }, "panelSizes[2]", /> 0/],
     ["negatif", { ...sbs, panelSizes: [125, -50, 25] }, "panelSizes[1]", /> 0/],
     ["string", { ...sbs, panelSizes: [50, "25", 25] }, "panelSizes[1]", /finite/],
@@ -132,7 +132,7 @@ describe("parseLayout panelSizes", () => {
 describe("serializeLayout", () => {
   test("tolak state yang melebihi batas byte", () => {
     const big = { ...base, updatedBy: "x".repeat(LAYOUT_MAX_BYTES) };
-    expect(() => serializeLayout(big)).toThrow(/melebihi/);
+    expect(() => serializeLayout(big)).toThrow(/exceeds/);
   });
 
   test("layout grid 49 slot tetap jauh di bawah batas", () => {
@@ -169,7 +169,7 @@ describe("swapSlots", () => {
   });
 
   test("index di luar range ditolak", () => {
-    expect(() => swapSlots(base, 0, 3, "a")).toThrow(/di luar 0..2/);
+    expect(() => swapSlots(base, 0, 3, "a")).toThrow(/outside 0..2/);
     expect(() => swapSlots(base, -1, 0, "a")).toThrow(LayoutValidationError);
     expect(() => swapSlots(base, 0.5, 0, "a")).toThrow(LayoutValidationError);
   });
@@ -199,7 +199,7 @@ describe("setFocus", () => {
   });
 
   test("track tak dikenal ditolak", () => {
-    expect(() => setFocus(base, ref("mallory"), "admin")).toThrow(/mallory\/camera tidak ada/);
+    expect(() => setFocus(base, ref("mallory"), "admin")).toThrow(/mallory\/camera is not in the layout/);
   });
 });
 

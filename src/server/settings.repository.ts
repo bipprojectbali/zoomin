@@ -31,7 +31,7 @@ function normalizeDomains(domains: readonly string[]): string[] {
   }
   const out = domains.map((d) => d.trim().toLowerCase());
   out.forEach((d, i) => {
-    if (!DOMAIN_PATTERN.test(d)) throw new InvalidSettingsError(`domain tidak valid: ${JSON.stringify(d)}`, `/allowedEmailDomains/${i}`);
+    if (!DOMAIN_PATTERN.test(d)) throw new InvalidSettingsError(`invalid domain: ${JSON.stringify(d)}`, `/allowedEmailDomains/${i}`);
     if (out.indexOf(d) !== i) throw new InvalidSettingsError(`domain duplikat: ${d}`, `/allowedEmailDomains/${i}`);
   });
   return out;

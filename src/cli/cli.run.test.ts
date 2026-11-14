@@ -133,7 +133,7 @@ describe("runCli", () => {
     const { code, stdout, stderr } = await run(["check"], { ...noopHooks, check: async () => ({ ok: true, summary: summarizeConfig(config) }) });
     expect(code).toBe(0);
     for (const value of Object.values(secrets)) expect(stdout + stderr).not.toContain(value);
-    expect(stdout).toMatch(/BETTER_AUTH_SECRET\s+diset/);
+    expect(stdout).toMatch(/BETTER_AUTH_SECRET\s+set/);
     expect(stdout).toMatch(/SUPER_ADMIN_EMAILS\s+1 email/);
     expect(stdout).not.toContain("boss-UNIQ");
     for (const field of ["3100", "0.0.0.0", "production", "TLS", "TRUST_PROXY", "PUBLIC_APP_URL", "LIVEKIT_URL"]) expect(stdout).toContain(field);

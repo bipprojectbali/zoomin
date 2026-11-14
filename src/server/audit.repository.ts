@@ -16,7 +16,7 @@ function decodeCursor(cursor: string): { at: number; id: string } {
   const comma = raw.indexOf(",");
   const at = Number(raw.slice(0, comma));
   const id = raw.slice(comma + 1);
-  if (comma <= 0 || !Number.isSafeInteger(at) || !id) throw new InvalidCursorError(`listAudit: cursor tidak valid (${JSON.stringify(cursor)})`);
+  if (comma <= 0 || !Number.isSafeInteger(at) || !id) throw new InvalidCursorError(`listAudit: invalid cursor (${JSON.stringify(cursor)})`);
   return { at, id };
 }
 

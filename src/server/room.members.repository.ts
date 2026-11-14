@@ -24,13 +24,13 @@ function decodeCursor(cursor: string): Cursor {
   try {
     c = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
   } catch (cause) {
-    throw new InvalidCursorError(`listRoomMembers: cursor bukan JSON (${JSON.stringify(cursor)})`, { cause });
+    throw new InvalidCursorError(`listRoomMembers: cursor is not JSON (${JSON.stringify(cursor)})`, { cause });
   }
   const ok =
     Array.isArray(c) &&
     c.every((v) => typeof v === "string") &&
     ((c[0] === "m" && c.length === 3) || (c[0] === "p" && c.length === 2));
-  if (!ok) throw new InvalidCursorError(`listRoomMembers: cursor tidak valid (${JSON.stringify(cursor)})`);
+  if (!ok) throw new InvalidCursorError(`listRoomMembers: invalid cursor (${JSON.stringify(cursor)})`);
   return c as Cursor;
 }
 
@@ -77,7 +77,7 @@ const memberRole = (db: Database, roomId: string, userId: string) =>
 function assertNotLastHost(db: Database, roomId: string, userId: string, nextRole: RoomRole | null): void {
   if (nextRole === "host" || memberRole(db, roomId, userId) !== "host") return;
   const hosts = db.query<{ n: number }, [string]>("SELECT COUNT(*) AS n FROM room_members WHERE room_id = ? AND role = 'host'").get(roomId)?.n ?? 0;
-  if (hosts <= 1) throw new LastHostError(`room ${roomId}: user ${userId} adalah host terakhir`);
+  if (hosts <= 1) throw new LastHostError(`room ${roomId}: user ${userId} is the last host`);
 }
 
 const getMember = (db: Database, roomId: string, userId: string) =>
@@ -123,7 +123,7 @@ export function addRoomMember(db: Database, roomId: string, email: string, role:
 export function updateRoomMemberRole(db: Database, roomId: string, userId: string, role: RoomRole, by: SessionUser): RoomMemberItem {
   return db.transaction(() => {
     const before = memberRole(db, roomId, userId);
-    if (!before) throw new MemberNotFoundError(`room ${roomId}: user ${userId} bukan anggota`);
+    if (!before) throw new MemberNotFoundError(`room ${roomId}: user ${userId} is not a member`);
     assertNotLastHost(db, roomId, userId, role);
     db.query("UPDATE room_members SET role = ? WHERE room_id = ? AND user_id = ?").run(role, roomId, userId);
     audit(db, by, "room.member.role", roomId, { userId, from: before, to: role });
@@ -135,7 +135,7 @@ export function updateRoomMemberRole(db: Database, roomId: string, userId: strin
 export function removeRoomMember(db: Database, roomId: string, userId: string, by: SessionUser): void {
   db.transaction(() => {
     const before = memberRole(db, roomId, userId);
-    if (!before) throw new MemberNotFoundError(`room ${roomId}: user ${userId} bukan anggota`);
+    if (!before) throw new MemberNotFoundError(`room ${roomId}: user ${userId} is not a member`);
     assertNotLastHost(db, roomId, userId, null);
     db.query("DELETE FROM room_members WHERE room_id = ? AND user_id = ?").run(roomId, userId);
     audit(db, by, "room.member.remove", roomId, { userId, role: before });
@@ -146,7 +146,7 @@ export function removeRoomMember(db: Database, roomId: string, userId: string, b
 export function cancelRoomInvitation(db: Database, roomId: string, email: string, by: SessionUser): void {
   db.transaction(() => {
     const { changes } = db.query("DELETE FROM room_invitations WHERE room_id = ? AND email = ?").run(roomId, email);
-    if (changes === 0) throw new MemberNotFoundError(`room ${roomId}: tidak ada undangan pending untuk email tersebut`);
+    if (changes === 0) throw new MemberNotFoundError(`room ${roomId}: no pending invitation for that email`);
     audit(db, by, "room.member.remove", roomId, { email, pending: true });
   })();
 }

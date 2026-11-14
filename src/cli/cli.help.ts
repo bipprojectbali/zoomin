@@ -61,7 +61,7 @@ ${SERVE_OPTIONS}
 # Examples
   zoomin migrate --db /var/lib/zoomin/zoomin.sqlite`,
   check: `zoomin check - validasi konfigurasi tanpa menjalankan server (exit 1 bila tidak valid)
-Secret hanya ditampilkan sebagai "diset"/"kosong", nilainya tidak pernah dicetak.
+Secret hanya ditampilkan sebagai "set"/"empty", nilainya tidak pernah dicetak.
 
 # Usage
   zoomin check [options]

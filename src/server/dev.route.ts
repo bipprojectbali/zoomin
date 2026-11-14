@@ -72,7 +72,7 @@ export function devRoutes(deps: ApiDeps) {
       },
       { auth: "super_admin", body: t.Object({ allowedEmailDomains: t.Array(t.String()) }) },
     )
-    // summarizeConfig: secret hanya "diset"/"kosong", email super admin hanya jumlah.
+    // summarizeConfig: secret hanya "set"/"empty", email super admin hanya jumlah.
     .get("/config", () => summarizeConfig(deps.config), { auth: "super_admin" })
     .put(
       "/users/:id/role",

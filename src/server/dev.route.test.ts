@@ -84,7 +84,7 @@ describe("GET /api/dev/config", () => {
     expect(res.status).toBe(200);
     const text = await res.text();
     for (const value of [...Object.values(secrets), "rahasia@example.test", TEST_SUPER_ADMIN_EMAIL]) expect(text).not.toContain(value);
-    expect(JSON.parse(text)).toMatchObject({ LIVEKIT_API_SECRET: "diset", BETTER_AUTH_SECRET: "diset", SUPER_ADMIN_EMAILS: "2 email" });
+    expect(JSON.parse(text)).toMatchObject({ LIVEKIT_API_SECRET: "set", BETTER_AUTH_SECRET: "set", SUPER_ADMIN_EMAILS: "2 emails" });
   });
 });
 

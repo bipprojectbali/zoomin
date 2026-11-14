@@ -44,7 +44,7 @@ export function meRoutes(deps: ApiDeps) {
         }
         if (Object.keys(patch).length === 0) return { user } satisfies UserResponse;
         const updated = await (await ctx()).internalAdapter.updateUser(user.id, patch);
-        if (!updated) throw new Error(`PATCH /me: updateUser ${user.id} tidak mengembalikan user`);
+        if (!updated) throw new Error(`PATCH /me: updateUser ${user.id} returned no user`);
         return { user: toSessionUser(updated) } satisfies UserResponse;
       },
       {

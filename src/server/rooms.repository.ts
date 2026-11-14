@@ -25,7 +25,7 @@ function decodeCursor(cursor: string): Cursor {
   const createdAt = Number(raw.slice(0, comma));
   const id = raw.slice(comma + 1);
   if (comma <= 0 || !Number.isSafeInteger(createdAt) || !id) {
-    throw new InvalidCursorError(`listRoomsForUser: cursor tidak valid (${JSON.stringify(cursor)})`);
+    throw new InvalidCursorError(`listRoomsForUser: invalid cursor (${JSON.stringify(cursor)})`);
   }
   return { createdAt, id };
 }
@@ -94,7 +94,7 @@ export function createRoom(
   const visibility = input.visibility ?? "public";
   const expiresAt = input.expiresAt ?? null;
   const passwordHash = visibility === "password" ? input.passwordHash : undefined;
-  if (visibility === "password" && !passwordHash) throw new Error(`createRoom: room ${input.id} bertipe password tanpa hash`);
+  if (visibility === "password" && !passwordHash) throw new Error(`createRoom: room ${input.id} is a password room without a hash`);
   try {
     db.transaction(() => {
       db.query(
@@ -116,9 +116,9 @@ export function createRoom(
     })();
   } catch (cause) {
     if (cause instanceof SQLiteError && cause.code === "SQLITE_CONSTRAINT_PRIMARYKEY") {
-      throw new RoomExistsError(`createRoom: room ${input.id} sudah ada`, { cause });
+      throw new RoomExistsError(`createRoom: room ${input.id} already exists`, { cause });
     }
-    throw new Error(`createRoom: gagal membuat room ${input.id}`, { cause });
+    throw new Error(`createRoom: failed to create room ${input.id}`, { cause });
   }
   const row: RoomRow = {
     id: input.id,

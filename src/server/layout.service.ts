@@ -21,7 +21,7 @@ export type PutLayoutInput = { roomId: string; baseVersion: number; layout: Layo
 /** baseVersion usang: tulis lain sudah lebih dulu masuk. */
 export class LayoutConflictError extends Error {
   constructor(readonly currentVersion: number) {
-    super(`layout conflict: versi sekarang ${currentVersion}`);
+    super(`layout conflict: current version ${currentVersion}`);
     this.name = "LayoutConflictError";
   }
 }
@@ -29,7 +29,7 @@ export class LayoutConflictError extends Error {
 /** Room tidak ada di SQLite. */
 export class RoomNotFoundError extends Error {
   constructor(readonly roomId: string) {
-    super(`room ${roomId} tidak ditemukan`);
+    super(`room ${roomId} not found`);
     this.name = "RoomNotFoundError";
   }
 }
@@ -50,7 +50,7 @@ export function getLayout(db: Database, roomId: string): LayoutResponse {
   try {
     return { version: row.layout_version, layout: row.layout_json === null ? null : parseLayout(row.layout_json) };
   } catch (cause) {
-    throw new Error(`getLayout: layout_json room=${roomId} v=${row.layout_version} rusak`, { cause });
+    throw new Error(`getLayout: layout_json room=${roomId} v=${row.layout_version} is corrupt`, { cause });
   }
 }
 
@@ -77,7 +77,7 @@ export async function putLayout(deps: LayoutDeps, input: PutLayoutInput): Promis
     // Room LiveKit baru ada setelah ada yang join; SQLite tetap sumber kebenaran dan syncRoomLayout
     // menulis ulang metadata saat token pertama diterbitkan, jadi tulis ini tidak boleh gagal.
     if (!isLiveKitRoomMissing(e)) {
-      throw new Error(`putLayout: publish metadata room=${roomId} v=${version} gagal`, { cause: e });
+      throw new Error(`putLayout: publish metadata room=${roomId} v=${version} failed`, { cause: e });
     }
     console.warn(`[layout] room=${roomId} v=${version} belum ada di LiveKit; metadata diterapkan saat join`);
   }
@@ -96,6 +96,6 @@ export async function syncRoomLayout(deps: LayoutDeps, roomId: string): Promise<
       await deps.roomService.updateRoomMetadata(roomId, metadata);
     }
   } catch (cause) {
-    throw new Error(`syncRoomLayout: room=${roomId} v=${row.layout_version} gagal`, { cause });
+    throw new Error(`syncRoomLayout: room=${roomId} v=${row.layout_version} failed`, { cause });
   }
 }

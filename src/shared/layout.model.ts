@@ -47,21 +47,21 @@ const isObj = (v: unknown): v is Record<string, unknown> =>
 const byteLength = (s: string) => new TextEncoder().encode(s).byteLength;
 
 function nonEmptyString(v: unknown, path: string): string {
-  if (typeof v !== "string" || v.length === 0) throw new LayoutValidationError(path, "harus string non-kosong");
+  if (typeof v !== "string" || v.length === 0) throw new LayoutValidationError(path, "must be a non-empty string");
   return v;
 }
 
 function parseSlot(v: unknown, i: number): LayoutSlot {
   const p = `slots[${i}]`;
-  if (!isObj(v)) throw new LayoutValidationError(p, "harus object");
-  if (!isObj(v.trackRef)) throw new LayoutValidationError(`${p}.trackRef`, "harus object");
+  if (!isObj(v)) throw new LayoutValidationError(p, "must be an object");
+  if (!isObj(v.trackRef)) throw new LayoutValidationError(`${p}.trackRef`, "must be an object");
   const trackRef = {
     identity: nonEmptyString(v.trackRef.identity, `${p}.trackRef.identity`),
     trackName: nonEmptyString(v.trackRef.trackName, `${p}.trackRef.trackName`),
   };
   if (v.size === undefined) return { trackRef };
   if (!SLOT_SIZES.includes(v.size as SlotSize)) {
-    throw new LayoutValidationError(`${p}.size`, `"${String(v.size)}" bukan salah satu dari ${SLOT_SIZES.join("|")}`);
+    throw new LayoutValidationError(`${p}.size`, `"${String(v.size)}" is not one of ${SLOT_SIZES.join("|")}`);
   }
   return { trackRef, size: v.size as SlotSize };
 }
@@ -83,20 +83,20 @@ export function panelCountFor(template: LayoutTemplate, slotCount: number): numb
 
 /** Validasi panelSizes terhadap template + jumlah slot; mengembalikan salinan array. */
 function validatePanelSizes(v: unknown, template: LayoutTemplate, slotCount: number): number[] {
-  if (!Array.isArray(v)) throw new LayoutValidationError("panelSizes", "harus array angka");
+  if (!Array.isArray(v)) throw new LayoutValidationError("panelSizes", "must be an array of numbers");
   const expected = panelCountFor(template, slotCount);
-  if (expected === 0) throw new LayoutValidationError("panelSizes", `template ${template} tidak memakai panelSizes`);
+  if (expected === 0) throw new LayoutValidationError("panelSizes", `template ${template} does not use panelSizes`);
   if (v.length !== expected) {
-    throw new LayoutValidationError("panelSizes", `jumlah ${v.length}, template ${template} butuh ${expected}`);
+    throw new LayoutValidationError("panelSizes", `got ${v.length}, template ${template} needs ${expected}`);
   }
   v.forEach((n, i) => {
     if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) {
-      throw new LayoutValidationError(`panelSizes[${i}]`, "harus angka finite > 0");
+      throw new LayoutValidationError(`panelSizes[${i}]`, "must be a finite number > 0");
     }
   });
   const total = (v as number[]).reduce((a, b) => a + b, 0);
   if (Math.abs(total - 100) > PANEL_SIZES_TOTAL_TOLERANCE) {
-    throw new LayoutValidationError("panelSizes", `total ${total}, harus 100 (±${PANEL_SIZES_TOTAL_TOLERANCE})`);
+    throw new LayoutValidationError("panelSizes", `total ${total}, must be 100 (±${PANEL_SIZES_TOTAL_TOLERANCE})`);
   }
   return [...(v as number[])];
 }
@@ -104,33 +104,33 @@ function validatePanelSizes(v: unknown, template: LayoutTemplate, slotCount: num
 /** Parse + validasi ketat JSON layout (dari room.metadata / body PUT). Field asing dibuang. */
 export function parseLayout(json: string): LayoutState {
   if (byteLength(json) > LAYOUT_MAX_BYTES) {
-    throw new LayoutValidationError(ROOT, `layout melebihi ${LAYOUT_MAX_BYTES} byte`);
+    throw new LayoutValidationError(ROOT, `layout exceeds ${LAYOUT_MAX_BYTES} bytes`);
   }
   let raw: unknown;
   try {
     raw = JSON.parse(json);
   } catch (e) {
-    throw new LayoutValidationError(ROOT, `layout bukan JSON valid: ${(e as Error).message}`, { cause: e });
+    throw new LayoutValidationError(ROOT, `layout is not valid JSON: ${(e as Error).message}`, { cause: e });
   }
-  if (!isObj(raw)) throw new LayoutValidationError(ROOT, "layout harus object");
+  if (!isObj(raw)) throw new LayoutValidationError(ROOT, "layout must be an object");
   if (!Number.isSafeInteger(raw.version) || (raw.version as number) < 0) {
-    throw new LayoutValidationError("version", "harus integer >= 0");
+    throw new LayoutValidationError("version", "must be an integer >= 0");
   }
   if (!LAYOUT_TEMPLATES.includes(raw.template as LayoutTemplate)) {
-    throw new LayoutValidationError("template", `"${String(raw.template)}" tidak dikenal`);
+    throw new LayoutValidationError("template", `unknown template "${String(raw.template)}"`);
   }
   const template = raw.template as LayoutTemplate;
-  if (!Array.isArray(raw.slots)) throw new LayoutValidationError("slots", "harus array");
-  if (raw.slots.length > LAYOUT_MAX_SLOTS) throw new LayoutValidationError("slots", `maks ${LAYOUT_MAX_SLOTS}`);
+  if (!Array.isArray(raw.slots)) throw new LayoutValidationError("slots", "must be an array");
+  if (raw.slots.length > LAYOUT_MAX_SLOTS) throw new LayoutValidationError("slots", `at most ${LAYOUT_MAX_SLOTS}`);
   const slots = raw.slots.map(parseSlot);
   const seen = new Set<string>();
   slots.forEach((s, i) => {
     const k = refKey(s.trackRef);
-    if (seen.has(k)) throw new LayoutValidationError(`slots[${i}].trackRef`, "trackRef duplikat");
+    if (seen.has(k)) throw new LayoutValidationError(`slots[${i}].trackRef`, "duplicate trackRef");
     seen.add(k);
   });
   if (typeof raw.updatedAt !== "number" || !Number.isFinite(raw.updatedAt)) {
-    throw new LayoutValidationError("updatedAt", "harus angka (epoch ms)");
+    throw new LayoutValidationError("updatedAt", "must be a number (epoch ms)");
   }
   const state: LayoutState = {
     version: raw.version as number,
@@ -148,7 +148,7 @@ export function serializeLayout(state: LayoutState): string {
   const json = JSON.stringify(state);
   const bytes = byteLength(json);
   if (bytes > LAYOUT_MAX_BYTES) {
-    throw new LayoutValidationError(ROOT, `layout ${bytes} byte melebihi ${LAYOUT_MAX_BYTES}`);
+    throw new LayoutValidationError(ROOT, `layout is ${bytes} bytes, exceeds ${LAYOUT_MAX_BYTES}`);
   }
   return json;
 }
@@ -160,7 +160,7 @@ const sameRef = (a: TrackRef, b: TrackRef) => refKey(a) === refKey(b);
 export function swapSlots(state: LayoutState, i: number, j: number, by: string): LayoutState {
   const n = state.slots.length;
   if (!Number.isInteger(i) || !Number.isInteger(j) || i < 0 || j < 0 || i >= n || j >= n) {
-    throw new LayoutValidationError("slots", `swapSlots: index ${i},${j} di luar 0..${n - 1}`);
+    throw new LayoutValidationError("slots", `swapSlots: index ${i},${j} outside 0..${n - 1}`);
   }
   const slots = state.slots.map((s) => ({ ...s }));
   const a = slots[i]!;
@@ -173,7 +173,7 @@ export function swapSlots(state: LayoutState, i: number, j: number, by: string):
 export function setFocus(state: LayoutState, trackRef: TrackRef, by: string): LayoutState {
   const rest = state.slots.filter((s) => !sameRef(s.trackRef, trackRef));
   if (rest.length === state.slots.length) {
-    throw new LayoutValidationError("trackRef", `setFocus: track ${trackRef.identity}/${trackRef.trackName} tidak ada di layout`);
+    throw new LayoutValidationError("trackRef", `setFocus: track ${trackRef.identity}/${trackRef.trackName} is not in the layout`);
   }
   const slots: LayoutSlot[] = [
     { trackRef, size: "large" },
@@ -186,7 +186,7 @@ export function setFocus(state: LayoutState, trackRef: TrackRef, by: string): La
 /** Ganti template; panelSizes dibuang karena jumlah panel template lain berbeda (render pakai default). */
 export function setTemplate(state: LayoutState, template: LayoutTemplate, by: string): LayoutState {
   if (!LAYOUT_TEMPLATES.includes(template)) {
-    throw new LayoutValidationError("template", `"${String(template)}" tidak dikenal`);
+    throw new LayoutValidationError("template", `unknown template "${String(template)}"`);
   }
   return touch(state, { template, panelSizes: undefined }, by);
 }

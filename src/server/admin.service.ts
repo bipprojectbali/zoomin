@@ -31,9 +31,9 @@ export function canManage(actor: GlobalRole, target: GlobalRole): boolean {
 /** Target yang boleh dikelola aktor, atau throw AdminActionError (404 → diri sendiri → peran). */
 export function assertManageable(deps: Pick<ApiDeps, "db">, actor: SessionUser, targetId: string): AdminUser {
   const target = getAdminUser(deps.db, targetId);
-  if (!target) throw new AdminActionError("user_not_found", `user ${targetId} tidak ditemukan`);
-  if (target.id === actor.id) throw new AdminActionError("cannot_modify_self", "tidak bisa mengelola akun sendiri");
-  if (!canManage(actor.role, target.role)) throw new AdminActionError("insufficient_role", `${actor.role} tidak boleh mengelola ${target.role}`);
+  if (!target) throw new AdminActionError("user_not_found", `user ${targetId} not found`);
+  if (target.id === actor.id) throw new AdminActionError("cannot_modify_self", "cannot manage your own account");
+  if (!canManage(actor.role, target.role)) throw new AdminActionError("insufficient_role", `${actor.role} cannot manage ${target.role}`);
   return target;
 }
 
@@ -113,7 +113,7 @@ export async function revokeUserSessions(deps: ApiDeps, actor: SessionUser, targ
 
 /** Ubah peran global (A5, dipakai /api/dev): hanya super_admin; target bukan diri sendiri / super_admin. */
 export async function setGlobalRole(deps: ApiDeps, actor: SessionUser, targetId: string, role: "user" | "admin"): Promise<AdminUser> {
-  if (actor.role !== "super_admin") throw new AdminActionError("insufficient_role", "hanya super_admin yang boleh mengubah peran");
+  if (actor.role !== "super_admin") throw new AdminActionError("insufficient_role", "only super_admin can change roles");
   const target = assertManageable(deps, actor, targetId);
   await (await ctx(deps)).internalAdapter.updateUser(targetId, { role, updatedAt: new Date() });
   audit(deps, actor, "user.role", targetId, { from: target.role, to: role });
@@ -141,5 +141,5 @@ export async function listAdminRooms(deps: ApiDeps, actor: SessionUser, opts: { 
 
 /** Hapus room (logika di room.service.ts#deleteRoom: DB + audit + LiveKit); 404 bila tidak ada. */
 export async function deleteAdminRoom(deps: ApiDeps, actor: SessionUser, roomId: string): Promise<void> {
-  if (!(await deleteRoom(deps, actor, roomId))) throw new AdminActionError("room_not_found", `room ${roomId} tidak ditemukan`);
+  if (!(await deleteRoom(deps, actor, roomId))) throw new AdminActionError("room_not_found", `room ${roomId} not found`);
 }
