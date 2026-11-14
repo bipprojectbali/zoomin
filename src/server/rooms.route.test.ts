@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { createTestDeps, createTestUser, TEST_SUPER_ADMIN_EMAIL } from "../../test/auth.helpers";
-import type { ApiError, Page, RoomSummary } from "../shared/api.types";
+import type { ApiError, AuditEntry, Page, RoomSummary } from "../shared/api.types";
 import { createApi } from "./api";
 import { createRoom } from "./rooms.repository";
 
@@ -72,6 +72,28 @@ describe("GET/POST /api/rooms", () => {
     const dup = await call("POST", "/rooms", ADMIN, { id: "dup-room", title: "Lagi" });
     expect(dup.status).toBe(409);
     expect(await dup.json()).toMatchObject({ code: "room_exists", path: "/id" });
+  });
+
+  test("A8: POST sukses → audit room.create (actor & target benar); duplikat 409 → tanpa entri baru", async () => {
+    const root = await createTestUser(deps, { email: TEST_SUPER_ADMIN_EMAIL });
+    const audited = async () => {
+      const res = await call("GET", "/dev/audit?action=room.create&limit=200", root.cookie);
+      expect(res.status).toBe(200);
+      return ((await res.json()) as Page<AuditEntry>).items.filter((e) => e.targetId === "audit-room");
+    };
+    expect((await call("POST", "/rooms", ADMIN, { id: "audit-room", title: "Audit" })).status).toBe(200);
+    const entries = await audited();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      actorId: ADMIN_ID,
+      actorEmail: "admin@example.test",
+      action: "room.create",
+      targetType: "room",
+      targetId: "audit-room",
+      detail: { title: "Audit" },
+    });
+    expect((await call("POST", "/rooms", ADMIN, { id: "audit-room", title: "Lagi" })).status).toBe(409);
+    expect(await audited()).toHaveLength(1);
   });
 
   test("paginasi 25 room, limit 10 → 3 halaman tanpa duplikat, nextCursor null di akhir", async () => {

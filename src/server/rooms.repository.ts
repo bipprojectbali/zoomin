@@ -1,5 +1,6 @@
 import { type Database, SQLiteError } from "bun:sqlite";
 import type { Page, RoomRole, RoomSummary, SessionUser } from "../shared/api.types";
+import { recordAudit } from "./audit.repository";
 
 /** Default dan batas atas `limit` daftar room (kontrak GET /api/rooms). */
 export const ROOMS_PAGE_DEFAULT = 20;
@@ -77,8 +78,12 @@ export function listRoomsForUser(
   return { items, nextCursor: rows.length > limit && last ? encodeCursor(last) : null };
 }
 
-/** Insert room + pembuatnya sebagai member host dalam satu transaksi. Throw RoomExistsError bila id dipakai. */
-export function createRoom(db: Database, input: { id: string; title: string; createdBy: string }): RoomSummary {
+/**
+ * Insert room + pembuatnya sebagai member host dalam satu transaksi. Throw RoomExistsError bila id dipakai.
+ * `actorEmail` diisi → audit `room.create` (A8) ikut di transaksi yang sama (room tanpa audit / audit tanpa room
+ * tak mungkin). Opsional hanya agar fixture test bisa membuat room tanpa audit; route wajib mengisinya.
+ */
+export function createRoom(db: Database, input: { id: string; title: string; createdBy: string; actorEmail?: string }): RoomSummary {
   const createdAt = Date.now();
   try {
     db.transaction(() => {
@@ -89,6 +94,16 @@ export function createRoom(db: Database, input: { id: string; title: string; cre
         createdAt,
       );
       db.query("INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, 'host')").run(input.id, input.createdBy);
+      if (input.actorEmail !== undefined) {
+        recordAudit(db, {
+          actorId: input.createdBy,
+          actorEmail: input.actorEmail,
+          action: "room.create",
+          targetType: "room",
+          targetId: input.id,
+          detail: { title: input.title },
+        });
+      }
     })();
   } catch (cause) {
     if (cause instanceof SQLiteError && cause.code === "SQLITE_CONSTRAINT_PRIMARYKEY") {

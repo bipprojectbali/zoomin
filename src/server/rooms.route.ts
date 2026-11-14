@@ -45,10 +45,10 @@ export function roomsRoutes(deps: ApiDeps) {
     )
     .post(
       "/rooms",
-      // A7: hanya admin/super_admin global yang boleh membuat room; pembuat jadi host.
+      // A7: hanya admin/super_admin global yang boleh membuat room; pembuat jadi host. A8: audit room.create (atomik di repository).
       ({ user, body, status }) => {
         try {
-          return createRoom(deps.db, { id: body.id, title: body.title, createdBy: user.id });
+          return createRoom(deps.db, { id: body.id, title: body.title, createdBy: user.id, actorEmail: user.email });
         } catch (cause) {
           if (cause instanceof RoomExistsError) return status(HTTP_CONFLICT, apiError("room_exists", "room already exists", "/id"));
           throw cause;
