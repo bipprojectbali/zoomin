@@ -3,5 +3,5 @@
 plugins = ["bun-plugin-tailwind"]
 
 [test]
-# Test spike di RND/ punya dependency & server sendiri; jangan ikut `bun test` produk.
-pathIgnorePatterns = ["RND/**", "node_modules/**"]
+# Test spike di RND/ punya dependency & server sendiri; e2e/ dijalankan Playwright (`bun run test:e2e`).
+pathIgnorePatterns = ["RND/**", "node_modules/**", "e2e/**"]

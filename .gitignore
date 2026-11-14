@@ -12,3 +12,6 @@ data/
 .DS_Store
 RND/spike/.bin/
 RND/spike/.run/
+e2e/.artifacts/
+test-results/
+playwright-report/
