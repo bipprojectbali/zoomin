@@ -2,6 +2,8 @@
 export type Config = {
   nodeEnv: string;
   port: number;
+  /** Interface listen Bun.serve (HOST). Produksi di belakang reverse proxy: 127.0.0.1. */
+  host: string;
   dbPath: string;
   /** URL LiveKit untuk panggilan server-ke-server (Twirp). */
   livekitUrl: string;
@@ -22,6 +24,7 @@ export type Config = {
 
 export const SESSION_SECRET_MIN_LENGTH = 32;
 const DEFAULT_PORT = 3000;
+const DEFAULT_HOST = "0.0.0.0";
 const DEFAULT_DB_PATH = "./data/zoomin.sqlite";
 const DEFAULT_LIVEKIT_URL = "ws://127.0.0.1:7880";
 const DEFAULT_PUBLIC_APP_URL = "http://localhost:3000";
@@ -62,6 +65,7 @@ export function loadConfig(env: Env = process.env): Config {
   return {
     nodeEnv,
     port,
+    host: env.HOST?.trim() || DEFAULT_HOST,
     dbPath: env.DB_PATH?.trim() || DEFAULT_DB_PATH,
     livekitUrl,
     publicLivekitUrl: env.PUBLIC_LIVEKIT_URL?.trim() || livekitUrl,

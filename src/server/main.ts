@@ -17,6 +17,7 @@ export function createServer(deps: ApiDeps, port: number) {
   const api = createApi(deps);
   return Bun.serve({
     port,
+    hostname: deps.config.host,
     tls: loadTls(deps.config.tls),
     development: deps.config.nodeEnv !== "production",
     routes: {
@@ -44,10 +45,37 @@ export function toHttpUrl(livekitUrl: string): string {
   return livekitUrl.replace(/^ws(s?):\/\//, "http$1://");
 }
 
+type Stoppable = { stop(closeActiveConnections?: boolean): Promise<void> };
+type Closable = { close(): void };
+type SignalProcess = { once(signal: string, listener: () => void): unknown; exit(code?: number): never };
+
+/** Hentikan server (tunggu request berjalan) lalu tutup DB agar WAL ter-checkpoint dengan bersih. */
+export async function shutdown(server: Stoppable, db: Closable, signal: string): Promise<void> {
+  await server.stop();
+  db.close();
+  console.info(`zoomin: ${signal} diterima, server berhenti dan DB ditutup`);
+}
+
+/** Pasang handler SIGTERM/SIGINT (systemd stop / Ctrl+C) → shutdown lalu exit. */
+export function installShutdown(server: Stoppable, db: Closable, proc: SignalProcess = process): void {
+  for (const signal of ["SIGTERM", "SIGINT"]) {
+    proc.once(signal, () => {
+      shutdown(server, db, signal).then(
+        () => proc.exit(0),
+        (cause) => {
+          console.error(`zoomin: shutdown setelah ${signal} gagal`, cause);
+          proc.exit(1);
+        },
+      );
+    });
+  }
+}
+
 if (import.meta.main) {
   const config = loadConfig();
   const db = openDb(config.dbPath);
   const roomService = new RoomServiceClient(toHttpUrl(config.livekitUrl), config.livekitApiKey, config.livekitApiSecret);
   const server = createServer({ db, config, roomService }, config.port);
+  installShutdown(server, db);
   console.info(`zoomin: ${server.url} (LiveKit ${config.livekitUrl}, env ${config.nodeEnv})`);
 }

@@ -70,7 +70,7 @@ describe("POST /auth/admin-login rate limit", () => {
     const blocked = await post(app, "/auth/admin-login", { password: config.adminPassword }, ip("1.1.1.1"));
     expect(blocked.status).toBe(429);
     expect(blocked.headers.get("retry-after")).toBe(String(ADMIN_LOGIN_WINDOW_MS / 1000));
-    expect(((await blocked.json()) as { error: string }).error).toContain("Coba lagi");
+    expect(((await blocked.json()) as { code: string }).code).toBe("rate_limited");
     expect((await post(app, "/auth/admin-login", { password: config.adminPassword }, ip("2.2.2.2"))).status).toBe(200);
 
     setSystemTime(T0 + ADMIN_LOGIN_WINDOW_MS);

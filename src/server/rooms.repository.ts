@@ -41,6 +41,17 @@ export function roomExists(db: Database, roomId: string): boolean {
   return db.query<{ one: number }, [string]>("SELECT 1 AS one FROM rooms WHERE id = ?").get(roomId) !== null;
 }
 
+/** Satu room beserta role user (null = bukan member); null bila room tidak ada. Hak akses diputuskan route. */
+export function getRoomForUser(db: Database, roomId: string, userId: string): RoomSummary | null {
+  const row = db
+    .query<RoomRow, [string, string]>(
+      "SELECT r.id, r.title, m.role, r.created_at FROM rooms r " +
+        "LEFT JOIN room_members m ON m.room_id = r.id AND m.user_id = ? WHERE r.id = ?",
+    )
+    .get(userId, roomId);
+  return row ? { id: row.id, title: row.title, role: row.role, createdAt: row.created_at } : null;
+}
+
 // Urutan terbaru dulu; keyset (created_at, id) agar stabil walau created_at kembar.
 // Admin global: LEFT JOIN (semua room, role null bila bukan member). Lainnya: JOIN (hanya room member).
 const LIST_SQL = (join: "LEFT JOIN" | "JOIN") => `

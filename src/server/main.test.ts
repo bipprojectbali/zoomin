@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, mock, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,9 +8,9 @@ import { createApi } from "./api";
 import type { ApiDeps } from "./api.deps";
 import { loadConfig } from "./config";
 import { openDb } from "./db";
-import { createServer, toHttpUrl } from "./main";
+import { createServer, installShutdown, shutdown, toHttpUrl } from "./main";
 
-const config = loadConfig({ DB_PATH: ":memory:" });
+const config = loadConfig({ DB_PATH: ":memory:", HOST: "127.0.0.1" });
 const deps: ApiDeps = {
   db: openDb(":memory:"),
   config,
@@ -88,5 +88,43 @@ describe("main server TLS", () => {
   test("file sertifikat tidak ada → throw saat start", () => {
     const missing = { certPath: "/tidak/ada/cert.pem", keyPath: "/tidak/ada/key.pem" };
     expect(() => createServer({ ...deps, config: { ...config, tls: missing } }, 0)).toThrow("TLS_CERT_PATH tidak ditemukan");
+  });
+});
+
+describe("HOST + graceful shutdown", () => {
+  test("Bun.serve listen di config.host", () => {
+    expect(server.hostname).toBe("127.0.0.1");
+  });
+
+  test("shutdown: server.stop() dulu (tunggu), baru db.close()", async () => {
+    const calls: string[] = [];
+    const fakeServer = { stop: async () => void calls.push("stop") };
+    const fakeDb = { close: () => void calls.push("close") };
+    await shutdown(fakeServer, fakeDb, "SIGTERM");
+    expect(calls).toEqual(["stop", "close"]);
+  });
+
+  test("installShutdown memasang SIGTERM & SIGINT; sinyal → shutdown lalu exit(0)", async () => {
+    const listeners = new Map<string, () => void>();
+    const exit = mock((_code?: number) => undefined as never);
+    const close = mock(() => {});
+    installShutdown({ stop: async () => {} }, { close }, { once: (s, l) => listeners.set(s, l), exit });
+    expect([...listeners.keys()].sort()).toEqual(["SIGINT", "SIGTERM"]);
+    listeners.get("SIGTERM")?.();
+    await Bun.sleep(0);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  test("stop gagal → exit(1), error tidak ditelan", async () => {
+    const listeners = new Map<string, () => void>();
+    const exit = mock((_code?: number) => undefined as never);
+    const errorLog = console.error;
+    console.error = () => {};
+    installShutdown({ stop: async () => { throw new Error("boom"); } }, { close() {} }, { once: (s, l) => listeners.set(s, l), exit });
+    listeners.get("SIGINT")?.();
+    await Bun.sleep(0);
+    console.error = errorLog;
+    expect(exit).toHaveBeenCalledWith(1);
   });
 });

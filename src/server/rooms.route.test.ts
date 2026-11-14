@@ -1,6 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { RoomServiceClient } from "livekit-server-sdk";
-import type { Page, RoomSummary } from "../shared/api.types";
+import type { ApiError, Page, RoomSummary } from "../shared/api.types";
 import { createApi } from "./api";
 import type { ApiDeps } from "./api.deps";
 import { createSessionCookie } from "./auth.session";
@@ -50,7 +50,9 @@ describe("GET/POST /api/rooms", () => {
   ])("body invalid → 400 (bukan 422): %o", async (body) => {
     const res = await call("POST", "/rooms", ADMIN, body);
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toBeString();
+    const err = (await res.json()) as ApiError;
+    expect(err.error).toBeString();
+    expect(err.code).toBe("invalid_input");
   });
 
   test("admin POST → room + creator jadi admin; duplikat → 409", async () => {
@@ -61,7 +63,9 @@ describe("GET/POST /api/rooms", () => {
     expect(db.query("SELECT role FROM room_members WHERE room_id = ? AND user_id = ?").get("dup-room", "admin")).toEqual({
       role: "admin",
     });
-    expect((await call("POST", "/rooms", ADMIN, { id: "dup-room", title: "Lagi" })).status).toBe(409);
+    const dup = await call("POST", "/rooms", ADMIN, { id: "dup-room", title: "Lagi" });
+    expect(dup.status).toBe(409);
+    expect(await dup.json()).toMatchObject({ code: "room_exists", path: "/id" });
   });
 
   test("paginasi 25 room, limit 10 → 3 halaman tanpa duplikat, nextCursor null di akhir", async () => {
@@ -104,5 +108,39 @@ describe("GET/POST /api/rooms", () => {
     const all = (await (await call("GET", "/rooms?limit=100", ADMIN)).json()) as Page<RoomSummary>;
     expect(all.items.find((r) => r.id === "alice-room")?.role).toBeNull();
     expect(all.items.find((r) => r.id === "dup-room")?.role).toBe("admin");
+  });
+});
+
+describe("GET /api/rooms/:roomId", () => {
+  let BOB = "";
+  beforeAll(() => {
+    BOB = addUser("bob");
+    createRoom(db, { id: "detail-room", title: "Rapat Detail", createdBy: "admin" });
+    db.query("INSERT INTO room_members (room_id, user_id, role) VALUES ('detail-room', 'alice', 'participant')").run();
+    db.query("DELETE FROM room_members WHERE room_id = 'detail-room' AND user_id = 'admin'").run();
+  });
+  const codeOf = async (res: Response) => ((await res.json()) as ApiError).code;
+
+  test("member → 200 RoomSummary dengan role-nya", async () => {
+    const res = await call("GET", "/rooms/detail-room", ALICE);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: "detail-room", title: "Rapat Detail", role: "participant" });
+  });
+
+  test("admin global non-member → 200 role null", async () => {
+    const res = await call("GET", "/rooms/detail-room", ADMIN);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as RoomSummary).role).toBeNull();
+  });
+
+  test("401 / 403 / 404 / 400 dengan code", async () => {
+    const anon = await call("GET", "/rooms/detail-room");
+    expect([anon.status, await codeOf(anon)]).toEqual([401, "unauthorized"]);
+    const outsider = await call("GET", "/rooms/detail-room", BOB);
+    expect([outsider.status, await codeOf(outsider)]).toEqual([403, "forbidden"]);
+    const missing = await call("GET", "/rooms/tidak-ada", ALICE);
+    expect([missing.status, await codeOf(missing)]).toEqual([404, "room_not_found"]);
+    const bad = await call("GET", "/rooms/a%20b", ALICE);
+    expect([bad.status, await codeOf(bad)]).toEqual([400, "invalid_input"]);
   });
 });

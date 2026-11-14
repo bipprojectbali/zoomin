@@ -99,7 +99,7 @@ describe("layout.route", () => {
 
     const stale = await call(app, "PUT", "ra", "r1", { baseVersion: 0, layout: { ...layout, template: "focus" } });
     expect(stale.status).toBe(409);
-    expect(await stale.json()).toEqual({ error: "layout conflict", currentVersion: 1 });
+    expect(await stale.json()).toEqual({ error: "layout conflict", code: "layout_conflict", currentVersion: 1 });
 
     // admin global (bukan member) boleh menulis
     const ok2 = await call(app, "PUT", "admin", "r1", { baseVersion: 1, layout: { ...layout, template: "focus" } });

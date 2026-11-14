@@ -77,4 +77,8 @@ describe("loadConfig", () => {
     expect(loadConfig({ TRUST_PROXY: "1" }).trustProxy).toBe(false);
     expect(loadConfig({ TRUST_PROXY: "true" }).trustProxy).toBe(true);
   });
+  test("HOST: default 0.0.0.0, bisa dioverride (mis. 127.0.0.1 di belakang proxy)", () => {
+    expect(loadConfig({}).host).toBe("0.0.0.0");
+    expect(loadConfig({ HOST: " 127.0.0.1 " }).host).toBe("127.0.0.1");
+  });
 });

@@ -1,7 +1,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { Elysia, t } from "elysia";
-import type { ApiError, UserResponse } from "../shared/api.types";
+import type { UserResponse } from "../shared/api.types";
 import type { ApiDeps } from "./api.deps";
+import { apiError } from "./api.error";
 import { inviteRoutes } from "./auth.invite.route";
 import { clientIp, createRateLimiter } from "./auth.ratelimit";
 import { clearSessionCookie, createSessionCookie, getSessionUser, SESSION_TTL_SECONDS } from "./auth.session";
@@ -16,7 +17,6 @@ export const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000;
 export const ADMIN_USER_ID = "admin";
 const ADMIN_NAME = "Admin";
 
-const UNAUTHORIZED: ApiError = { error: "unauthorized" };
 const sha256 = (value: string) => createHash("sha256").update(value).digest();
 
 /** Plugin route auth: /me, admin-login, logout, plus undangan (lihat kontrak di src/shared/api.types.ts). */
@@ -28,7 +28,7 @@ export function authRoutes(deps: ApiDeps) {
   return new Elysia({ name: "auth" })
     .get("/me", ({ request, status }) => {
       const user = getSessionUser(request, db, config.sessionSecret);
-      return user ? ({ user } satisfies UserResponse) : status(HTTP_UNAUTHORIZED, UNAUTHORIZED);
+      return user ? ({ user } satisfies UserResponse) : status(HTTP_UNAUTHORIZED, apiError("unauthorized", "unauthorized"));
     })
     .post(
       "/auth/admin-login",
@@ -37,14 +37,12 @@ export function authRoutes(deps: ApiDeps) {
         const retryAfter = loginFailures.retryAfter(ip);
         if (retryAfter > 0) {
           set.headers["retry-after"] = String(retryAfter);
-          return status(HTTP_TOO_MANY_REQUESTS, {
-            error: `Terlalu banyak percobaan login gagal. Coba lagi dalam ${Math.ceil(retryAfter / 60)} menit.`,
-          } satisfies ApiError);
+          return status(HTTP_TOO_MANY_REQUESTS, apiError("rate_limited", `too many failed logins, retry in ${retryAfter}s`));
         }
         // Hash dulu kedua sisi supaya panjang sama; timingSafeEqual tidak membocorkan panjang password.
         if (!timingSafeEqual(sha256(body.password), sha256(config.adminPassword))) {
           loginFailures.hit(ip);
-          return status(HTTP_UNAUTHORIZED, UNAUTHORIZED);
+          return status(HTTP_UNAUTHORIZED, apiError("invalid_credentials", "invalid credentials"));
         }
         loginFailures.reset(ip);
         const row = db

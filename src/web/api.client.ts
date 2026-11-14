@@ -3,9 +3,11 @@ import type {
   AcceptInviteResponse,
   AdminLoginBody,
   ApiError,
+  ApiErrorCode,
   CreateInviteBody,
   CreateInviteResponse,
   CreateRoomBody,
+  InvitePreview,
   LayoutResponse,
   ListRoomsQuery,
   Page,
@@ -16,8 +18,10 @@ import type {
   UserResponse,
 } from "../shared/api.types";
 
-/** Error dari API: status HTTP + body JSON (`error`, dan field lain seperti `currentVersion` untuk 409). */
+/** Error dari API: status HTTP + `code`/`path` dari body, body lengkap (mis. `currentVersion` untuk 409). */
 export class ApiRequestError extends Error {
+  readonly code?: ApiErrorCode;
+  readonly path?: string;
   constructor(
     readonly status: number,
     readonly body: ApiError & Record<string, unknown>,
@@ -25,6 +29,8 @@ export class ApiRequestError extends Error {
   ) {
     super(`${operation}: HTTP ${status} ${body.error}`);
     this.name = "ApiRequestError";
+    this.code = body.code;
+    this.path = body.path;
   }
 }
 
@@ -70,7 +76,11 @@ export const logout = () => request<void>("POST", "/api/auth/logout");
 export const createInvite = (roomId: string, body: CreateInviteBody) =>
   request<CreateInviteResponse>("POST", `${roomPath(roomId)}/invites`, body);
 
-/** POST /api/invites/accept. */
+/** GET /api/invites/preview: info undangan sebelum diterima (tanpa sesi boleh). */
+export const previewInvite = (invite: string) =>
+  request<InvitePreview>("GET", `/api/invites/preview?${new URLSearchParams({ invite })}`);
+
+/** POST /api/invites/accept (`name` diabaikan server bila sudah bersesi). */
 export const acceptInvite = (body: AcceptInviteBody) => request<AcceptInviteResponse>("POST", "/api/invites/accept", body);
 
 /** GET /api/rooms?limit=&cursor=. */
@@ -84,6 +94,9 @@ export function listRooms(query: ListRoomsQuery = {}) {
 
 /** POST /api/rooms (admin global). */
 export const createRoom = (body: CreateRoomBody) => request<RoomSummary>("POST", "/api/rooms", body);
+
+/** GET /api/rooms/:roomId: detail satu room (member / admin global). */
+export const getRoom = (roomId: string) => request<RoomSummary>("GET", roomPath(roomId));
 
 /** POST /api/rooms/:roomId/token: role & identity ditentukan server dari sesi. */
 export const getRoomToken = (roomId: string) => request<TokenResponse>("POST", `${roomPath(roomId)}/token`);
