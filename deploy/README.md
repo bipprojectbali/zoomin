@@ -206,35 +206,50 @@ ExecStart=/opt/zoomin/current/zoomin serve
 jalan otomatis saat start; `zoomin migrate --db /var/lib/zoomin/zoomin.sqlite` bisa dipakai untuk menjalankannya
 terpisah (sesudah backup).
 
-## LiveKit via Portainer (tanpa subdomain)
+## LiveKit via Portainer
 
-Alternatif `livekit.service` + Caddy untuk VPS yang sudah memakai Portainer: `livekit-compose.yml` (image
-`livekit/livekit-server:v1.13.11`, `network_mode: host`, config lewat env `LIVEKIT_CONFIG`). Tanpa subdomain dan
-tanpa Traefik: browser memakai signaling `wss://<APP_DOMAIN>/livekit` yang diproxy app zoomin, server zoomin
-memanggil API langsung ke `ws://<IP-VPS>:7880`.
+Alternatif `livekit.service` + Caddy untuk VPS yang sudah memakai Portainer + Traefik: `livekit-compose.yml` (image
+`livekit/livekit-server:v1.13.11`, network `public-net`, config lewat env `LIVEKIT_CONFIG`).
 
-1. Portainer > Stacks > Add stack > Web editor: tempel `livekit-compose.yml`. Environment variables: isi dari
-   `livekit-stack.env.example` (`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`; `LIVEKIT_BIND` opsional). Deploy.
+- Signaling `wss://lk.wibudev.com` (env stack `LIVEKIT_HOST`): Cloudflare → Traefik (`websecure`, `letsencrypt`)
+  → container `:7880`. Port 7880 tidak di-publish. Tanpa basic auth (klien LiveKit tidak bisa) dan tanpa rate
+  limit Traefik (reconnect klien sering terjadi); akses dijaga token JWT.
+- Media langsung ke IP publik asli VPS (Cloudflare tidak meneruskan UDP/TCP mentah): `7882/udp` (semua media UDP
+  lewat satu port, UDP mux `rtc.udp_port`) dan `7881/tcp` (ICE/TCP cadangan). IP publik dicari via STUN
+  (`use_external_ip: true`) lalu diiklankan ke klien.
+- TURN mati. Klien di jaringan yang hanya membuka 443 (korporat/hotel ketat) bisa tersambung signaling tapi gagal
+  media. Butuh itu → pakai setup Caddy + caddy-l4 di atas dengan domain TURN.
+
+Langkah:
+
+1. Pastikan DNS `lk.wibudev.com` (atau nilai `LIVEKIT_HOST`) mengarah ke VPS; wildcard `*.wibudev.com` di Cloudflare
+   sudah mencakupnya.
+2. Portainer > Stacks > Add stack > Web editor: tempel `livekit-compose.yml`. Environment variables: isi dari
+   `livekit-stack.env.example` (`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`; `LIVEKIT_HOST` opsional). Deploy.
    Variabel kunci kosong → stack ditolak (`required variable ... is missing a value`).
-2. Firewall/security group VPS (host network = port langsung terbuka di host):
-   - TCP 7880 (API/signaling): hanya dari IP/tailnet server zoomin bila bisa. Alternatif:
-     `LIVEKIT_BIND=<IP Tailscale VPS>` agar 7880 hanya listen di tailnet. `bind_addresses` di livekit 1.13.11 hanya
-     dipakai listener HTTP (+prometheus/webtransport) di `pkg/service/server.go`; RTC dan TURN punya bind sendiri
-     (default `0.0.0.0`), jadi media tidak ikut terikat ke IP privat. Syarat: tailscaled sudah up saat container
-     start (kalau belum, start gagal dan `restart: unless-stopped` mengulang).
-   - TCP 7881 (ICE/TCP), UDP 50000–60000 (media), UDP 3478 (TURN/UDP): terbuka untuk semua klien.
-   - Range relay TURN (default UDP 30000–40000) tidak perlu dibuka: relay embedded hanya mengirim ke SFU di host
-     yang sama.
-3. Uji: `curl http://<IP-VPS>:7880` → `OK`, lalu
-   `RND/spike/.bin/lk room list --url http://<IP-VPS>:7880 --api-key "$LIVEKIT_API_KEY" --api-secret "$LIVEKIT_API_SECRET"`
-   (ambil dari env, jangan tulis secret di command line yang tersimpan di history). Log: `docker logs livekit`
-   harus memuat `found external IP via STUN` dengan IP publik VPS.
-4. `.env` zoomin: `LIVEKIT_URL=ws://<IP-VPS>:7880`, `PUBLIC_LIVEKIT_URL=wss://<APP_DOMAIN>/livekit`
-   (mis. `wss://malik.wibudev.com/livekit`), `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` sama dengan env stack.
-   Proxy `/livekit` di app sedang dikerjakan terpisah; sebelum itu selesai, URL publik ini belum berfungsi.
+3. Firewall: `ports:` Docker (7881/tcp, 7882/udp) dibuka lewat iptables Docker dan **melewati ufw**, jadi
+   `ufw status` tidak menampilkannya. Informasikan ke pengelola server. Menutup port = stop stack (Portainer >
+   Stacks > livekit > Stop). Firewall/security group di level provider (bila ada) tetap harus mengizinkan keduanya.
+4. Uji:
+   - `curl -I https://lk.wibudev.com` → `HTTP/2 200`, body `curl https://lk.wibudev.com` → `OK`. Beberapa detik pertama setelah start
+     wajar `406` "Not Ready"; `404` dari Traefik = router/label belum terbaca.
+   - `docker logs livekit` (Portainer > Containers > livekit > Logs): `found external IP via STUN` dengan IP publik
+     VPS, lalu `starting LiveKit server` dengan `"rtc.portUDP": {"Start":7882,...}` dan `nodeIP` = IP publik.
+     Baris `could not validate external IP` aman diabaikan bila `nodeIP` sudah benar (LiveKit tetap memakai IP
+     hasil STUN).
+   - Dari mesin luar: `nc -vz <IP-VPS> 7881` (TCP harus `succeeded`). UDP tidak bisa dipastikan dengan `nc`
+     (tanpa balasan); uji nyata = gabung room dari dua perangkat di jaringan berbeda, lalu cek
+     `chrome://webrtc-internals` → candidate pair terpilih memakai `<IP-VPS>:7882` udp.
+   - API: `RND/spike/.bin/lk room list --url https://lk.wibudev.com --api-key "$LIVEKIT_API_KEY" --api-secret "$LIVEKIT_API_SECRET"`
+     (ambil dari env, jangan tulis secret di command line yang tersimpan di history).
+5. `.env` zoomin: `LIVEKIT_URL=wss://lk.wibudev.com`, `PUBLIC_LIVEKIT_URL=wss://lk.wibudev.com`,
+   `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` sama dengan env stack. Proxy `/livekit` di app tidak diperlukan untuk desain
+   ini (tetap tersedia).
 
-Batasan: tanpa TURN/TLS di 443, klien di jaringan yang hanya membuka 443 (korporat/hotel ketat) bisa tersambung
-signaling tapi gagal media. Butuh itu → pakai setup Caddy + caddy-l4 di atas dengan domain TURN.
+IP hasil STUN salah (mis. VPS punya beberapa IP publik): di `LIVEKIT_CONFIG` ganti `use_external_ip: false` dan
+tambahkan `node_ip: <IP publik VPS>` di bawah `rtc:`. Keduanya harus diubah bersama: selama `use_external_ip: true`,
+`node_ip` ditimpa hasil STUN; sebaliknya `use_external_ip: false` tanpa `node_ip` mengiklankan IP bridge 172.x.
+Jangan tambahkan `port_range_start/end`: bila diisi, LiveKit memakai range itu dan `udp_port` diabaikan.
 
 ## Backup SQLite
 

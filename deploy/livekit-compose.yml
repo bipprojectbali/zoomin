@@ -1,15 +1,17 @@
-# Stack Portainer: LiveKit SFU untuk zoomin (tanpa subdomain, tanpa Traefik).
+# Stack Portainer: LiveKit SFU untuk zoomin di belakang Traefik (network public-net).
 # Env stack (Portainer > Stacks > Environment variables): lihat deploy/livekit-stack.env.example.
-# Panduan + firewall: deploy/README.md bagian "LiveKit via Portainer (tanpa subdomain)".
+# Panduan + uji: deploy/README.md bagian "LiveKit via Portainer".
+#
+# Jalur trafik:
+# - Signaling (HTTP/WebSocket :7880): klien -> Cloudflare -> Traefik (websecure) -> container. Tidak di-publish.
+# - Media WebRTC (7881/TCP, 7882/UDP): klien -> IP publik asli VPS (Cloudflare tidak meneruskan UDP/TCP mentah).
+#   Port di `ports:` dibuka Docker lewat iptables sendiri, jadi MELEWATI ufw. Menutupnya = stop stack.
 services:
   livekit:
     # Pin versi; sama dengan binary yang diverifikasi di repo (1.13.11).
     image: livekit/livekit-server:v1.13.11
     container_name: livekit
     restart: unless-stopped
-    # Host network: WebRTC butuh range UDP 50000-60000; port mapping Docker untuk 10k port lambat & boros.
-    # Konsekuensi: tidak ada `ports:`/`networks:`/label Traefik, port langsung terbuka di host -> atur firewall.
-    network_mode: host
     cpus: "2.0"
     mem_limit: 2g
     mem_reservation: 512m
@@ -24,22 +26,47 @@ services:
       options:
         max-size: 10m
         max-file: "3"
+    ports:
+      # ICE/TCP: cadangan bila UDP diblok jaringan klien.
+      - "7881:7881/tcp"
+      # Semua media UDP lewat satu port (UDP mux), jadi cukup satu port, bukan range 50000-60000.
+      - "7882:7882/udp"
+    networks:
+      - public-net
+    labels:
+      # Tanpa basic auth: klien LiveKit tidak bisa mengirim kredensial basic auth; akses diatur token JWT LiveKit.
+      # Tanpa middleware rate limit: klien reconnect berulang (ganti jaringan, tab kembali aktif) dan banyak
+      # peserta di belakang satu NAT kantor bisa terkena limit lalu gagal masuk room.
+      # WebSocket diteruskan Traefik secara default, tidak perlu label tambahan.
+      - "traefik.enable=true"
+      - "traefik.docker.network=public-net"
+      - "traefik.http.routers.livekit.rule=Host(`${LIVEKIT_HOST:-lk.wibudev.com}`)"
+      - "traefik.http.routers.livekit.entrypoints=websecure"
+      - "traefik.http.routers.livekit.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.livekit.priority=200"
+      - "traefik.http.routers.livekit.service=livekit"
+      - "traefik.http.services.livekit.loadbalancer.server.port=7880"
     environment:
       # Dibaca livekit-server sebagai isi config (flag --config-body, sumber env LIVEKIT_CONFIG).
       # Bentuk map (bukan list seperti biasa) karena nilainya YAML multi-baris.
       LIVEKIT_CONFIG: |
         port: 7880
-        # Hanya memengaruhi listener HTTP/signaling 7880 (bukan RTC/TURN). Default semua interface.
-        bind_addresses:
-          - "${LIVEKIT_BIND:-0.0.0.0}"
         log_level: info
         rtc:
           tcp_port: 7881
-          port_range_start: 50000
-          port_range_end: 60000
+          # Satu port UDP (mux). Jangan isi port_range_start/end: bila diisi, range menang dan udp_port diabaikan.
+          udp_port: 7882
+          # Container di bridge hanya punya IP 172.x; IP publik VPS dicari lewat STUN lalu diiklankan ke klien.
+          # IP hasil STUN salah? Ganti `use_external_ip: false` dan tambahkan `node_ip: <IP publik VPS>`
+          # (node_ip diabaikan selama use_external_ip true).
           use_external_ip: true
+        # TURN mati: tidak ada port untuk itu. Klien di jaringan yang hanya membuka 443 (korporat/hotel ketat)
+        # bisa tersambung signaling tapi gagal media.
         turn:
-          enabled: true
-          udp_port: 3478
+          enabled: false
         keys:
           "${LIVEKIT_API_KEY:?isi LIVEKIT_API_KEY di env stack}": "${LIVEKIT_API_SECRET:?isi LIVEKIT_API_SECRET di env stack}"
+
+networks:
+  public-net:
+    external: true
