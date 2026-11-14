@@ -27,11 +27,25 @@ export function resolveSlots<T extends TrackLike>(layout: LayoutState, tracks: T
   return { slots, extras: tracks.filter((t) => !used.has(keyOf(refOf(t)))) };
 }
 
-/** Layout otomatis saat admin belum mengatur: grid, semua layar dulu lalu kamera (urut stabil). */
+/** Berdampingan dengan lebih dari ini jadi kolom potret sempit → dirender sebagai grid (UX-19). */
+export const SIDE_BY_SIDE_MAX = 3;
+
+/**
+ * Layout otomatis saat admin belum mengatur (UX-19):
+ * - ada layar → slot = layar saja; kamera tidak masuk slot sehingga tampil di strip kecil "lainnya".
+ * - tanpa layar → slot = kamera.
+ * Template: 2 track → berdampingan, selain itu grid (1 track grid = penuh). Urutan stabil (numeric).
+ */
 export function autoLayout(tracks: TrackLike[]): LayoutState {
-  const rank = (t: TrackLike) => (t.source === SCREEN_SOURCE ? 0 : 1);
-  const sorted = [...tracks].sort(
-    (a, b) => rank(a) - rank(b) || keyOf(refOf(a)).localeCompare(keyOf(refOf(b)), "en", { numeric: true }),
+  const screens = tracks.filter((t) => t.source === SCREEN_SOURCE);
+  const main = (screens.length > 0 ? screens : tracks).toSorted((a, b) =>
+    keyOf(refOf(a)).localeCompare(keyOf(refOf(b)), "en", { numeric: true }),
   );
-  return { version: 0, template: "grid", slots: sorted.map((t) => ({ trackRef: refOf(t) })), updatedBy: "auto", updatedAt: 0 };
+  return {
+    version: 0,
+    template: main.length === 2 ? "side-by-side" : "grid",
+    slots: main.map((t) => ({ trackRef: refOf(t) })),
+    updatedBy: "auto",
+    updatedAt: 0,
+  };
 }

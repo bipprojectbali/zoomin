@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { LAYOUT_MAX_SLOTS, LayoutValidationError, parseLayout, serializeLayout, type LayoutState } from "../../shared/layout.model";
-import { placeTrack } from "./stage.edit";
+import { placeTrack, removeSlot } from "./stage.edit";
 
 // test-only
 const ref = (identity: string, trackName = "camera") => ({ identity, trackName });
@@ -50,5 +50,31 @@ describe("placeTrack", () => {
   test("index di luar rentang ditolak", () => {
     expect(() => placeTrack(layout(2), 2, ref("x"), "a")).toThrow(LayoutValidationError);
     expect(() => placeTrack(layout(2), -1, ref("x"), "a")).toThrow(LayoutValidationError);
+  });
+});
+
+describe("removeSlot", () => {
+  test("hapus slot index; input tidak dimutasi; hasil valid", () => {
+    const base = layout(3);
+    const next = removeSlot(base, 1, "u9");
+    expect(names(next)).toEqual(["u0", "u2"]);
+    expect(next.updatedBy).toBe("u9");
+    expect(next.version).toBe(3);
+    expect(names(base)).toEqual(["u0", "u1", "u2"]);
+    expect(() => parseLayout(serializeLayout(next))).not.toThrow();
+  });
+  test("side-by-side membuang panelSizes; focus mempertahankan", () => {
+    const sbs = removeSlot(layout(3, { template: "side-by-side", panelSizes: [30, 30, 40] }), 0, "a");
+    expect("panelSizes" in sbs).toBe(false);
+    expect(() => parseLayout(serializeLayout(sbs))).not.toThrow();
+    expect(removeSlot(layout(3, { template: "focus", panelSizes: [70, 30] }), 2, "a").panelSizes).toEqual([70, 30]);
+  });
+  test("hapus slot terakhir → layout kosong valid", () => {
+    expect(removeSlot(layout(1), 0, "a").slots).toEqual([]);
+  });
+  test("index di luar rentang ditolak", () => {
+    expect(() => removeSlot(layout(2), 2, "a")).toThrow(LayoutValidationError);
+    expect(() => removeSlot(layout(2), -1, "a")).toThrow(LayoutValidationError);
+    expect(() => removeSlot(layout(2), 0.5, "a")).toThrow(LayoutValidationError);
   });
 });

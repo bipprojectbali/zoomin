@@ -37,21 +37,27 @@ describe("resolveSlots", () => {
 });
 
 describe("autoLayout", () => {
-  test("semua layar dulu lalu kamera, grid, version 0", () => {
-    const l = autoLayout([track("a", "camera"), track("b", "screen-2"), track("c", "camera"), track("b", "screen-10"), track("a", "screen-1")]);
+  const refs = (l: LayoutState) => l.slots.map((s) => `${s.trackRef.identity}/${s.trackRef.trackName}`);
+  test("ada layar → slot hanya layar (urut numeric), kamera ke strip lainnya; version 0", () => {
+    const tracks = [track("a", "camera"), track("b", "screen-2"), track("c", "camera"), track("b", "screen-10"), track("a", "screen-1")];
+    const l = autoLayout(tracks);
     expect(l.template).toBe("grid");
     expect(l.version).toBe(0);
-    expect(l.slots.map((s) => `${s.trackRef.identity}/${s.trackRef.trackName}`)).toEqual([
-      "a/screen-1",
-      "b/screen-2",
-      "b/screen-10",
-      "a/camera",
-      "c/camera",
-    ]);
+    expect(refs(l)).toEqual(["a/screen-1", "b/screen-2", "b/screen-10"]);
+    expect(resolveSlots(l, tracks).extras.map((t) => t.participant.identity)).toEqual(["a", "c"]);
   });
-  test("tanpa track → slot kosong; hasilnya tak menyisakan extras", () => {
+  test("1 track → grid (penuh); 2 layar → berdampingan", () => {
+    expect(autoLayout([track("a", "camera")]).template).toBe("grid");
+    const two = autoLayout([track("a", "screen-1"), track("a", "camera"), track("b", "screen-1")]);
+    expect(two.template).toBe("side-by-side");
+    expect(refs(two)).toEqual(["a/screen-1", "b/screen-1"]);
+  });
+  test("tanpa layar → semua kamera; ≥3 → grid; tanpa track → kosong", () => {
+    const cams = [track("c", "camera"), track("a", "camera"), track("b", "camera")];
+    const l = autoLayout(cams);
+    expect(l.template).toBe("grid");
+    expect(refs(l)).toEqual(["a/camera", "b/camera", "c/camera"]);
+    expect(resolveSlots(l, cams).extras).toEqual([]);
     expect(autoLayout([]).slots).toEqual([]);
-    const tracks = [track("a", "camera"), track("b", "screen-1")];
-    expect(resolveSlots(autoLayout(tracks), tracks).extras).toEqual([]);
   });
 });

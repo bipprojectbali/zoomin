@@ -5,7 +5,7 @@ import { STAGE_LABELS } from "./stage.labels";
 
 export function StageToolbar({ template, onSelect }: { template: LayoutTemplate; onSelect: (t: LayoutTemplate) => void }) {
   return (
-    <div role="toolbar" aria-label={STAGE_LABELS.toolbar} className="flex shrink-0 gap-1 p-1">
+    <div role="toolbar" aria-label={STAGE_LABELS.toolbar} data-testid="layout-toolbar" className="flex shrink-0 gap-1 p-1">
       {LAYOUT_TEMPLATES.map((t) => (
         <Button
           key={t}
