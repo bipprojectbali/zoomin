@@ -131,3 +131,22 @@ describe("0002_auth dari DB berisi data 0001", () => {
     expect(db.query("PRAGMA foreign_key_check").all()).toEqual([]);
   });
 });
+
+describe("0003_admin", () => {
+  test("tabel audit_log & app_settings + index; audit tetap ada setelah user pelaku dihapus (tanpa FK)", () => {
+    const db = seed();
+    for (const t of ["audit_log", "app_settings"]) expect(tableExists(db, t)).toBe(true);
+    const idx = db.query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'audit_log' AND name NOT LIKE 'sqlite_%' ORDER BY name").all();
+    expect(idx.map((r) => r.name)).toEqual(["audit_log_action_at_idx", "audit_log_actor_at_idx", "audit_log_at_idx"]);
+    db.run("INSERT INTO audit_log (id, at, actor_id, actor_email, action, target_type, target_id) VALUES ('a1', 1, 'u1', 'u1@example.test', 'user.ban', 'user', 'x')");
+    db.run(`DELETE FROM "user" WHERE id = 'u1'`);
+    expect(db.query("SELECT detail_json FROM audit_log").get()).toEqual({ detail_json: "{}" });
+  });
+
+  test("SQL 0003 aman dijalankan ulang langsung dan data tetap", () => {
+    const db = openDb(":memory:");
+    db.run("INSERT INTO app_settings (key, value_json) VALUES ('k', '[]')");
+    db.transaction(() => db.run(MIGRATIONS[2]!.sql))();
+    expect(count(db, "app_settings")).toBe(1);
+  });
+});

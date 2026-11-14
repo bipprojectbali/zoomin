@@ -1,8 +1,10 @@
 import { Elysia } from "elysia";
+import { adminRoutes } from "./admin.route";
 import type { ApiDeps } from "./api.deps";
 import { apiError } from "./api.error";
 import { inviteRoutes } from "./auth.invite.route";
 import { meRoutes } from "./auth.me.route";
+import { devRoutes } from "./dev.route";
 import { CLIENT_IP_HEADER, clientIp } from "./auth.ratelimit";
 import { testLoginRoutes } from "./auth.test.route";
 import { layoutRoutes } from "./layout.route";
@@ -49,6 +51,8 @@ export function createApi(deps: ApiDeps) {
     .use(inviteRoutes(deps))
     .use(roomsRoutes(deps))
     .use(tokenRoutes(deps))
-    .use(layoutRoutes(deps));
+    .use(layoutRoutes(deps))
+    .use(adminRoutes(deps))
+    .use(devRoutes(deps));
   return deps.config.testAuth ? app.use(testLoginRoutes(deps)) : app;
 }

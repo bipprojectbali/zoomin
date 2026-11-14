@@ -54,7 +54,6 @@ describe("POST /api/test/login (A12)", () => {
 
   test("domain ditolak → 403 email_domain_not_allowed", async () => {
     const deps = createTestDeps();
-    deps.db.run("CREATE TABLE app_settings (key TEXT PRIMARY KEY, value_json TEXT NOT NULL, updated_at INTEGER, updated_by TEXT)");
     deps.db.run(`INSERT INTO app_settings (key, value_json) VALUES ('allowed_email_domains', '["kantor.test"]')`);
     const res = await login(deps, { email: "a@luar.test" });
     expect(res.status).toBe(403);

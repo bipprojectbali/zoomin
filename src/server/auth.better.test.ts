@@ -5,7 +5,7 @@ import { createApi } from "./api";
 import type { ApiDeps } from "./api.deps";
 import { ALLOWED_EMAIL_DOMAINS_KEY, createAuth, getAllowedEmailDomains, isEmailDomainAllowed, syncedRole } from "./auth.better";
 
-/** Simulasi tabel app_settings milik migrasi 0003 (gelombang 2) dengan kontrak kolom dari spec. */
+/** Tulis setting domain langsung (tabel dari migrasi 0003; CREATE IF NOT EXISTS untuk kasus tabel di-drop). */
 function setAllowedDomains(deps: ApiDeps, valueJson: string) {
   deps.db.run("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value_json TEXT NOT NULL, updated_at INTEGER, updated_by TEXT)");
   deps.db.run("INSERT OR REPLACE INTO app_settings (key, value_json) VALUES (?, ?)", [ALLOWED_EMAIL_DOMAINS_KEY, valueJson]);
@@ -33,6 +33,8 @@ describe("aturan murni", () => {
 
   test("getAllowedEmailDomains defensif: tabel belum ada / baris kosong / JSON rusak / bukan array → []", () => {
     const deps = createTestDeps();
+    // Migrasi 0003 sudah membuat tabel; hapus untuk menguji kondisi "sebelum 0003".
+    deps.db.run("DROP TABLE app_settings");
     expect(getAllowedEmailDomains(deps.db)).toEqual([]);
     deps.db.run("CREATE TABLE app_settings (key TEXT PRIMARY KEY, value_json TEXT NOT NULL, updated_at INTEGER, updated_by TEXT)");
     expect(getAllowedEmailDomains(deps.db)).toEqual([]);
