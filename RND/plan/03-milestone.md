@@ -8,7 +8,23 @@ worker lain. Worker tidak boleh commit, push, atau ganti branch.
 
 ---
 
+## Status per 2026-11-14 (rilis 0.1.0 disiapkan, belum dideploy)
+
+| Milestone | Status |
+|---|---|
+| M0 | Sebagian. Uji browser **otomatis** selesai: suite Playwright (`bun run test:e2e`, 28/28, Chromium + media palsu, multi layar, layout, reconnect, mobile) dan QA mode produksi via ego-browser (`../qa/02-ux-recheck.md`). Uji perangkat nyata (picker + izin OS, matriks browser, CPU nyata), load test produksi, dan uji decode tetap terbuka dan dikerjakan bersama M4. |
+| M1–M3 | Selesai di level kode + test (`bun test` 330+ pass, typecheck bersih, e2e 28/28), plus gelombang UX (`../qa/01-ux-audit.md`, `02`). Kriteria "diuji manual di 2 browser" tertutup oleh e2e multi-context; uji perangkat nyata ikut M4. |
+| M4 | Artefak siap (`deploy/`, versi 0.1.0, CHANGELOG). Deploy menunggu perintah user + keputusan domain final (K3). |
+| M5 | Ditunda. |
+
+Ringkasan kesiapan rilis: `../qa/00-status-rilis.md`.
+
+---
+
 ## M0 — Bukti browser + kapasitas (tanpa kode produk)
+
+**Status:** sebagian (lihat tabel di atas). Bukti otomatis menggantikan langkah yang bisa diotomasi; picker dan
+izin OS asli tetap butuh manusia.
 
 **Scope:** jalankan checklist `../spike/06-browser-manual.md` dan ukur kapasitas server di hardware target.
 
@@ -40,7 +56,9 @@ worker lain. Worker tidak boleh commit, push, atau ganti branch.
 
 ## M1 — Room, join, kamera + mic
 
-**Status:** diimplementasikan di `feature/m1-m3-core`, uji browser manual belum.
+**Status:** selesai. Diimplementasikan di `feature/m1-m3-core`, dipoles di `feature/prod-ready` (pre-join, control
+bar, peserta, status koneksi). Join 2 klien, viewer tanpa kontrol publish, dan sesi ganda diuji e2e
+(`e2e/room.spec.ts`, `session.spec.ts`). Uji perangkat lain lewat HTTPS ikut M4.
 
 **Scope:** fondasi repo (`02-stack.md`), migrasi SQLite, auth (metode menurut K2), buat/daftar room, keanggotaan
 + role, token dari sesi, halaman room dengan kamera dan mic, grid sederhana untuk semua track, viewer tanpa
@@ -78,7 +96,8 @@ kontrol publish, dan HTTPS lokal untuk uji dari device lain. HTTPS lokal: opsion
 
 ## M2 — Multi screen share
 
-**Status:** diimplementasikan di `feature/m1-m3-core`, uji browser manual belum.
+**Status:** selesai. Multi layar dari satu dan dua peserta diuji e2e dengan layar palsu Chromium; layar sendiri tidak
+lagi dirender sebagai cermin. Picker layar asli (pilih jendela/tab, centang audio) belum diuji tangan, ikut M4.
 
 **Scope:** tombol "Tambah layar" (getDisplayMedia berulang + `publishTrack`), konvensi nama track
 `screen-<n>`/`screen-<n>-audio` di `src/shared/track.naming.ts`, encoding VP8 + simulcast (`h1080fps15`, lalu
@@ -109,7 +128,8 @@ kontrol publish, dan HTTPS lokal untuk uji dari device lain. HTTPS lokal: opsion
 
 ## M3 — Layout admin + template
 
-**Status:** diimplementasikan di `feature/m1-m3-core`, uji browser manual belum.
+**Status:** selesai. Template, swap, resize, fokus, dan hapus slot diuji e2e termasuk sinkron ke penonton
+(`e2e/layout.spec.ts`). Side-by-side dibatasi 3 kolom (`SIDE_BY_SIDE_MAX`).
 
 **Scope:** render `LayoutState` (side-by-side, grid, focus), admin drag-drop tukar slot (`@dnd-kit/react`),
 resize (`react-resizable-panels`), endpoint `PUT /api/rooms/:id/layout` dengan cek admin + `parseLayout` + CAS
@@ -145,6 +165,10 @@ ada.
 
 ## M4 — Deploy produksi (100.64.0.8 / subdomain)
 
+**Status:** artefak siap, deploy menunggu perintah user. `deploy/` (Caddy + caddy-l4, LiveKit + TURN/TLS 443,
+systemd, backup, rollback), build produksi, smoke test, rate limit, versi 0.1.0 + CHANGELOG. Default akses publik
+(K1, lihat `04`). Kriteria jaringan luar, UDP diblokir, dan load test produksi baru bisa dicek setelah server jalan.
+
 **Scope:** binary Linux resmi atau Docker livekit-server 1.13.11 dengan `livekit.yaml` (bukan `--dev`), Caddy
 TLS, TURN bawaan (TLS 443), UDP 50000–60000, TCP 7881, `use_external_ip` sesuai jaringan, app sebagai service
 systemd, file SQLite + backup, secret di env (`../spike/01-livekit-server.md` §Deploy). Model akses dari
@@ -168,6 +192,8 @@ systemd). `wkr-m4-docs` memegang `CHANGELOG.md` + bagian deploy di README, diker
 ---
 
 ## M5 — Desktop (opsional, ditunda)
+
+**Status:** ditunda, tidak masuk 0.1.0.
 
 **Scope:** spike terlebih dulu, bukan produk. Buktikan getDisplayMedia multi-layar di Electrobun 2.0.6 (CEF
 Alloy, tanpa picker, CEF #3667) **atau** di Electron (`setDisplayMediaRequestHandler`), dengan picker native
