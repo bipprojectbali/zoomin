@@ -13,6 +13,6 @@
     "verbatimModuleSyntax": true,
     "paths": { "@/*": ["./src/web/*"] }
   },
-  "include": ["src", "test"],
+  "include": ["src", "test", "e2e", "playwright.config.ts"],
   "exclude": ["RND", "node_modules"]
 }
