@@ -111,7 +111,7 @@ function LeaveButton({ onLeave }: { onLeave: () => void }) {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{ROOM_LABELS.cancel}</AlertDialogCancel>
-          <AlertDialogAction className="bg-destructive text-white hover:bg-destructive/90" onClick={onLeave} data-testid="leave-confirm">
+          <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={onLeave} data-testid="leave-confirm">
             {ROOM_LABELS.leaveConfirm}
           </AlertDialogAction>
         </AlertDialogFooter>
