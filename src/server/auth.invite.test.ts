@@ -24,7 +24,9 @@ describe("auth.invite", () => {
       JSON.stringify({ ...JSON.parse(Buffer.from(data, "base64url").toString()), role: "admin" }),
     ).toString("base64url");
     expect(verifyInvite(`${upgraded}.${sig}`, SECRET, NOW)).toBeNull();
-    expect(verifyInvite(`${data}.${sig.slice(0, -1)}A`, SECRET, NOW)).toBeNull();
+    // Karakter pengganti harus pasti beda: sig acak (nonce) dan karakter terakhirnya 'A' dengan peluang 1/16.
+    const tamperedSig = `${sig.slice(0, -1)}${sig.endsWith("A") ? "B" : "A"}`;
+    expect(verifyInvite(`${data}.${tamperedSig}`, SECRET, NOW)).toBeNull();
     expect(verifyInvite(inv, "x".repeat(32), NOW)).toBeNull();
     expect(verifyInvite("tanpa-titik", SECRET, NOW)).toBeNull();
   });
