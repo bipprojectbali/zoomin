@@ -59,7 +59,8 @@ test("dev: domain email diizinkan → domain lain ditolak, super admin tetap bis
     await page.getByRole("button", { name: "Hapus domain contoh.test" }).click();
     await expect(page.getByTestId("settings-domain-chip")).toHaveCount(0);
     await page.getByTestId("settings-save").click();
-    await expect(toast(page, "Pengaturan disimpan")).toBeVisible();
+    // Toast simpan pertama bisa masih tampil → dua toast cocok; ambil yang terbaru.
+    await expect(toast(page, "Pengaturan disimpan").last()).toBeVisible();
     expect((await testLogin(fresh, { email: outsider })).status()).toBe(200);
   } finally {
     // Jaring pengaman: jangan tinggalkan pembatasan domain untuk test lain.

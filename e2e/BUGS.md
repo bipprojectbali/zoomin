@@ -45,6 +45,46 @@ begitu bug diperbaiki test itu jadi "unexpectedly passed" → hapus `test.fail()
 - **Dugaan akar:** `src/web/pages/NotFoundPage.tsx` masih `<Link to="/">` dari sebelum rute A10. Arah perbaikan:
   `to="/app"` (atau ganti label jadi "Ke beranda" bila landing memang tujuannya).
 
+## E2E-03 — Room nonaktif/kadaluarsa: anggota melihat "Anda bukan anggota room ini" ✅ diperbaiki
+
+- **Status:** ✅ diperbaiki: `joinErrorFor` memeriksa `err.code` lebih dulu; `room_inactive`/`room_expired`/
+  `room_private` → pesan `errorMessage(err)` (teks `CODE_TEXT` di `src/web/error.message.ts`), kind `forbidden`
+  (tanpa retry, log warn); baru setelah itu fallback per status HTTP. Unit test di `room.connection.test.ts`.
+- **Test:** `e2e/room-access.spec.ts` › "nonaktif: anggota yang membuka /rooms/:id mendapat pesan room dinonaktifkan"
+  (kini test normal; `test.fail()` dihapus).
+- **Dampak:** sedang. Anggota sah room yang dinonaktifkan host (atau kadaluarsa) diberi tahu bahwa ia **bukan
+  anggota**, tanpa petunjuk bahwa room hanya ditutup sementara / perlu diperpanjang. Menyesatkan dan memicu
+  permintaan akses yang tidak perlu ke host.
+- **Langkah reproduksi:** host menambahkan user X sebagai peserta → Pengaturan → Status → matikan "Room aktif" → X
+  membuka `/rooms/:id` → Gabung.
+- **Ekspektasi:** "Room ini sedang dinonaktifkan. Minta host room mengaktifkannya kembali." (`room_inactive`;
+  analog `room_expired`), seperti `CODE_TEXT` di `src/web/error.message.ts`.
+- **Aktual:** layar `room-status-screen`: "Tidak dapat bergabung ke room — Anda bukan anggota room ini".
+- **Akar:** `src/web/room/room.connection.ts#joinErrorFor` memetakan `ApiRequestError` lewat `API_ERROR[err.status]`
+  dulu, jadi setiap 403 dari `POST /api/rooms/:id/token` → `forbidden` "bukan anggota", mengabaikan `err.code`
+  (`room_inactive`/`room_expired` yang ditambahkan RND/plan/06 R5). Arah perbaikan: cek `err.code` lebih dulu (kode
+  room_inactive/room_expired → pesan `errorMessage(err)`, kind non-retry), baru fallback per status.
+
+## E2E-04 — Enforcer room menutup room LiveKit milik instance lain yang berbagi server LiveKit ✅ diperbaiki
+
+- **Status:** ✅ diperbaiki (R6 direvisi di `RND/plan/06-room-access.md`): `runEnforcerOnce` hanya menutup room live
+  yang ADA di DB dan tidak `active`; room yang tidak dikenal DB dibiarkan (room yang dihapus sudah ditutup
+  `deleteRoom` saat dihapus). Unit test `room.access.test.ts` membuktikan room live tak dikenal tidak ditutup.
+
+- **Test terdampak (bukan `test.fail`, muncul sebagai gagal di test lain):** `e2e/room.spec.ts` › "toast: peserta lain
+  bergabung…" dan `e2e/session.spec.ts` › "leave: keluar…": gagal di 2 dari 2 run penuh `bun run test:e2e`, host
+  tiba-tiba di `room-status-screen` "Anda terputus dari room — Room sudah dihapus".
+- **Dampak:** tinggi untuk e2e (suite merah ±60 dtk setelah server start); di luar e2e: dua instance zoomin (mis.
+  `bun run dev` + produksi lokal, staging + prod) atau app lain yang memakai LiveKit yang sama saling menendang
+  semua peserta tiap 60 dtk.
+- **Akar:** `src/server/room.enforcer.ts#runEnforcerOnce` menutup **setiap** room live di LiveKit yang tidak ada di DB
+  instance itu (`!row` → stale), sesuai R6 ("atau tidak ada"). Playwright menyalakan dua server (dev :3101 DB
+  `zoomin.sqlite`, prod :3102 DB `zoomin-prod.sqlite`) dengan LiveKit dev yang sama; enforcer server prod tidak
+  mengenal room project `chromium` → `deleteRoom` pada putaran pertama (60 dtk), dan sebaliknya.
+- **Arah perbaikan (perlu keputusan orkestrator, menyentuh R6):** hanya tutup room yang ADA di DB dan non-active
+  (room terhapus sudah ditutup `deleteRoom` saat dihapus), atau beri prefix/namespace nama room per instance; plus
+  opsi env untuk mematikan enforcer di server e2e prod (`playwright.config.ts` `BASE_ENV`).
+
 ## Catatan (bukan bug app, tidak di-`test.fail`)
 
 - **Bentrok `data-testid="stage"`** (sudah beres): panel Fokus kini ber-id `focus-main`/`focus-strip`, jadi
