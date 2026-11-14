@@ -10,6 +10,9 @@ import { ROOM_SETTINGS_TEXT } from "@/room-settings/room-settings.labels";
 import { VisibilityToggle } from "@/room-settings/VisibilityToggle";
 import { createRoom } from "@/api.client";
 import { errorMessage } from "@/error.message";
+import { InvitePicker, type InvitePickerHandle } from "@/invite-picker/InvitePicker";
+import { validInvites, type InviteEntry } from "@/invite-picker/invite.parse";
+import { INVITE_PICKER_TEXT } from "@/invite-picker/invite-picker.labels";
 import { SAFE_ID_PATTERN, type RoomSummary, type RoomVisibility } from "../../shared/api.types";
 import { slugifyRoomId } from "../../shared/room.id";
 import { effectiveRoomId, withStableSuffix } from "./lobby.format";
@@ -42,6 +45,8 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
   const [visibility, setVisibility] = useState<RoomVisibility>("public");
   const [expiryPreset, setExpiryPreset] = useState<ExpiryPreset>("none");
   const [expiryDate, setExpiryDate] = useState("");
+  const [invites, setInvites] = useState<InviteEntry[]>([]);
+  const picker = useRef<InvitePickerHandle>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const autoId = withStableSuffix(slugifyRoomId(title), suffix);
@@ -60,7 +65,9 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
     setBusy(true);
     setError(null);
     try {
-      const room = await createRoom({ id, title: title.trim(), visibility, expiresAt });
+      // Picker hanya tampil untuk Private; undangan yang tersisa saat beralih ke Public tidak dikirim.
+      const members = visibility === "private" ? validInvites(picker.current?.flush() ?? invites) : [];
+      const room = await createRoom({ id, title: title.trim(), visibility, expiresAt, ...(members.length ? { members } : {}) });
       onCreated(room);
       toast.success(TEXT.created(room.title));
       setTitle("");
@@ -69,6 +76,7 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
       setVisibility("public");
       setExpiryPreset("none");
       setExpiryDate("");
+      setInvites([]);
     } catch (err) {
       console.error("lobby: buat room gagal", err);
       setError(errorMessage(err));
@@ -108,6 +116,15 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
         </Button>
       </div>
       <VisibilityToggle value={visibility} onChange={setVisibility} disabled={busy} />
+      {visibility === "private" && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="create-room-invite">{INVITE_PICKER_TEXT.label}</Label>
+          <InvitePicker ref={picker} value={invites} onChange={setInvites} inputId="create-room-invite" describedBy="create-room-invite-hint" disabled={busy} />
+          <p id="create-room-invite-hint" className="text-xs text-muted-foreground">
+            {INVITE_PICKER_TEXT.hint}
+          </p>
+        </div>
+      )}
       <details className="group text-sm">
         <summary className="flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
           <ChevronRight className="size-4 transition-transform group-open:rotate-90" aria-hidden="true" />

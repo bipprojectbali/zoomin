@@ -1,65 +1,73 @@
 import { Loader2, UserPlus } from "lucide-react";
-import { useCallback, useState, type SubmitEvent } from "react";
+import { useCallback, useRef, useState, type SubmitEvent } from "react";
 import { toast } from "sonner";
 import { addRoomMember, listRoomMembers } from "@/api.client";
 import { useCursorList } from "@/admin/useCursorList";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { errorMessage } from "@/error.message";
-import type { RoomMemberItem, RoomRole } from "../../shared/api.types";
+import { InvitePicker, type InvitePickerHandle } from "@/invite-picker/InvitePicker";
+import { validInvites, type InviteEntry } from "@/invite-picker/invite.parse";
+import { INVITE_PICKER_TEXT as PICKER_TEXT } from "@/invite-picker/invite-picker.labels";
+import type { RoomMemberItem } from "../../shared/api.types";
 import { MemberRow } from "./MemberRow";
-import { RoleSelect } from "./RoleSelect";
 import { ROOM_SETTINGS_TEXT as TEXT } from "./room-settings.labels";
 
 /** Tab Anggota: tambah per email (R2), daftar member + pending, ubah peran, keluarkan/batalkan (R9). */
 export function MembersTab({ roomId }: { roomId: string }) {
   const fetchPage = useCallback((cursor?: string) => listRoomMembers(roomId, { cursor }), [roomId]);
   const list = useCursorList<RoomMemberItem>(fetchPage, roomId);
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<RoomRole>("participant");
+  const [invites, setInvites] = useState<InviteEntry[]>([]);
   const [busy, setBusy] = useState(false);
+  const picker = useRef<InvitePickerHandle>(null);
 
+  /** P6: POST /members berurutan; chip yang gagal tetap di picker agar bisa diperbaiki/dicoba lagi. */
   async function onSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
+    const bodies = validInvites(picker.current?.flush() ?? invites);
+    if (!bodies.length) return;
     setBusy(true);
-    try {
-      const added = await addRoomMember(roomId, { email: email.trim(), role });
-      toast.success(TEXT.memberAdded(added.email));
-      setEmail("");
-      list.reload(); // urutan server: member (nama) lalu pending (email)
-    } catch (err) {
-      console.error(`room-settings: tambah anggota room ${roomId} gagal`, err);
-      toast.error(errorMessage(err));
-    } finally {
-      setBusy(false);
+    const failed: { email: string; reason: string }[] = [];
+    for (const body of bodies) {
+      try {
+        await addRoomMember(roomId, body);
+      } catch (err) {
+        console.error(`room-settings: tambah anggota room ${roomId} gagal`, err);
+        failed.push({ email: body.email, reason: errorMessage(err) });
+      }
     }
+    const failedEmails = new Set(failed.map((f) => f.email));
+    setInvites((prev) => prev.filter((v) => failedEmails.has(v.email)));
+    const summary = PICKER_TEXT.summary(bodies.length - failed.length, failed.length);
+    if (failed.length) toast.error(summary, { description: failed.map((f) => PICKER_TEXT.failedItem(f.email, f.reason)).join("; ") });
+    else toast.success(bodies.length === 1 ? TEXT.memberAdded(bodies[0]!.email) : summary);
+    if (failed.length < bodies.length) list.reload(); // urutan server: member (nama) lalu pending (email)
+    setBusy(false);
   }
 
   return (
     <div className="flex flex-col gap-4">
       <form className="flex flex-col gap-2" onSubmit={onSubmit}>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="flex flex-1 flex-col gap-2">
-            <Label htmlFor="member-email">{TEXT.memberEmail}</Label>
-            <Input
-              id="member-email"
-              data-testid="member-email-input"
-              type="email"
-              required
-              autoComplete="off"
-              placeholder={TEXT.memberEmailPlaceholder}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              aria-describedby="member-email-hint"
-            />
-          </div>
-          <RoleSelect value={role} onChange={setRole} label={TEXT.memberRole} testId="member-role-select" />
-          <Button type="submit" disabled={busy || !email.trim()} data-testid="member-add">
-            {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <UserPlus aria-hidden="true" />}
-            {TEXT.memberAdd}
-          </Button>
-        </div>
+        <Label htmlFor="member-email">{PICKER_TEXT.label}</Label>
+        <InvitePicker
+          ref={picker}
+          value={invites}
+          onChange={setInvites}
+          inputId="member-email"
+          describedBy="member-email-hint"
+          disabled={busy}
+          legacyInputTestId="member-email-input"
+          action={
+            // testid ganda: `members-add-submit` (spec 07) di pembungkus, `member-add` (e2e lama) di tombol.
+            <div data-testid="members-add-submit" className="self-end sm:self-auto">
+              {/* Tidak di-disable saat chip kosong: submit juga meng-commit email yang masih diketik (flush). */}
+              <Button type="submit" disabled={busy} data-testid="member-add">
+                {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <UserPlus aria-hidden="true" />}
+                {PICKER_TEXT.submit}
+              </Button>
+            </div>
+          }
+        />
         <p id="member-email-hint" className="text-xs text-muted-foreground">
           {TEXT.memberAddHint}
         </p>

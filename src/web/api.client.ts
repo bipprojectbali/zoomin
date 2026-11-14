@@ -30,6 +30,7 @@ import type {
   UpdateRoomBody,
   UpdateRoomMemberBody,
   UserResponse,
+  UserSearchResponse,
 } from "../shared/api.types";
 
 /** Header `Retry-After` dalam detik (bentuk tanggal HTTP tidak dipakai server ini) → null bila tidak ada/tidak valid. */
@@ -171,7 +172,11 @@ export const acceptInvite = (body: AcceptInviteBody) => request<AcceptInviteResp
 /** GET /api/rooms?limit=&cursor=. */
 export const listRooms = (query: ListRoomsQuery = {}) => request<Page<RoomSummary>>("GET", `/api/rooms${queryString(query)}`);
 
-/** POST /api/rooms (admin+; user → 403 insufficient_role). */
+/** GET /api/users/search?q=&limit=: saran akun untuk undangan (admin+ / host room; selain itu 403, 429 rate_limited). */
+export const searchUsers = (q: string, limit?: number) =>
+  request<UserSearchResponse>("GET", `/api/users/search${queryString({ q, limit })}`);
+
+/** POST /api/rooms (admin+; user → 403 insufficient_role); `members` opsional dibuat dalam transaksi yang sama. */
 export const createRoom = (body: CreateRoomBody) => request<RoomSummary>("POST", "/api/rooms", body);
 
 /** GET /api/rooms/:roomId: detail satu room (member / admin global). */
