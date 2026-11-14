@@ -8,7 +8,7 @@ import { createApi } from "./api";
 import type { ApiDeps } from "./api.deps";
 import { loadConfig } from "./config";
 import { openDb } from "./db";
-import { createServer, installShutdown, shutdown, toHttpUrl } from "./main";
+import { createServer, displayUrl, installShutdown, shutdown, toHttpUrl } from "./main";
 
 const config = loadConfig({ DB_PATH: ":memory:", HOST: "127.0.0.1" });
 const deps: ApiDeps = {
@@ -50,6 +50,14 @@ describe("createApi onError", () => {
     const body = (await res.json()) as { error: string; path?: string };
     expect(body.path).toBe("/id");
     expect(typeof body.error).toBe("string");
+  });
+
+  test("displayUrl: bind semua interface → localhost (secure context), selainnya apa adanya", () => {
+    expect(displayUrl("0.0.0.0", 3000, false)).toBe("http://localhost:3000/");
+    expect(displayUrl("::", 3000, true)).toBe("https://localhost:3000/");
+    expect(displayUrl("127.0.0.1", 8080, false)).toBe("http://127.0.0.1:8080/");
+    expect(displayUrl("100.64.0.1", 3000, true)).toBe("https://100.64.0.1:3000/");
+    expect(displayUrl("::1", 3000, false)).toBe("http://[::1]:3000/");
   });
 
   test("toHttpUrl", () => {

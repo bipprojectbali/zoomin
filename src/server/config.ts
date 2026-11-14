@@ -23,9 +23,11 @@ export type Config = {
 };
 
 export const SESSION_SECRET_MIN_LENGTH = 32;
+/** Env yang wajib diset di production (loadConfig throw bila kosong). Sumber tunggal untuk docs/CLI. */
+export const REQUIRED_IN_PRODUCTION = ["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "SESSION_SECRET", "ADMIN_PASSWORD"] as const;
 const DEFAULT_PORT = 3000;
 const DEFAULT_HOST = "0.0.0.0";
-const DEFAULT_DB_PATH = "./data/zoomin.sqlite";
+export const DEFAULT_DB_PATH = "./data/zoomin.sqlite";
 const DEFAULT_LIVEKIT_URL = "ws://127.0.0.1:7880";
 const DEFAULT_PUBLIC_APP_URL = "http://localhost:3000";
 

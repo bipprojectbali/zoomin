@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { openDb, runMigrations } from "./db";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
+import { connectDb, MIGRATIONS, openDb, runMigrations } from "./db";
 
 function seed() {
   const db = openDb(":memory:");
@@ -14,6 +16,26 @@ describe("db", () => {
     expect(runMigrations(db)).toEqual([]);
     const rows = db.query<{ name: string }, []>("SELECT name FROM schema_migrations").all();
     expect(rows.map((r) => r.name)).toEqual(["0001_init.sql"]);
+  });
+
+  test("MIGRATIONS embed sinkron dengan folder migrations/ (urutan nama file)", () => {
+    const files = readdirSync(join(import.meta.dir, "../../migrations")).filter((f) => f.endsWith(".sql")).sort();
+    expect(MIGRATIONS.map((m) => m.name)).toEqual(files);
+  });
+
+  test("runMigrations mengembalikan migrasi yang baru diterapkan, lalu [] di run berikutnya", () => {
+    const db = connectDb(":memory:");
+    const extra = [...MIGRATIONS, { name: "9999_test.sql", sql: "CREATE TABLE t9 (a INTEGER)" }]; // test-only
+    expect(runMigrations(db)).toEqual(["0001_init.sql"]);
+    expect(runMigrations(db, extra)).toEqual(["9999_test.sql"]);
+    expect(runMigrations(db, extra)).toEqual([]);
+  });
+
+  test("migrasi gagal → error menyebut nama file, tidak tercatat", () => {
+    const db = connectDb(":memory:");
+    const bad = [{ name: "0001_bad.sql", sql: "CREATE TABLE (" }]; // test-only
+    expect(() => runMigrations(db, bad)).toThrow("migrasi 0001_bad.sql gagal");
+    expect(db.query("SELECT * FROM schema_migrations").all()).toEqual([]);
   });
 
   test("foreign_keys aktif", () => {

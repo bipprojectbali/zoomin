@@ -1,0 +1,80 @@
+import { existsSync, readFileSync } from "node:fs";
+import { parseEnv } from "node:util";
+import { RoomServiceClient } from "livekit-server-sdk";
+import type { CliOverrides } from "../cli/cli.args";
+import { summarizeConfig } from "../cli/cli.check";
+import type { CliServerHooks } from "../cli/cli.run";
+import { type Config, DEFAULT_DB_PATH, loadConfig } from "./config";
+import { connectDb, openDb, runMigrations } from "./db";
+import { createServer, displayUrl, installShutdown, lanAddress, loadTls, toHttpUrl } from "./main";
+
+type Env = Record<string, string | undefined>;
+
+const BINARY_HINT = "binary berjalan sebagai NODE_ENV=production; buat .env dengan `zoomin env > .env`, isi secret, lalu `zoomin check`";
+
+/**
+ * Env efektif untuk satu perintah CLI. Prioritas: flag CLI > env proses > `--env-file` (file hanya mengisi variabel
+ * yang belum diset, sama seperti autoload .env Bun) > default config.
+ * Binary (`standalone`) = mode produksi kecuali NODE_ENV diset eksplisit: binary dipakai untuk deploy, jadi secret wajib.
+ */
+export function resolveEnv(overrides: CliOverrides, env: Env = process.env, standalone = Bun.isStandaloneExecutable): Env {
+  const resolved: Env = { ...env };
+  if (overrides.envFile) {
+    if (!existsSync(overrides.envFile)) throw new Error(`file env tidak ditemukan: ${overrides.envFile}`);
+    for (const [key, value] of Object.entries(parseEnv(readFileSync(overrides.envFile, "utf8")))) resolved[key] ??= value;
+  }
+  if (standalone) resolved.NODE_ENV ??= "production";
+  if (overrides.port !== undefined) resolved.PORT = String(overrides.port);
+  if (overrides.host !== undefined) resolved.HOST = overrides.host;
+  if (overrides.dbPath !== undefined) resolved.DB_PATH = overrides.dbPath;
+  return resolved;
+}
+
+/** loadConfig + petunjuk perbaikan saat binary gagal karena secret produksi kosong. */
+function configFrom(env: Env, standalone: boolean): Config {
+  try {
+    return loadConfig(env);
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    throw new Error(standalone ? `${message} (${BINARY_HINT})` : message, { cause });
+  }
+}
+
+/** Implementasi CliServerHooks: start server, migrasi, dan validasi config. */
+export function createServerHooks(env: Env = process.env, standalone = Bun.isStandaloneExecutable): CliServerHooks {
+  return {
+    serve(overrides) {
+      const config = configFrom(resolveEnv(overrides, env, standalone), standalone);
+      const db = openDb(config.dbPath);
+      const roomService = new RoomServiceClient(toHttpUrl(config.livekitUrl), config.livekitApiKey, config.livekitApiSecret);
+      const server = createServer({ db, config, roomService }, config.port);
+      installShutdown(server, db);
+      console.info(`zoomin: ${displayUrl(server.hostname ?? config.host, server.port ?? config.port, Boolean(config.tls))} (LiveKit ${config.livekitUrl}, env ${config.nodeEnv})`);
+      const lan = config.host === "0.0.0.0" || config.host === "::" ? lanAddress() : undefined;
+      if (lan) console.info(`zoomin: juga terjangkau di jaringan: ${displayUrl(lan, server.port ?? config.port, Boolean(config.tls))} (perangkat lain butuh HTTPS untuk kamera/layar)`);
+      // Tidak pernah resolve: SIGTERM/SIGINT ditangani installShutdown (stop server, tutup DB, process.exit).
+      return new Promise<void>(() => {});
+    },
+
+    async migrate(overrides) {
+      // Migrasi hanya butuh path DB, jadi tidak memanggil loadConfig (secret produksi tidak wajib di sini).
+      const dbPath = resolveEnv(overrides, env, standalone).DB_PATH?.trim() || DEFAULT_DB_PATH;
+      const db = connectDb(dbPath);
+      try {
+        return { applied: runMigrations(db) };
+      } finally {
+        db.close();
+      }
+    },
+
+    async check(overrides) {
+      try {
+        const config = configFrom(resolveEnv(overrides, env, standalone), standalone);
+        loadTls(config.tls);
+        return { ok: true, summary: summarizeConfig(config) };
+      } catch (cause) {
+        return { ok: false, errors: [cause instanceof Error ? cause.message : String(cause)] };
+      }
+    },
+  };
+}

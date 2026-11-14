@@ -1,12 +1,17 @@
 import { existsSync } from "node:fs";
-import { RoomServiceClient } from "livekit-server-sdk";
-import index from "../web/index.html";
+import { networkInterfaces } from "node:os";
 import type { ApiDeps } from "./api.deps";
 import { createApi } from "./api";
 import { CLIENT_IP_HEADER } from "./auth.ratelimit";
-import { loadConfig } from "./config";
-import { openDb } from "./db";
-import { staticRoutes, WEB_DIST_DIR } from "./static.serve";
+import { DEFAULT_WEB_DIR, staticRoutes } from "./static.serve";
+
+/**
+ * HTML import untuk dev (bundle on-demand + HMR). scripts/build.binary.ts men-define `process.env.ZOOMIN_BINARY`
+ * = "1", sehingga cabang ini dibuang saat compile: binary tidak ikut mem-bundle SPA kedua kali (dan tidak butuh
+ * plugin Tailwind); binary menyajikan dist/web yang ditanam (static.serve.ts).
+ */
+const devIndex: Bun.HTMLBundle | undefined =
+  process.env.ZOOMIN_BINARY === "1" ? undefined : (await import("../web/index.html")).default;
 
 /**
  * Satu Bun.serve untuk SPA + API.
@@ -15,10 +20,11 @@ import { staticRoutes, WEB_DIST_DIR } from "./static.serve";
  * (code splitting + hash, static.serve.ts); HTML import hanya manifest lazy, jadi tidak di-bundle saat runtime.
  * Elysia dipasang sebagai handler `/api/*` lewat `api.fetch`; route yang lebih spesifik menang atas wildcard `/*`.
  */
-export function createServer(deps: ApiDeps, port: number, webDir: string = WEB_DIST_DIR) {
+export function createServer(deps: ApiDeps, port: number, webDir: string = DEFAULT_WEB_DIR) {
   const api = createApi(deps);
   const isProd = deps.config.nodeEnv === "production";
-  const web: Record<string, Bun.HTMLBundle | ((req: Request) => Response)> = isProd ? staticRoutes(webDir) : { "/*": index };
+  // Binary dengan NODE_ENV=development eksplisit tidak punya devIndex → tetap sajikan SPA tertanam.
+  const web: Record<string, Bun.HTMLBundle | ((req: Request) => Response)> = isProd || !devIndex ? staticRoutes(webDir) : { "/*": devIndex };
   return Bun.serve({
     port,
     hostname: deps.config.host,
@@ -36,12 +42,28 @@ export function createServer(deps: ApiDeps, port: number, webDir: string = WEB_D
 }
 
 /** Config TLS → opsi `tls` Bun.serve (isi file, bukan path). Throw bila file tidak ada agar gagal saat start. */
-function loadTls(tls: ApiDeps["config"]["tls"]) {
+export function loadTls(tls: ApiDeps["config"]["tls"]) {
   if (!tls) return undefined;
   for (const [name, path] of [["TLS_CERT_PATH", tls.certPath], ["TLS_KEY_PATH", tls.keyPath]] as const) {
     if (!existsSync(path)) throw new Error(`createServer: ${name} tidak ditemukan (${path})`);
   }
   return { cert: Bun.file(tls.certPath), key: Bun.file(tls.keyPath) };
+}
+
+const WILDCARD_HOSTS = new Set(["0.0.0.0", "::", "[::]", ""]);
+
+/**
+ * URL yang dicetak saat start. Bind ke semua interface (0.0.0.0/::) → tampilkan localhost: origin 0.0.0.0 bukan
+ * secure context, jadi clipboard/kamera/share layar gagal bila user mengklik URL itu.
+ */
+export function displayUrl(hostname: string, port: number, tls: boolean): string {
+  const host = WILDCARD_HOSTS.has(hostname) ? "localhost" : hostname.includes(":") && !hostname.startsWith("[") ? `[${hostname}]` : hostname;
+  return `${tls ? "https" : "http"}://${host}:${port}/`;
+}
+
+/** IPv4 LAN pertama (non-loopback), untuk info akses dari perangkat lain; undefined bila tidak ada. */
+export function lanAddress(): string | undefined {
+  return Object.values(networkInterfaces()).flat().find((i) => i?.family === "IPv4" && !i.internal)?.address;
 }
 
 /** LiveKit Twirp memakai HTTP(S), sedangkan config menyimpan URL ws(s). */
@@ -75,11 +97,19 @@ export function installShutdown(server: Stoppable, db: Closable, proc: SignalPro
   }
 }
 
+// Entry dev/start/binary: CLI (src/cli) memilih perintah; default `serve`. Import dinamis menghindari siklus
+// main ↔ server.hooks (hooks memakai createServer dari file ini).
 if (import.meta.main) {
-  const config = loadConfig();
-  const db = openDb(config.dbPath);
-  const roomService = new RoomServiceClient(toHttpUrl(config.livekitUrl), config.livekitApiKey, config.livekitApiSecret);
-  const server = createServer({ db, config, roomService }, config.port);
-  installShutdown(server, db);
-  console.info(`zoomin: ${server.url} (LiveKit ${config.livekitUrl}, env ${config.nodeEnv})`);
+  const [{ runCli }, { userArgs }, { createServerHooks }] = await Promise.all([
+    import("../cli/cli.run"),
+    import("../cli/cli.args"),
+    import("./server.hooks"),
+  ]);
+  const io = {
+    out: (s: string) => void process.stdout.write(s),
+    err: (s: string) => void process.stderr.write(s),
+    isTTY: Boolean(process.stdout.isTTY),
+    env: process.env,
+  };
+  process.exit(await runCli(userArgs(process.argv), io, createServerHooks()));
 }

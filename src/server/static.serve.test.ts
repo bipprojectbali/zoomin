@@ -7,7 +7,7 @@ import type { ApiDeps } from "./api.deps";
 import { loadConfig } from "./config";
 import { openDb } from "./db";
 import { createServer, toHttpUrl } from "./main";
-import { staticRoutes } from "./static.serve";
+import { DEFAULT_WEB_DIR, staticRoutes, WEB_DIST_DIR } from "./static.serve";
 
 // Dist palsu (test-only): meniru output scripts/build.web.ts.
 const dist = mkdtempSync(join(tmpdir(), "zoomin-dist-"));
@@ -78,6 +78,10 @@ describe("produksi: SPA statis dari dist", () => {
     expect((await get("/api/health")).status).toBe(200);
     expect((await get("/api/tidak-ada")).status).toBe(404);
   });
+});
+
+test("dari source (bukan binary) SPA dibaca dari dist/web relatif cwd", () => {
+  expect(DEFAULT_WEB_DIR).toBe(WEB_DIST_DIR);
 });
 
 test("produksi tanpa dist → throw dengan petunjuk build", () => {

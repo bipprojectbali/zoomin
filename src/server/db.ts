@@ -1,35 +1,43 @@
 import { Database } from "bun:sqlite";
-import { mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+// Migrasi di-embed sebagai teks (di-inline oleh `bun build --compile`), jadi runtime tidak membaca migrations/ dari disk.
+// File migrasi baru: tambahkan import + entri MIGRATIONS (db.test.ts gagal bila daftar tak sinkron dengan folder).
+import m0001 from "../../migrations/0001_init.sql" with { type: "text" };
 
-/** Folder file migrasi SQL bernomor (0001_*.sql, ...), dijalankan berurutan nama file. */
-export const MIGRATIONS_DIR = join(import.meta.dir, "../../migrations");
+export type Migration = { name: string; sql: string };
 
-/** Membuka DB SQLite (FK aktif, WAL untuk file) lalu menjalankan migrasi yang belum tercatat. */
-export function openDb(path: string, migrationsDir = MIGRATIONS_DIR): Database {
+/** Migrasi SQL bernomor, berurutan nama file. */
+export const MIGRATIONS: readonly Migration[] = [{ name: "0001_init.sql", sql: m0001 }];
+
+/** Membuka koneksi SQLite (FK aktif, WAL untuk file) tanpa menjalankan migrasi. */
+export function connectDb(path: string): Database {
   const inMemory = path === ":memory:";
   if (!inMemory) mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path, { strict: true, create: true });
   db.run("PRAGMA foreign_keys = ON");
   if (!inMemory) db.run("PRAGMA journal_mode = WAL");
-  runMigrations(db, migrationsDir);
   return db;
 }
 
-/** Menjalankan file migrasi yang belum ada di `schema_migrations`. Idempotent. */
-export function runMigrations(db: Database, migrationsDir = MIGRATIONS_DIR): string[] {
+/** Membuka DB lalu menjalankan migrasi yang belum tercatat. */
+export function openDb(path: string, migrations: readonly Migration[] = MIGRATIONS): Database {
+  const db = connectDb(path);
+  runMigrations(db, migrations);
+  return db;
+}
+
+/** Menjalankan migrasi yang belum ada di `schema_migrations`; mengembalikan nama yang baru diterapkan. Idempotent. */
+export function runMigrations(db: Database, migrations: readonly Migration[] = MIGRATIONS): string[] {
   db.run(
     "CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)",
   );
   const applied = new Set(
     db.query<{ name: string }, []>("SELECT name FROM schema_migrations").all().map((r) => r.name),
   );
-  const pending = readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql") && !applied.has(f))
-    .sort();
+  const pending = migrations.filter((m) => !applied.has(m.name)).toSorted((a, b) => a.name.localeCompare(b.name));
   const record = db.prepare("INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)");
-  for (const name of pending) {
-    const sql = readFileSync(join(migrationsDir, name), "utf8");
+  for (const { name, sql } of pending) {
     try {
       db.transaction(() => {
         db.run(sql);
@@ -39,5 +47,5 @@ export function runMigrations(db: Database, migrationsDir = MIGRATIONS_DIR): str
       throw new Error(`runMigrations: migrasi ${name} gagal`, { cause });
     }
   }
-  return pending;
+  return pending.map((m) => m.name);
 }

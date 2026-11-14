@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { loadConfig } from "./config";
+import { loadConfig, REQUIRED_IN_PRODUCTION } from "./config";
 
 const PROD_SECRETS = {
   NODE_ENV: "production",
@@ -19,6 +19,13 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...PROD_SECRETS, SESSION_SECRET: undefined })).toThrow("SESSION_SECRET");
     expect(() => loadConfig({ ...PROD_SECRETS, SESSION_SECRET: "pendek" })).toThrow("minimal 32");
     expect(() => loadConfig({ ...PROD_SECRETS, ADMIN_PASSWORD: "  " })).toThrow("ADMIN_PASSWORD");
+  });
+
+  test("REQUIRED_IN_PRODUCTION sinkron: tiap nama yang hilang membuat production throw", () => {
+    expect(Object.keys(PROD_SECRETS).filter((k) => k !== "NODE_ENV").sort()).toEqual([...REQUIRED_IN_PRODUCTION].sort());
+    for (const name of REQUIRED_IN_PRODUCTION) {
+      expect(() => loadConfig({ ...PROD_SECRETS, [name]: "" })).toThrow(`${name} wajib diset`);
+    }
   });
 
   test("production lengkap → lolos", () => {

@@ -4,6 +4,13 @@ import { join } from "node:path";
 /** Direktori hasil `bun run build` (scripts/build.web.ts), relatif ke WorkingDirectory. */
 export const WEB_DIST_DIR = "dist/web";
 
+/**
+ * Lokasi SPA saat runtime. Binary (scripts/build.binary.ts) menanam salinan dist/web lewat `compile.assets` sebagai
+ * folder "web" di bawah `import.meta.dir` (/$bunfs/root), terbaca via node:fs/Bun.file; dari source tetap relatif
+ * ke WorkingDirectory. Folder khusus (bukan root bunfs) agar file entry binary sendiri tidak ikut dirutekan.
+ */
+export const DEFAULT_WEB_DIR = Bun.isStandaloneExecutable ? join(import.meta.dir, "web") : WEB_DIST_DIR;
+
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
 type Handler = (req: Request) => Response;
@@ -14,7 +21,7 @@ type Handler = (req: Request) => Response;
  * menyentuh filesystem. Asset ber-hash → cache immutable; index.html → no-cache (selalu revalidasi agar rilis
  * baru langsung terpakai). Path tak dikenal dengan ekstensi file → 404; selainnya → index.html (client-side routing).
  */
-export function staticRoutes(dir: string = WEB_DIST_DIR): Record<string, Handler> {
+export function staticRoutes(dir: string = DEFAULT_WEB_DIR): Record<string, Handler> {
   const indexPath = join(dir, "index.html");
   if (!existsSync(indexPath)) {
     throw new Error(`staticRoutes: ${indexPath} tidak ada; jalankan \`bun run build\` sebelum start produksi`);
