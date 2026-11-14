@@ -1,0 +1,7 @@
+body { font-family: system-ui, sans-serif; margin: 16px; background: #111; color: #eee; }
+button, input { font: inherit; padding: 4px 8px; margin: 2px; }
+#error { color: #f88; white-space: pre-wrap; }
+#grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; }
+.tile { background: #222; padding: 4px; }
+.tile video { width: 100%; background: #000; }
+.tile small { display: block; font-family: monospace; }

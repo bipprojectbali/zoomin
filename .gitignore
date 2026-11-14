@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+*.db
+*.pem
+*.key
+dist/
+.DS_Store
+RND/spike/.bin/
+RND/spike/.run/

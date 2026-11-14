@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LiveKit multi-screen spike</title>
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body>
+    <form id="join">
+      <input name="room" placeholder="room" value="spike" required pattern="[A-Za-z0-9_\-]{1,64}" />
+      <input name="identity" placeholder="nama (identity)" required pattern="[A-Za-z0-9_\-]{1,64}" />
+      <button>Join</button>
+    </form>
+    <div id="controls" hidden>
+      <button id="cam">Kamera</button>
+      <button id="mic">Mic</button>
+      <button id="screen">Tambah layar</button>
+      <button id="leave">Keluar</button>
+      <span id="status"></span>
+    </div>
+    <pre id="error" hidden></pre>
+    <h3>Track lokal</h3>
+    <ul id="local"></ul>
+    <h3>Track remote</h3>
+    <div id="grid"></div>
+    <script type="module" src="./app.ts"></script>
+  </body>
+</html>
