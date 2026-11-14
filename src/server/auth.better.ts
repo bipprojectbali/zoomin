@@ -8,6 +8,7 @@ import { createAccessControl } from "better-auth/plugins/access";
 import type { GlobalRole } from "../shared/api.types";
 import { CLIENT_IP_HEADER } from "./auth.ratelimit";
 import type { Config } from "./config";
+import { claimPendingInvitations } from "./room.invitations.claim";
 
 /** Path dasar handler Better Auth (dipasang di api.ts). */
 export const AUTH_BASE_PATH = "/api/auth";
@@ -153,6 +154,7 @@ export function createAuth({ db, config }: AuthDeps) {
             assertEmailAllowed(db, row.email, superAdminEmails);
             const role = syncedRole(row.email, row.role, superAdminEmails);
             if (role !== row.role) db.query(`UPDATE "user" SET role = ? WHERE id = ?`).run(role, session.userId);
+            claimPendingInvitations(db, session.userId, row.email);
           },
         },
       },

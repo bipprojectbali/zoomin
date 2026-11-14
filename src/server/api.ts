@@ -8,6 +8,7 @@ import { devRoutes } from "./dev.route";
 import { CLIENT_IP_HEADER, clientIp } from "./auth.ratelimit";
 import { testLoginRoutes } from "./auth.test.route";
 import { layoutRoutes } from "./layout.route";
+import { roomMembersRoutes } from "./room.members.route";
 import { roomsRoutes } from "./rooms.route";
 import { tokenRoutes } from "./token.route";
 
@@ -50,6 +51,7 @@ export function createApi(deps: ApiDeps) {
     .use(meRoutes(deps))
     .use(inviteRoutes(deps))
     .use(roomsRoutes(deps))
+    .use(roomMembersRoutes(deps))
     .use(tokenRoutes(deps))
     .use(layoutRoutes(deps))
     .use(adminRoutes(deps))
