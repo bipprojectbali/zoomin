@@ -1,6 +1,7 @@
 import { type Database, SQLiteError } from "bun:sqlite";
-import type { Page, RoomRole, RoomSummary, RoomVisibility, SessionUser } from "../shared/api.types";
+import type { AddRoomMemberBody, Page, RoomRole, RoomSummary, RoomVisibility, SessionUser } from "../shared/api.types";
 import { recordAudit } from "./audit.repository";
+import { addRoomMember } from "./room.members.repository";
 import { ROOM_COLUMNS, type RoomRow, toRoomSummary } from "./room.access";
 
 /** Default dan batas atas `limit` daftar room (kontrak GET /api/rooms). */
@@ -72,10 +73,20 @@ export function listRoomsForUser(
  * Insert room + pembuatnya sebagai member host dalam satu transaksi. Throw RoomExistsError bila id dipakai.
  * `actorEmail` diisi → audit `room.create` (A8) ikut di transaksi yang sama (room tanpa audit / audit tanpa room
  * tak mungkin). Opsional hanya agar fixture test bisa membuat room tanpa audit; route wajib mengisinya.
+ * `members` (email sudah dinormalisasi & lolos allowlist, tanpa email pembuat) ditambahkan di transaksi yang sama
+ * lewat addRoomMember (P5): gagal satu = tidak ada room/anggota/audit yang tersimpan.
  */
 export function createRoom(
   db: Database,
-  input: { id: string; title: string; createdBy: string; actorEmail?: string; visibility?: RoomVisibility; expiresAt?: number | null },
+  input: {
+    id: string;
+    title: string;
+    createdBy: string;
+    actorEmail?: string;
+    visibility?: RoomVisibility;
+    expiresAt?: number | null;
+    members?: AddRoomMemberBody[];
+  },
 ): RoomSummary {
   const createdAt = Date.now();
   const visibility = input.visibility ?? "public";
@@ -98,9 +109,11 @@ export function createRoom(
           action: "room.create",
           targetType: "room",
           targetId: input.id,
-          detail: { title: input.title, visibility, expiresAt },
+          detail: { title: input.title, visibility, expiresAt, members: input.members?.length ?? 0 },
         });
       }
+      const by = { id: input.createdBy, email: input.actorEmail ?? "" };
+      for (const m of input.members ?? []) addRoomMember(db, input.id, m.email, m.role, by);
     })();
   } catch (cause) {
     if (cause instanceof SQLiteError && cause.code === "SQLITE_CONSTRAINT_PRIMARYKEY") {

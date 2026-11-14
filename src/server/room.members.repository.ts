@@ -87,14 +87,17 @@ const getMember = (db: Database, roomId: string, userId: string) =>
     )
     .get(roomId, userId);
 
-const audit = (db: Database, by: SessionUser, action: "room.member.add" | "room.member.role" | "room.member.remove", roomId: string, detail: Record<string, unknown>) =>
+type Actor = Pick<SessionUser, "id" | "email">;
+
+const audit = (db: Database, by: Actor, action: "room.member.add" | "room.member.role" | "room.member.remove", roomId: string, detail: Record<string, unknown>) =>
   recordAudit(db, { actorId: by.id, actorEmail: by.email, action, targetType: "room", targetId: roomId, detail });
 
 /**
  * Tambah anggota lewat email ternormalisasi (R2): user ada → room_members dengan role persis (upsert); belum ada →
- * pending di room_invitations. Audit room.member.add dalam transaksi yang sama.
+ * pending di room_invitations. Audit room.member.add dalam transaksi yang sama. Aman dipanggil di dalam transaksi
+ * luar (bun:sqlite memakai SAVEPOINT untuk transaksi bersarang; throw → seluruh transaksi luar ikut rollback).
  */
-export function addRoomMember(db: Database, roomId: string, email: string, role: RoomRole, by: SessionUser): RoomMemberItem {
+export function addRoomMember(db: Database, roomId: string, email: string, role: RoomRole, by: Actor): RoomMemberItem {
   return db.transaction(() => {
     const user = db.query<{ id: string }, [string]>(`SELECT id FROM "user" WHERE email = ?`).get(email);
     if (user) {

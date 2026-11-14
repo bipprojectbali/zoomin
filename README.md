@@ -273,7 +273,8 @@ callback `/api/auth/callback/google`, `POST /api/auth/sign-out`). Endpoint plugi
 | GET | `/api/me/sessions` | sesi | `{ items }` (sesi login, tanda `current`) |
 | DELETE | `/api/me/sessions` · `/api/me/sessions/:id` | sesi | 204 (cabut semua sesi lain / satu sesi) |
 | GET | `/api/rooms?limit=&cursor=` | sesi | `{ items, nextCursor }` (user: room yang diikuti; admin+: semua; limit default 20, maks 100) |
-| POST | `/api/rooms` | admin+, `{ id, title, visibility?, expiresAt? }` | `RoomSummary`; pembuat jadi host \| 403 `insufficient_role` |
+| POST | `/api/rooms` | admin+, `{ id, title, visibility?, expiresAt?, members? }` | `RoomSummary`; pembuat jadi host; `members` (`[{ email, role }]`, maks 100) dibuat sekaligus (akun ada → anggota, belum → tertunda; gagal satu = room tidak dibuat) \| 400 `email_domain_not_allowed` (`path` `/members/<i>/email`) \| 403 `insufficient_role` |
+| GET | `/api/users/search?q=&limit=` | admin+ / host di minimal satu room | `{ items: [{ id, name, email, image }] }` (q 2–100 huruf, nama/email; tanpa akun di-ban; limit default 8, maks 10) \| 403 `insufficient_role` \| 429 `rate_limited` (30/menit per user) |
 | GET | `/api/rooms/:roomId` | anggota / admin+ | `RoomSummary` \| 401 \| 403 \| 404 |
 | PATCH | `/api/rooms/:roomId` | host room / admin+, `{ title?, visibility?, enabled?, expiresAt? }` | `RoomSummary` (`enabled: false` memutus semua peserta) |
 | DELETE | `/api/rooms/:roomId` | host room / admin+ | 204 (hapus room di DB + LiveKit) |

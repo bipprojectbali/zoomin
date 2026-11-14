@@ -28,6 +28,21 @@ const EMAIL_MAX_LENGTH = 254;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const roleSchema = t.Union([t.Literal("host"), t.Literal("participant"), t.Literal("viewer")]);
+/** Skema body satu anggota (POST /members dan `members[]` POST /rooms). */
+export const memberBodySchema = t.Object({ email: t.String({ minLength: 3, maxLength: EMAIL_MAX_LENGTH }), role: roleSchema });
+
+/**
+ * Normalisasi email undangan (trim + lowercase) lalu cek format dan allowlist domain. Sama dengan aturan login (A9):
+ * super_admin env dikecualikan dari allowlist.
+ */
+export function checkInviteEmail(deps: Pick<ApiDeps, "db" | "config">, raw: string) {
+  const email = raw.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) return { ok: false, code: "invalid_input", error: "invalid email" } as const;
+  if (!deps.config.superAdminEmails.includes(email) && !isEmailDomainAllowed(email, getAllowedEmailDomains(deps.db))) {
+    return { ok: false, code: "email_domain_not_allowed", error: "email domain not allowed" } as const;
+  }
+  return { ok: true, email } as const;
+}
 const roomParams = { roomId: t.String({ pattern: SAFE_ID_PATTERN }) };
 
 type Status = (code: number, body: unknown) => unknown;
@@ -72,19 +87,15 @@ export function roomMembersRoutes(deps: ApiDeps) {
       ({ user, params: { roomId }, body, status }) => {
         const blocked = denied(user, roomId, status);
         if (blocked) return blocked;
-        const email = body.email.trim().toLowerCase();
-        if (!EMAIL_PATTERN.test(email)) return status(HTTP_BAD_REQUEST, apiError("invalid_input", "invalid email", "/email"));
-        // Sama dengan aturan login (A9): super_admin env dikecualikan dari allowlist domain.
-        if (!deps.config.superAdminEmails.includes(email) && !isEmailDomainAllowed(email, getAllowedEmailDomains(db))) {
-          return status(HTTP_BAD_REQUEST, apiError("email_domain_not_allowed", "email domain not allowed", "/email"));
-        }
+        const checked = checkInviteEmail(deps, body.email);
+        if (!checked.ok) return status(HTTP_BAD_REQUEST, apiError(checked.code, checked.error, "/email"));
         try {
-          return status(HTTP_CREATED, addRoomMember(db, roomId, email, body.role, user));
+          return status(HTTP_CREATED, addRoomMember(db, roomId, checked.email, body.role, user));
         } catch (cause) {
           return mapError(cause, status);
         }
       },
-      { auth: "user", params: t.Object(roomParams), body: t.Object({ email: t.String({ minLength: 3, maxLength: EMAIL_MAX_LENGTH }), role: roleSchema }) },
+      { auth: "user", params: t.Object(roomParams), body: memberBodySchema },
     )
     .patch(
       "/rooms/:roomId/members/:userId",

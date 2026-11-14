@@ -15,6 +15,7 @@
 // POST /api/invites/accept    AcceptInviteBody  -> AcceptInviteResponse (wajib sesi)     | 401
 // GET  /api/rooms?limit=&cursor=                -> Page<RoomSummary> (limit default 20, max 100)
 // POST /api/rooms             CreateRoomBody (admin+) -> RoomSummary (creator jadi host) | 403 insufficient_role
+// GET  /api/users/search?q=&limit=          -> UserSearchResponse (admin+ / host room mana pun) | 403 | 429 rate_limited
 // GET  /api/rooms/:roomId                       -> RoomSummary (member / admin+)         | 401 | 403 | 404 room_not_found
 // PATCH  /api/rooms/:roomId UpdateRoomBody (pengelola) -> RoomSummary            | 403 forbidden | 404
 // DELETE /api/rooms/:roomId (pengelola)         -> 204
@@ -216,8 +217,21 @@ export type InvitePreview = {
 /** Query GET /api/rooms. */
 export type ListRoomsQuery = { limit?: number; cursor?: string };
 
-/** Body POST /api/rooms. */
-export type CreateRoomBody = { id: string; title: string; visibility?: RoomVisibility; expiresAt?: number | null };
+/** Body POST /api/rooms; `members` (maks CREATE_ROOM_MAX_MEMBERS) dibuat dalam transaksi yang sama. */
+export type CreateRoomBody = { id: string; title: string; visibility?: RoomVisibility; expiresAt?: number | null; members?: AddRoomMemberBody[] };
+
+/** Batas jumlah anggota di POST /api/rooms. */
+export const CREATE_ROOM_MAX_MEMBERS = 100;
+
+/** Satu saran akun di GET /api/users/search. */
+export type UserSearchItem = { id: string; name: string; email: string; image: string | null };
+
+/** Respons GET /api/users/search (tanpa paginasi: autocomplete dibatasi limit). */
+export type UserSearchResponse = { items: UserSearchItem[] };
+
+/** Panjang minimum `q` (setelah trim) dan batas atas `limit` GET /api/users/search. */
+export const USER_SEARCH_MIN = 2;
+export const USER_SEARCH_MAX_RESULTS = 10;
 
 /** Respons POST /api/rooms/:roomId/token. */
 export type TokenResponse = { token: string; url: string; role: RoomRole };

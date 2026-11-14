@@ -6,6 +6,11 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikut
 
 ### Added
 
+- Saat membuat room, admin bisa langsung mengundang orang: akun terdaftar jadi anggota, email yang belum terdaftar
+  jadi undangan tertunda. Semua dibuat sekaligus; bila satu email ditolak (mis. domain tidak diizinkan), room tidak
+  dibuat.
+- Pencarian akun terdaftar (nama atau email) untuk mengundang orang, tersedia bagi admin dan host room. Akun yang
+  sedang di-ban tidak muncul.
 - **Single binary**: `bun run build:binary` (host) atau `bun run build:binary:all` (Linux x64/arm64, macOS
   arm64/x64, Windows x64) menghasilkan satu file `bin/zoomin-<os>-<arch>` berisi server, SPA, dan migrasi. Bisa
   dijalankan di mesin tanpa Bun maupun file repo; default mode produksi.

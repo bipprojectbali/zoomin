@@ -11,6 +11,7 @@ import { layoutRoutes } from "./layout.route";
 import { roomMembersRoutes } from "./room.members.route";
 import { roomsRoutes } from "./rooms.route";
 import { tokenRoutes } from "./token.route";
+import { usersSearchRoutes } from "./users.search.route";
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
@@ -52,6 +53,7 @@ export function createApi(deps: ApiDeps) {
     .use(inviteRoutes(deps))
     .use(roomsRoutes(deps))
     .use(roomMembersRoutes(deps))
+    .use(usersSearchRoutes(deps))
     .use(tokenRoutes(deps))
     .use(layoutRoutes(deps))
     .use(adminRoutes(deps))
