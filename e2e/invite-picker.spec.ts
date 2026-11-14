@@ -1,5 +1,5 @@
 /**
- * Pemilih undangan (RND/plan/07-invite-picker.md P1–P6): saran akun, email manual, tempel banyak email, form buat
+ * Pemilih undangan (RND/plan/07 P1–P6 + 09 M1–M6): dropdown multi-select ber-checkbox, email manual tersimpan, tempel, form buat
  * room Private, tab Anggota (banyak sekaligus), Escape bertingkat di dialog, user banned tidak disarankan.
  */
 import type { Locator, Page } from "@playwright/test";
@@ -32,57 +32,86 @@ async function openMembers(page: Page, roomId: string): Promise<Locator> {
   return dialog;
 }
 
-test("buat room Private dengan picker: akun terdaftar + email manual + tempel (invalid tidak dikirim)", async ({ page, root, roomId, newGuestPage }) => {
-  const t = tag();
-  const registered = newIdentity(`Rina Picker ${t}`, "picker");
-  const registeredPage = await newGuestPage();
-  await loginAs(registeredPage, registered);
-  const later = newIdentity(`Belum Login ${t}`, "later");
-  const pastedA = newIdentity("Tempel A", "paste");
-  const pastedB = newIdentity("Tempel B", "paste");
-
-  await loginAdmin(page, root);
+/** Lobby → form buat room, mode Private, ID room diisi. */
+async function privateForm(page: Page, roomId: string): Promise<Locator> {
   await page.goto("/app");
   const form = page.getByTestId("create-room-form");
   await form.getByLabel("Judul room").fill(`Picker ${roomId}`);
   await form.locator('[data-testid="visibility-option"][data-value="private"]').click();
   await form.getByText("Opsi lanjutan").click();
   await form.getByLabel("ID room").fill(roomId);
+  return form;
+}
 
+test("buat room Private: centang beberapa akun, Tambah email manual, tempel (invalid & sisa kata cari tidak dikirim)", async ({ page, root, roomId, newGuestPage }) => {
+  const t = tag();
+  const registered = newIdentity(`Rina Picker ${t}`, "picker");
+  const second = newIdentity(`Rudi Picker ${t}`, "picker");
+  const registeredPage = await newGuestPage();
+  await loginAs(registeredPage, registered);
+  await loginAs(await newGuestPage(), second);
+  const later = newIdentity(`Belum Login ${t}`, "later");
+  const pastedA = newIdentity("Tempel A", "paste");
+  const pastedB = newIdentity("Tempel B", "paste");
+
+  await loginAdmin(page, root);
+  const form = await privateForm(page, roomId);
   const input = form.getByTestId("invite-picker-input");
-  // Saran akun terdaftar dari nama (substring, ≥2 huruf).
-  await input.fill(`picker ${t}`);
-  await option(form, registered.email).click();
-  await expect(chip(form, registered.email)).toBeVisible();
-  await expect(input).toHaveValue("");
 
-  // Email belum terdaftar → opsi "Undang <email>".
+  // M1: fokus tanpa mengetik → dropdown terbuka berisi akun terdaftar.
+  await input.click();
+  await expect(input).toHaveAttribute("aria-expanded", "true");
+  await expect(form.getByTestId("invite-picker-option").first()).toBeVisible();
+
+  // M2: satu pencarian, centang dua akun; teks cari & dropdown tetap setelah toggle.
+  const query = `picker ${t}`;
+  await input.fill(query);
+  await option(form, registered.email).click();
+  await expect(input).toHaveValue(query);
+  await expect(input).toHaveAttribute("aria-expanded", "true");
+  await expect(option(form, registered.email)).toHaveAttribute("aria-selected", "true");
+  await option(form, second.email).click();
+  await expect(option(form, second.email)).toHaveAttribute("aria-selected", "true");
+  await expect(input).toHaveValue(query);
+  for (const who of [registered, second]) await expect(chip(form, who.email)).toBeVisible();
+  // Hapus centang = hapus chip; centang lagi.
+  await option(form, second.email).click();
+  await expect(chip(form, second.email)).toHaveCount(0);
+  await option(form, second.email).click();
+  await expect(chip(form, second.email)).toBeVisible();
+
+  // M3: email belum terdaftar → "Tambah <email>" → tercentang + masuk daftar tersimpan, input dikosongkan.
   await input.fill(later.email);
-  await expect(form.getByTestId("invite-picker-manual")).toHaveText(`Undang ${later.email}`);
+  await expect(form.getByTestId("invite-picker-manual")).toHaveText(`Tambah ${later.email}`);
   await form.getByTestId("invite-picker-manual").click();
+  await expect(input).toHaveValue("");
   await expect(chip(form, later.email)).toHaveAttribute("data-invalid", "false");
+  await expect(form.locator(`[data-testid="invite-picker-saved"][data-email="${later.email}"]`)).toHaveAttribute("aria-selected", "true");
 
   // Tempel banyak email (koma/spasi/baris baru) termasuk satu tidak valid dan satu duplikat.
   await paste(input, `${pastedA.email}, bukan-email\n${pastedB.email} ${later.email.toUpperCase()}`);
   await expect(chip(form, pastedA.email)).toHaveAttribute("data-invalid", "false");
   await expect(chip(form, pastedB.email)).toHaveAttribute("data-invalid", "false");
   await expect(chip(form, "bukan-email")).toHaveAttribute("data-invalid", "true");
-  await expect(form.getByTestId("invite-chip")).toHaveCount(5);
+  await expect(form.getByTestId("invite-chip")).toHaveCount(6);
   await expect(form.getByText("1 email tidak valid tidak akan dikirim.")).toBeVisible();
 
+  // Sisa kata cari (tanpa "@") saat submit dibuang, bukan jadi chip tidak valid.
+  await input.fill(query);
   const sent = page.waitForRequest((r) => r.method() === "POST" && r.url().endsWith("/api/rooms"));
   await form.getByRole("button", { name: "Buat room" }).click();
   const body = (await sent).postDataJSON() as CreateRoomBody;
-  expect(body.members?.map((m) => m.email).sort()).toEqual([registered.email, later.email, pastedA.email, pastedB.email].sort());
+  const expected = [registered.email, second.email, later.email, pastedA.email, pastedB.email];
+  expect(body.members?.map((m) => m.email).sort()).toEqual(expected.sort());
   expect(body.members?.every((m) => m.role === "participant")).toBe(true);
   await expect(card(page, roomId).getByTestId("room-badge-private")).toBeVisible();
 
   const res = await page.request.get(`/api/rooms/${roomId}/members`);
   expect(res.status()).toBe(200);
   const items = ((await res.json()) as { items: RoomMemberItem[] }).items;
-  expect(items.find((i) => i.email === registered.email)?.kind).toBe("member");
+  for (const who of [registered, second]) expect(items.find((i) => i.email === who.email)?.kind).toBe("member");
   expect(items.find((i) => i.email === later.email)?.kind).toBe("pending");
-  expect(items.some((i) => i.email === "bukan-email")).toBe(false);
+  expect(items.some((i) => i.email === "bukan-email" || i.email.includes("picker "))).toBe(false);
 
   // User terdaftar langsung melihat room; email yang belum terdaftar melihatnya setelah login pertama (klaim R2).
   await registeredPage.goto("/app");
@@ -91,6 +120,36 @@ test("buat room Private dengan picker: akun terdaftar + email manual + tempel (i
   await loginAs(laterPage, later);
   await laterPage.goto("/app");
   await expect(card(laterPage, roomId).getByTestId("room-badge-private")).toBeVisible();
+});
+
+test("email manual tersimpan bertahan setelah reload dan bisa dihapus (sekaligus hapus centang)", async ({ page, root, roomId }) => {
+  const manual = newIdentity("Manual Simpan", "saved");
+  await loginAdmin(page, root);
+  let form = await privateForm(page, roomId);
+  let input = form.getByTestId("invite-picker-input");
+  await input.fill(manual.email);
+  await form.getByTestId("invite-picker-manual").click();
+  await expect(chip(form, manual.email)).toBeVisible();
+
+  await page.reload();
+  form = await privateForm(page, roomId);
+  input = form.getByTestId("invite-picker-input");
+  await expect(form.getByTestId("invite-chip")).toHaveCount(0);
+  await input.click();
+  const saved = form.locator(`[data-testid="invite-picker-saved"][data-email="${manual.email}"]`);
+  await expect(saved).toHaveAttribute("aria-selected", "false");
+  await expect(saved).toContainText("Manual");
+  await saved.click();
+  await expect(saved).toHaveAttribute("aria-selected", "true");
+  await expect(chip(form, manual.email)).toBeVisible();
+
+  await saved.getByTestId("invite-picker-saved-remove").click();
+  await expect(saved).toHaveCount(0);
+  await expect(chip(form, manual.email)).toHaveCount(0);
+  await page.reload();
+  form = await privateForm(page, roomId);
+  await form.getByTestId("invite-picker-input").click();
+  await expect(form.locator(`[data-testid="invite-picker-saved"][data-email="${manual.email}"]`)).toHaveCount(0);
 });
 
 test("tab Anggota: tambah dua orang sekaligus → toast ringkasan", async ({ host, roomId }) => {
