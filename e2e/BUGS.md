@@ -97,3 +97,7 @@ begitu bug diperbaiki test itu jadi "unexpectedly passed" → hapus `test.fail()
   join gagal "Server sedang bermasalah". Kini semua env config diset eksplisit + `bun --no-env-file`.
 - **Menu Radix dibuka ulang saat masih animasi tutup diabaikan** (`screen-list`): klik pemicu ~200 ms setelah
   Escape tidak membuka menu. Kosmetik; test menunggu menu benar-benar tertutup.
+- **Room private / public tanpa password lewat ID room** (`room-password.spec.ts`): non-anggota melihat pesan umum
+  "Anda bukan anggota room ini", bukan teks `room_private`. `POST /api/rooms/:id/token` menjawab `forbidden` untuk
+  keduanya (hanya `/join` yang membedakan `room_private`). Sesuai spec 08 (W5/W6 tidak mengatur kode token untuk
+  private); bila ingin pesan privat yang spesifik, token route perlu `room_private` untuk room private.
