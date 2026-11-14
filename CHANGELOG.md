@@ -1,110 +1,114 @@
 # Changelog
 
-Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikuti `version` di `package.json`.
+The format follows [Keep a Changelog](https://keepachangelog.com/). Versions follow `version` in `package.json`.
 
 ## [Unreleased]
 
 ### Added
 
-- **Image Docker + GHCR**: push ke `main` (dan tag `v*`) menjalankan test lalu menerbitkan
-  `ghcr.io/bipprojectbali/zoomin` (`latest`, `sha-<commit>`, versi). Deploy sebagai stack Portainer dari `compose.yml`
-  (Traefik, `zoomin.wibudev.com`, data SQLite di volume); rollback cukup ganti `ZOOMIN_TAG`. Panduan di
+- **Docker image + GHCR**: pushes to `main` (and `v*` tags) run the tests and then publish
+  `ghcr.io/bipprojectbali/zoomin` (`latest`, `sha-<commit>`, version). Deploy it as a Portainer stack from
+  `compose.yml` (Traefik, `zoomin.wibudev.com`, SQLite data in a volume); roll back by changing `ZOOMIN_TAG`. Guide in
   `deploy/README.md`.
-- Perintah `zoomin healthcheck`: cek `/api/health` server lokal, exit 0/1 (dipakai healthcheck container).
-- Favicon, ikon aplikasi (apple-touch-icon, ikon 192/512 + `site.webmanifest`), dan gambar pratinjau `og-image.png`
-  untuk tautan yang dibagikan. Halaman punya meta SEO (deskripsi, Open Graph, Twitter card, canonical, theme-color);
-  URL absolut di dalamnya mengikuti `PUBLIC_APP_URL`. `/robots.txt` mengizinkan landing dan menutup halaman privat
-  (`/app`, `/rooms`, `/invite`, `/admin`, `/dev`, `/settings`, `/api`); `/sitemap.xml` berisi landing. Ikon dibuat
-  ulang dengan `bun scripts/build.icons.ts`.
-- **Room dengan password**: selain Public dan Private, room bisa bertipe Password. Orang yang tahu ID room atau
-  memegang link undangan bisa masuk dengan password, lalu otomatis jadi anggota. Host bisa memasang, mengganti, atau
-  menghapus password kapan saja; anggota lama tidak dikeluarkan saat password diganti. Password disimpan sebagai
-  hash dan percobaan yang salah dibatasi 5 kali per menit.
-- Saat membuat room, admin bisa langsung mengundang orang: akun terdaftar jadi anggota, email yang belum terdaftar
-  jadi undangan tertunda. Semua dibuat sekaligus; bila satu email ditolak (mis. domain tidak diizinkan), room tidak
-  dibuat.
-- Pencarian akun terdaftar (nama atau email) untuk mengundang orang, tersedia bagi admin dan host room. Akun yang
-  sedang di-ban tidak muncul.
-- **Single binary**: `bun run build:binary` (host) atau `bun run build:binary:all` (Linux x64/arm64, macOS
-  arm64/x64, Windows x64) menghasilkan satu file `bin/zoomin-<os>-<arch>` berisi server, SPA, dan migrasi. Bisa
-  dijalankan di mesin tanpa Bun maupun file repo; default mode produksi.
-- Perintah `zoomin check` dan `zoomin migrate` untuk memvalidasi konfigurasi dan menerapkan migrasi tanpa start
-  server.
-- Saat server listen di semua interface, log start menampilkan `http://localhost:<port>/` (bukan `0.0.0.0`, yang
-  membuat kamera/share layar/clipboard gagal) plus alamat LAN untuk perangkat lain.
-- Proxy signaling LiveKit di `/livekit`: set `PUBLIC_LIVEKIT_URL=wss://<domain-app>/livekit` agar browser cukup
-  menjangkau satu hostname (mis. lewat Cloudflare Tunnel), tanpa subdomain LiveKit. Media tetap langsung ke LiveKit.
-- **Login dengan akun Google** (Better Auth) menggantikan login password admin. Akun Google mana pun bisa mendaftar;
-  user baru hanya bisa masuk room yang mengundangnya.
-- **Peran global** `user` / `admin` / `super_admin`. Super admin ditentukan oleh `SUPER_ADMIN_EMAILS` (disinkronkan
-  setiap login); admin diangkat atau diturunkan oleh super admin. Hanya admin dan super admin yang bisa membuat room.
-- **Halaman profil** `/settings`: ubah nama tampilan, pakai foto Google, lihat dan cabut sesi login di perangkat lain,
-  hapus akun sendiri. Foto profil tampil di tile avatar dan daftar peserta.
-- **Panel admin** `/admin`: cari akun, blokir (dengan alasan dan masa berlaku opsional; akun langsung dikeluarkan dari
-  room yang sedang diikuti), buka blokir, cabut sesi, hapus akun, dan kelola room (hapus room).
-- **Konsol developer** `/dev` (super admin): angkat/turunkan admin, kesehatan sistem (LiveKit, DB), audit log aksi
-  admin, pembatasan domain email login, dan ringkasan konfigurasi tanpa secret.
-- **Landing page** publik di `/` yang menonjolkan perbandingan beberapa layar sekaligus.
-- Perintah darurat `zoomin user list`, `zoomin user promote <email> --role admin|user`, dan `zoomin user unban <email>`
-  untuk mengelola akun langsung di server.
-- Variabel env baru: `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
-  `SUPER_ADMIN_EMAILS`, `WEB_DIST_DIR` (opsional), dan `ZOOMIN_TEST_AUTH` (khusus test otomatis). Panduan membuat
-  OAuth client Google ada di `.env.example` / `zoomin env`.
-- **Room public / private.** Room public (default) bisa dimasuki siapa pun yang login dan memegang link undangan;
-  room private hanya untuk anggota yang diundang lewat email, link undangan ditolak. Tipe bisa diubah kapan saja
-  (public → private membuat link yang sudah dibagikan tidak berlaku lagi).
-- **Undang anggota lewat email** (public maupun private) dengan peran `host`/`participant`/`viewer`. Email yang belum
-  punya akun disimpan sebagai undangan tertunda dan otomatis jadi anggota saat orang itu login pertama kali dengan
-  Google. Host bisa mengubah peran, mengeluarkan anggota (langsung terputus bila sedang di room), dan membatalkan
-  undangan tertunda; host terakhir tidak bisa diturunkan atau dikeluarkan.
-- **Dialog "Pengaturan room"** (dari menu ⋯ kartu room di lobby dan dari `/admin`) dengan tab Umum (judul, tipe),
-  Anggota, Status, dan zona bahaya.
-- **Aktifkan / nonaktifkan room.** Menonaktifkan room langsung memutus semua peserta; room nonaktif tidak bisa
-  dimasuki sampai diaktifkan lagi. Data room (layout, anggota) tetap tersimpan.
-- **Masa berlaku room** (default tanpa batas, maks 365 hari) saat membuat room atau dari tab Status, dengan tombol
-  cepat +1 / +7 / +30 hari, "Tanpa batas", atau pilih tanggal. Room yang kadaluarsa ditutup otomatis (diperiksa tiap
-  60 detik) dan aktif lagi begitu diperpanjang.
-- **Host room bisa menghapus room** sendiri (konfirmasi dengan mengetik ID room); sebelumnya hanya admin.
-- Kartu room menampilkan badge Private, status Nonaktif/Kadaluarsa (tombol Masuk dimatikan dengan alasan), dan tanggal
-  berakhir.
+- `zoomin healthcheck` command: checks `/api/health` on the local server and exits 0/1 (used by the container
+  healthcheck).
+- Favicon, app icons (apple-touch-icon, 192/512 icons + `site.webmanifest`), and an `og-image.png` preview image for
+  shared links. Pages have SEO meta tags (description, Open Graph, Twitter card, canonical, theme-color); absolute URLs
+  in them follow `PUBLIC_APP_URL`. `/robots.txt` allows the landing page and disallows private pages (`/app`,
+  `/rooms`, `/invite`, `/admin`, `/dev`, `/settings`, `/api`); `/sitemap.xml` lists the landing page. Regenerate the
+  icons with `bun scripts/build.icons.ts`.
+- **Password-protected rooms**: besides Public and Private, a room can be of type Password. Anyone who knows the room
+  ID or holds an invite link can join with the password and automatically becomes a member. The host can set, change,
+  or remove the password at any time; existing members are not removed when the password changes. Passwords are
+  stored as hashes and wrong attempts are limited to 5 per minute.
+- When creating a room, an admin can invite people right away: registered accounts become members, unregistered
+  emails become pending invitations. Everything is created at once; if one email is rejected (e.g. domain not
+  allowed), the room is not created.
+- Search for registered accounts (by name or email) when inviting people, available to admins and room hosts. Banned
+  accounts are not listed.
+- **Single binary**: `bun run build:binary` (host) or `bun run build:binary:all` (Linux x64/arm64, macOS arm64/x64,
+  Windows x64) produces a single `bin/zoomin-<os>-<arch>` file containing the server, SPA, and migrations. It runs on
+  machines without Bun or the repository files; production mode by default.
+- `zoomin check` and `zoomin migrate` commands to validate the configuration and apply migrations without starting
+  the server.
+- When the server listens on all interfaces, the startup log shows `http://localhost:<port>/` (not `0.0.0.0`, which
+  breaks camera, screen sharing, and clipboard) plus LAN addresses for other devices.
+- LiveKit signaling proxy at `/livekit`: set `PUBLIC_LIVEKIT_URL=wss://<app-domain>/livekit` so browsers only need to
+  reach one hostname (e.g. through a Cloudflare Tunnel), without a LiveKit subdomain. Media still goes directly to
+  LiveKit.
+- **Sign in with Google** (Better Auth) replaces the admin password login. Any Google account can register; new users
+  can only join rooms they are invited to.
+- **Global roles** `user` / `admin` / `super_admin`. Super admins are defined by `SUPER_ADMIN_EMAILS` (synced on
+  every sign-in); admins are promoted or demoted by a super admin. Only admins and super admins can create rooms.
+- **Profile page** `/settings`: change display name, use your Google photo, view and revoke sign-in sessions on other
+  devices, delete your own account. The profile photo appears on avatar tiles and in the participant list.
+- **Admin panel** `/admin`: search accounts, ban (with a reason and optional duration; the account is immediately
+  removed from rooms it is in), unban, revoke sessions, delete accounts, and manage rooms (delete rooms).
+- **Developer console** `/dev` (super admin): promote/demote admins, system health (LiveKit, DB), audit log of admin
+  actions, sign-in email domain restrictions, and a configuration summary without secrets.
+- Public **landing page** at `/` highlighting side-by-side sharing of multiple screens.
+- Emergency commands `zoomin user list`, `zoomin user promote <email> --role admin|user`, and
+  `zoomin user unban <email>` to manage accounts directly on the server.
+- New env variables: `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+  `SUPER_ADMIN_EMAILS`, `WEB_DIST_DIR` (optional), and `ZOOMIN_TEST_AUTH` (automated tests only). The guide for
+  creating a Google OAuth client is in `.env.example` / `zoomin env`.
+- **Public / private rooms.** Public rooms (default) can be joined by anyone signed in who holds an invite link;
+  private rooms are only for members invited by email, and invite links are rejected. The type can be changed at any
+  time (public → private invalidates links that were already shared).
+- **Invite members by email** (public and private rooms) with role `host`/`participant`/`viewer`. Emails without an
+  account are stored as pending invitations and automatically become members when that person first signs in with
+  Google. Hosts can change roles, remove members (disconnected immediately if in the room), and cancel pending
+  invitations; the last host cannot be demoted or removed.
+- **"Room settings" dialog** (from the ⋯ menu on lobby room cards and from `/admin`) with General (title, type),
+  Members, Status, and danger zone tabs.
+- **Activate / deactivate rooms.** Deactivating a room disconnects all participants immediately; an inactive room
+  cannot be joined until it is reactivated. Room data (layout, members) is kept.
+- **Room expiry** (no limit by default, max 365 days) when creating a room or from the Status tab, with quick buttons
+  +1 / +7 / +30 days, "No limit", or a date picker. Expired rooms are closed automatically (checked every 60 seconds)
+  and become active again once extended.
+- **Room hosts can delete their own room** (confirmed by typing the room ID); previously only admins could.
+- Room cards show a Private badge, Inactive/Expired status (the Join button is disabled with a reason), and the end
+  date.
 
 ### Changed
 
-- Pemilih undangan sekarang dropdown multi-pilih yang bisa dicari, dengan checkbox per akun; email manual yang
-  diketik tetap tersimpan sebagai pilihan. Pencarian akun boleh tanpa kata kunci (menampilkan semua akun urut nama)
-  dan mengembalikan hingga 50 hasil.
-- **BREAKING:** lobby pindah dari `/` ke `/app`; `/` sekarang landing page (tetap tampil walau sudah login).
-- **BREAKING:** peran room `admin` berganti nama menjadi **`host`** (termasuk pilihan peran di link undangan).
-- **BREAKING:** tamu wajib masuk dengan Google sebelum menerima undangan; tidak ada lagi akun tamu yang cukup
-  mengisi nama. Akun lama (admin password dan tamu) tidak dimigrasikan: room dan layout-nya tetap ada, tapi daftar
-  anggota room lama kosong, jadi undang ulang peserta.
-- Admin dan super admin yang membuka room tanpa undangan diperlakukan sebagai host.
-- Panel `/admin` › Room: kolom Tipe dan Status baru, plus aksi "Pengaturan" yang membuka dialog pengaturan room.
-- Tombol **Undang** di dalam room private membuka pengelolaan anggota (undang lewat email), bukan link undangan.
-- `POST /api/rooms` menerima field opsional `visibility` dan `expiresAt`; `RoomSummary` bertambah `visibility`,
-  `status`, `expiresAt`, `canManage`.
-- **BREAKING (API):** field `active` (room sedang live di LiveKit) di `GET /api/admin/rooms` berganti nama menjadi
+- UI and README are now English only.
+- The invite picker is now a searchable multi-select dropdown with a checkbox per account; manually typed emails stay
+  saved as options. Account search works without a query (lists all accounts sorted by name) and returns up to 50
+  results.
+- **BREAKING:** the lobby moved from `/` to `/app`; `/` is now the landing page (shown even when signed in).
+- **BREAKING:** the room role `admin` is renamed to **`host`** (including the role choice in invite links).
+- **BREAKING:** guests must sign in with Google before accepting an invite; name-only guest accounts are gone. Old
+  accounts (password admin and guests) are not migrated: rooms and their layouts remain, but old room member lists
+  are empty, so re-invite participants.
+- Admins and super admins who open a room without an invite are treated as host.
+- `/admin` › Rooms: new Type and Status columns, plus a "Settings" action that opens the room settings dialog.
+- The **Invite** button inside a private room opens member management (invite by email) instead of an invite link.
+- `POST /api/rooms` accepts optional `visibility` and `expiresAt` fields; `RoomSummary` gains `visibility`, `status`,
+  `expiresAt`, `canManage`.
+- **BREAKING (API):** the `active` field (room currently live in LiveKit) in `GET /api/admin/rooms` is renamed to
   `live`.
 
 ### Removed
 
-- **BREAKING:** login password admin (`ADMIN_PASSWORD`, `POST /api/auth/admin-login`) dan `SESSION_SECRET` (diganti
-  `BETTER_AUTH_SECRET`). Hapus keduanya dari env produksi.
+- **BREAKING:** admin password login (`ADMIN_PASSWORD`, `POST /api/auth/admin-login`) and `SESSION_SECRET` (replaced
+  by `BETTER_AUTH_SECRET`). Remove both from the production env.
 
 ### Fixed
 
-- `bun run build:binary -- --target <target>` gagal ("Unknown option '--target'"), dan `--outdir` ikut dipakai
-  sebagai folder build SPA sehingga binary menanam `dist/web` lama (atau gagal bila belum ada).
+- `bun run build:binary -- --target <target>` failed ("Unknown option '--target'"), and `--outdir` was also used as
+  the SPA build folder, so the binary embedded a stale `dist/web` (or failed if it did not exist).
 
 ### Security
 
-- **BREAKING:** semua sesi lama dan semua link undangan lama tidak berlaku setelah upgrade (kunci tanda tangan baru);
-  semua orang perlu login ulang dan undangan perlu dibuat ulang.
-- Aksi admin (blokir, buka blokir, hapus akun, ubah peran, cabut sesi, hapus room, ubah setting) dicatat di audit log.
-- Endpoint admin bawaan Better Auth tidak dibuka lewat HTTP; aturan siapa boleh mengelola siapa ditegakkan server
-  (admin tidak bisa menyentuh admin lain atau super admin, tidak ada yang bisa mengelola akunnya sendiri).
-- Login dibatasi rate limit Better Auth per IP. Jalur login khusus test (`ZOOMIN_TEST_AUTH`) selalu mati di production
-  dan dibuktikan oleh test.
+- **BREAKING:** all existing sessions and invite links are invalid after upgrading (new signing key); everyone must
+  sign in again and invites must be recreated.
+- Admin actions (ban, unban, delete account, change role, revoke sessions, delete room, change settings) are recorded
+  in the audit log.
+- Better Auth's built-in admin endpoints are not exposed over HTTP; the rules on who may manage whom are enforced by
+  the server (admins cannot touch other admins or super admins, nobody can manage their own account).
+- Sign-in is rate limited per IP by Better Auth. The test-only login path (`ZOOMIN_TEST_AUTH`) is always disabled in
+  production, and a test proves it.
 
 ## [0.1.0] - 2026-11-14
 

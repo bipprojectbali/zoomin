@@ -2,6 +2,7 @@
 // binary tetap mencetak isi file setelah file sumber dihapus), jadi --docs tidak butuh file di disk.
 import readme from "../../README.md" with { type: "text" };
 import deployReadme from "../../deploy/README.md" with { type: "text" };
+import apiDoc from "../../docs/api.md" with { type: "text" };
 import envExample from "../../.env.example" with { type: "text" };
 import { REQUIRED_IN_PRODUCTION } from "../server/config";
 
@@ -9,14 +10,6 @@ import { REQUIRED_IN_PRODUCTION } from "../server/config";
 export const ENV_EXAMPLE: string = envExample;
 
 const REQUIRED_IN_PROD = new Set<string>(REQUIRED_IN_PRODUCTION);
-
-/** Bagian `## <judul>` dari markdown sampai heading level-2 berikutnya. */
-function section(markdown: string, title: string): string {
-  const start = markdown.indexOf(`\n## ${title}\n`);
-  if (start < 0) return "";
-  const end = markdown.indexOf("\n## ", start + 1);
-  return markdown.slice(start + 1, end < 0 ? undefined : end).trim();
-}
 
 /** Tabel markdown variabel env dari .env.example: blok komentar tepat di atas baris VAR= (tanpa baris kosong) jadi keterangan. */
 export function envTable(example: string = envExample): string {
@@ -79,7 +72,7 @@ export const DOCS_TOPICS: Record<string, () => string> = {
   usage: () => USAGE,
   env: () => `# Variabel env\n\n${envTable()}\n\nDi produksi server gagal start bila variabel wajib kosong; BETTER_AUTH_SECRET minimal 32 karakter.`,
   deploy: () => deployReadme,
-  api: () => section(readme, "API"),
+  api: () => apiDoc,
   readme: () => readme,
   list: () => `Topik dokumentasi (zoomin --docs <topik>):\n${Object.keys(DOCS_TOPICS).map((t) => `  ${t}`).join("\n")}`,
 };

@@ -110,7 +110,7 @@ LiveKit dev lokal: `RND/spike/.bin/livekit-server --dev` (atau Docker `livekit/l
 - **Migrasi**: file SQL bernomor baru di `migrations/` (berikutnya `0006_<nama>.sql`), lalu tambahkan import + entri di
   `MIGRATIONS` (`src/server/db.ts`); `db.test.ts` gagal bila daftar tak sinkron. Migrasi hanya maju, idempotent.
 - **Secret**: jangan membaca, mencetak, atau commit `.env` (hanya `.env.example`). `zoomin check` menampilkan
-  secret sebagai "diset"/"kosong". Variabel baru → tambahkan ke `.env.example` + `src/server/config.ts`
+  secret sebagai "set"/"empty". Variabel baru → tambahkan ke `.env.example` + `src/server/config.ts`
   (`src/cli/cli.docs.test.ts` gagal bila tak sinkron). Tabel Better Auth (`user`, `session`, `account`) berisi email
   dan token: jangan log isinya (pakai user id).
 - **Hardcoded value**: URL/host/kredensial lewat env (`config.ts`); default dev ditandai `// test-only`.
