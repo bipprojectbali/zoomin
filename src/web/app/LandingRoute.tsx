@@ -1,5 +1,4 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Navigate } from "react-router";
 import { LANDING_META } from "@/landing/landing.copy";
 import { useSession } from "@/session.context";
 import { RouteLoading } from "./RouteLoading";
@@ -19,7 +18,7 @@ function setMetaDescription(content: string): string | null {
   return prev;
 }
 
-/** `/`: landing publik (lazy) + meta SEO; sudah login → `/app`. Landing tetap tampil selama sesi dicek. */
+/** `/`: landing publik (lazy) + meta SEO, selalu tampil (tamu maupun login); sesi hanya mengganti CTA ke `/app`. */
 export function LandingRoute() {
   const { user } = useSession();
 
@@ -34,10 +33,9 @@ export function LandingRoute() {
     };
   }, []);
 
-  if (user) return <Navigate to="/app" replace />;
   return (
     <Suspense fallback={<RouteLoading />}>
-      <LandingPage />
+      <LandingPage viewer={user} />
     </Suspense>
   );
 }

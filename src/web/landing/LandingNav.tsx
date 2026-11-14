@@ -1,10 +1,12 @@
 import { LogIn } from "lucide-react";
 import { AppBrand } from "@/app.brand";
+import { UserAvatar } from "@/app/UserAvatar";
 import { Button } from "@/components/ui/button";
-import { LOGIN_HREF, NAV, SECTION_IDS } from "./landing.copy";
+import { APP_HREF, LOGIN_HREF, NAV, SECTION_IDS } from "./landing.copy";
+import type { LandingViewer } from "./LandingPage";
 
-/** Header sticky: skip link, brand, anchor section, tombol Masuk. */
-export function LandingNav() {
+/** Header sticky: skip link, brand, anchor section, tombol Masuk (tamu) / Buka aplikasi (login). */
+export function LandingNav({ viewer }: { viewer?: LandingViewer }) {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <a
@@ -31,12 +33,22 @@ export function LandingNav() {
             ))}
           </ul>
         </nav>
-        <Button asChild size="sm" className="ml-auto">
-          <a href={LOGIN_HREF}>
-            <LogIn aria-hidden="true" />
-            {NAV.login}
-          </a>
-        </Button>
+        {/* min-w: reservasi lebar agar pergantian Masuk → Buka aplikasi setelah sesi diketahui tidak menggeser layout. */}
+        {viewer ? (
+          <Button asChild size="sm" className="ml-auto min-w-36">
+            <a href={APP_HREF} data-testid="landing-nav-app">
+              <UserAvatar user={viewer} className="-ml-1 size-5" />
+              {NAV.app}
+            </a>
+          </Button>
+        ) : (
+          <Button asChild size="sm" className="ml-auto min-w-36">
+            <a href={LOGIN_HREF}>
+              <LogIn aria-hidden="true" />
+              {NAV.login}
+            </a>
+          </Button>
+        )}
       </div>
     </header>
   );

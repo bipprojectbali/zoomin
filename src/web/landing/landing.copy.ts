@@ -6,6 +6,9 @@
 /** Tujuan CTA login: rute `/login` ditangani alur auth Google. */
 export const LOGIN_HREF = "/login";
 
+/** Tujuan CTA bagi user yang sudah login: area aplikasi. */
+export const APP_HREF = "/app";
+
 /** Id section yang menjadi target anchor nav/CTA. */
 export const SECTION_IDS = {
   top: "top",
@@ -33,6 +36,7 @@ export const NAV = {
     { href: `#${SECTION_IDS.faq}`, label: "FAQ" },
   ],
   login: "Masuk",
+  app: "Buka aplikasi",
   skip: "Lewati ke konten",
 } as const;
 
@@ -44,6 +48,7 @@ export const HERO = {
     "Setiap peserta bisa membagikan lebih dari satu layar. Host menata panggungnya — berdampingan, grid, atau " +
     "fokus — dan semua orang melihat susunan yang sama. Berjalan di server Anda sendiri.",
   ctaLogin: "Masuk dengan Google",
+  ctaApp: "Buka aplikasi",
   ctaHow: "Lihat cara kerja",
   points: ["Banyak layar per peserta", "Layout diatur host", "Data di server sendiri"],
 } as const;
@@ -150,6 +155,8 @@ export const FINAL_CTA = {
   title: "Siap membandingkan layar bersama tim?",
   sub: "Masuk dengan akun Google untuk membuka lobby dan bergabung ke room Anda.",
   cta: "Masuk dengan Google",
+  subApp: "Anda sudah masuk. Lanjutkan ke lobby dan bergabung ke room Anda.",
+  ctaApp: "Buka aplikasi",
 } as const;
 
 export const FOOTER = {
@@ -162,6 +169,7 @@ export const FOOTER = {
 export const ALL_HREFS: readonly string[] = [
   ...NAV.links.map((l) => l.href),
   LOGIN_HREF,
+  APP_HREF,
   `#${SECTION_IDS.top}`,
   `#${SECTION_IDS.main}`,
 ];

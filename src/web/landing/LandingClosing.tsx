@@ -1,7 +1,7 @@
 import { ArrowUp, ChevronDown } from "lucide-react";
 import { AppBrand } from "@/app.brand";
 import { Button } from "@/components/ui/button";
-import { FAQ, FINAL_CTA, FOOTER, LOGIN_HREF, NAV, SECTION_IDS } from "./landing.copy";
+import { APP_HREF, FAQ, FINAL_CTA, FOOTER, LOGIN_HREF, NAV, SECTION_IDS } from "./landing.copy";
 import { GoogleMark } from "./GoogleMark";
 import { Section } from "./LandingSections";
 
@@ -28,7 +28,7 @@ export function LandingFaq() {
 }
 
 /** Ajakan akhir. */
-export function LandingFinalCta() {
+export function LandingFinalCta({ signedIn = false }: { signedIn?: boolean }) {
   return (
     <section aria-labelledby="final-cta-title" className="border-t">
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
@@ -37,12 +37,12 @@ export function LandingFinalCta() {
             <h2 id="final-cta-title" className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
               {FINAL_CTA.title}
             </h2>
-            <p className="mt-2 opacity-90">{FINAL_CTA.sub}</p>
+            <p className="mt-2 opacity-90">{signedIn ? FINAL_CTA.subApp : FINAL_CTA.sub}</p>
           </div>
           <Button asChild size="lg" variant="secondary" className="h-11">
-            <a href={LOGIN_HREF}>
-              <GoogleMark />
-              {FINAL_CTA.cta}
+            <a href={signedIn ? APP_HREF : LOGIN_HREF}>
+              {!signedIn && <GoogleMark />}
+              {signedIn ? FINAL_CTA.ctaApp : FINAL_CTA.cta}
             </a>
           </Button>
         </div>
@@ -52,7 +52,7 @@ export function LandingFinalCta() {
 }
 
 /** Footer: brand, anchor, © tahun berjalan. */
-export function LandingFooter() {
+export function LandingFooter({ signedIn = false }: { signedIn?: boolean }) {
   const year = new Date().getFullYear();
   return (
     <footer className="border-t">
@@ -73,8 +73,8 @@ export function LandingFooter() {
               </li>
             ))}
             <li>
-              <a href={LOGIN_HREF} className="hover:text-foreground">
-                {NAV.login}
+              <a href={signedIn ? APP_HREF : LOGIN_HREF} className="hover:text-foreground">
+                {signedIn ? NAV.app : NAV.login}
               </a>
             </li>
             <li>

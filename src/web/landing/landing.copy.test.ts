@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as COPY from "./landing.copy";
-import { ALL_HREFS, LANDING_META, LOGIN_HREF, SECTION_IDS } from "./landing.copy";
+import { ALL_HREFS, APP_HREF, LANDING_META, LOGIN_HREF, SECTION_IDS } from "./landing.copy";
 
 const DIR = import.meta.dir;
 const COMPONENT_FILES = readdirSync(DIR).filter((f) => f.endsWith(".tsx"));
@@ -44,10 +44,17 @@ describe("landing copy", () => {
     expect(COPY.HERO.ctaHow).toBe("Lihat cara kerja");
   });
 
-  test("semua href ke /login atau anchor section yang ada", () => {
+  test("user yang sudah login diarahkan ke /app dengan label Buka aplikasi", () => {
+    expect(APP_HREF).toBe("/app");
+    expect(COPY.NAV.app).toBe("Buka aplikasi");
+    expect(COPY.HERO.ctaApp).toBe("Buka aplikasi");
+    expect(COPY.FINAL_CTA.ctaApp).toBe("Buka aplikasi");
+  });
+
+  test("semua href ke /login, /app, atau anchor section yang ada", () => {
     const ids = new Set<string>(Object.values(SECTION_IDS));
     for (const href of ALL_HREFS) {
-      if (href === LOGIN_HREF) continue;
+      if (href === LOGIN_HREF || href === APP_HREF) continue;
       expect(href.startsWith("#")).toBe(true);
       expect(ids.has(href.slice(1))).toBe(true);
     }

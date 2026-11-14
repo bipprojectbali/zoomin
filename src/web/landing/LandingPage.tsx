@@ -1,3 +1,4 @@
+import type { SessionUser } from "../../shared/api.types";
 import { SECTION_IDS } from "./landing.copy";
 import { LandingFaq, LandingFinalCta, LandingFooter } from "./LandingClosing";
 import { LandingHero } from "./LandingHero";
@@ -6,20 +7,23 @@ import { LandingFeatures, LandingSteps, LandingUseCases } from "./LandingSection
 
 export { LANDING_META } from "./landing.copy";
 
-/** Landing page publik di `/` (statis, tanpa panggilan API). */
-export default function LandingPage() {
+/** User yang sedang login (dari sesi router); null/undefined = tamu atau sesi belum diketahui. */
+export type LandingViewer = Pick<SessionUser, "name" | "image"> | null | undefined;
+
+/** Landing page publik di `/` (statis, tanpa panggilan API); `viewer` hanya mengganti CTA Masuk → Buka aplikasi. */
+export default function LandingPage({ viewer }: { viewer?: LandingViewer }) {
   return (
     <div id={SECTION_IDS.top} data-testid="landing" className="min-h-dvh bg-background">
-      <LandingNav />
+      <LandingNav viewer={viewer} />
       <main id={SECTION_IDS.main} tabIndex={-1}>
-        <LandingHero />
+        <LandingHero signedIn={!!viewer} />
         <LandingFeatures />
         <LandingSteps />
         <LandingUseCases />
         <LandingFaq />
-        <LandingFinalCta />
+        <LandingFinalCta signedIn={!!viewer} />
       </main>
-      <LandingFooter />
+      <LandingFooter signedIn={!!viewer} />
     </div>
   );
 }

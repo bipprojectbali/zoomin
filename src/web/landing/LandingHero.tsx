@@ -1,11 +1,11 @@
-import { ArrowDown, Check } from "lucide-react";
+import { ArrowDown, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { HERO, LOGIN_HREF, SECTION_IDS } from "./landing.copy";
+import { APP_HREF, HERO, LOGIN_HREF, SECTION_IDS } from "./landing.copy";
 import { GoogleMark } from "./GoogleMark";
 import { StageMockup } from "./StageMockup";
 
 /** Hero: headline komparasi multi-layar, CTA, dan mockup panggung. */
-export function LandingHero() {
+export function LandingHero({ signedIn = false }: { signedIn?: boolean }) {
   return (
     <section aria-labelledby="hero-title" className="relative overflow-hidden">
       {/* Latar grid tipis: mengingatkan pada panggung bertile, murni dekoratif. */}
@@ -24,12 +24,22 @@ export function LandingHero() {
           </h1>
           <p className="mt-5 max-w-xl text-base text-pretty text-muted-foreground sm:text-lg">{HERO.sub}</p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Button asChild size="lg" className="h-11">
-              <a href={LOGIN_HREF} data-testid="landing-cta-login">
-                <GoogleMark />
-                {HERO.ctaLogin}
-              </a>
-            </Button>
+            {/* min-w: lebar sama untuk kedua label supaya tidak ada layout shift saat sesi diketahui. */}
+            {signedIn ? (
+              <Button asChild size="lg" className="h-11 sm:min-w-56">
+                <a href={APP_HREF} data-testid="landing-cta-app">
+                  {HERO.ctaApp}
+                  <ArrowRight aria-hidden="true" />
+                </a>
+              </Button>
+            ) : (
+              <Button asChild size="lg" className="h-11 sm:min-w-56">
+                <a href={LOGIN_HREF} data-testid="landing-cta-login">
+                  <GoogleMark />
+                  {HERO.ctaLogin}
+                </a>
+              </Button>
+            )}
             <Button asChild size="lg" variant="outline" className="h-11">
               <a href={`#${SECTION_IDS.how}`}>
                 {HERO.ctaHow}
