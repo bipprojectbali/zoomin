@@ -71,4 +71,10 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ TLS_CERT_PATH: "c.pem" })).toThrow("TLS_KEY_PATH");
     expect(() => loadConfig({ TLS_KEY_PATH: "k.pem", TLS_CERT_PATH: " " })).toThrow("bersamaan");
   });
+
+  test("TRUST_PROXY default false; hanya 'true' yang mengaktifkan", () => {
+    expect(loadConfig({}).trustProxy).toBe(false);
+    expect(loadConfig({ TRUST_PROXY: "1" }).trustProxy).toBe(false);
+    expect(loadConfig({ TRUST_PROXY: "true" }).trustProxy).toBe(true);
+  });
 });

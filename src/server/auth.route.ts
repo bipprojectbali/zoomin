@@ -3,10 +3,15 @@ import { Elysia, t } from "elysia";
 import type { ApiError, UserResponse } from "../shared/api.types";
 import type { ApiDeps } from "./api.deps";
 import { inviteRoutes } from "./auth.invite.route";
+import { clientIp, createRateLimiter } from "./auth.ratelimit";
 import { clearSessionCookie, createSessionCookie, getSessionUser, SESSION_TTL_SECONDS } from "./auth.session";
 
 const HTTP_NO_CONTENT = 204;
 const HTTP_UNAUTHORIZED = 401;
+const HTTP_TOO_MANY_REQUESTS = 429;
+/** R17: maks percobaan login admin gagal per IP per jendela; login sukses mereset hitungan. */
+export const ADMIN_LOGIN_MAX_FAILURES = 5;
+export const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000;
 /** User id tetap admin global (K2). */
 export const ADMIN_USER_ID = "admin";
 const ADMIN_NAME = "Admin";
@@ -18,6 +23,7 @@ const sha256 = (value: string) => createHash("sha256").update(value).digest();
 export function authRoutes(deps: ApiDeps) {
   const { db, config } = deps;
   const secure = config.nodeEnv === "production";
+  const loginFailures = createRateLimiter(ADMIN_LOGIN_MAX_FAILURES, ADMIN_LOGIN_WINDOW_MS);
 
   return new Elysia({ name: "auth" })
     .get("/me", ({ request, status }) => {
@@ -26,11 +32,21 @@ export function authRoutes(deps: ApiDeps) {
     })
     .post(
       "/auth/admin-login",
-      ({ body, set, status }) => {
+      ({ body, request, set, status }) => {
+        const ip = clientIp(request, config.trustProxy);
+        const retryAfter = loginFailures.retryAfter(ip);
+        if (retryAfter > 0) {
+          set.headers["retry-after"] = String(retryAfter);
+          return status(HTTP_TOO_MANY_REQUESTS, {
+            error: `Terlalu banyak percobaan login gagal. Coba lagi dalam ${Math.ceil(retryAfter / 60)} menit.`,
+          } satisfies ApiError);
+        }
         // Hash dulu kedua sisi supaya panjang sama; timingSafeEqual tidak membocorkan panjang password.
         if (!timingSafeEqual(sha256(body.password), sha256(config.adminPassword))) {
+          loginFailures.hit(ip);
           return status(HTTP_UNAUTHORIZED, UNAUTHORIZED);
         }
+        loginFailures.reset(ip);
         const row = db
           .query<{ id: string; name: string }, [string, string, number]>(
             "INSERT INTO users (id, name, is_admin, created_at) VALUES (?, ?, 1, ?) " +

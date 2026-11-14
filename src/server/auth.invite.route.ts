@@ -10,12 +10,17 @@ import {
 } from "../shared/api.types";
 import type { ApiDeps } from "./api.deps";
 import { createInvite, INVITE_DEFAULT_TTL_HOURS, INVITE_MAX_TTL_HOURS, verifyInvite } from "./auth.invite";
+import { clientIp, createRateLimiter } from "./auth.ratelimit";
 import { createSessionCookie, getSessionUser, SESSION_TTL_SECONDS } from "./auth.session";
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_FORBIDDEN = 403;
 const HTTP_NOT_FOUND = 404;
+const HTTP_TOO_MANY_REQUESTS = 429;
+/** R17: maks POST /invites/accept per IP per jendela (cegah spam akun tamu). Semua percobaan dihitung. */
+export const INVITE_ACCEPT_MAX = 20;
+export const INVITE_ACCEPT_WINDOW_MS = 60 * 60 * 1000;
 const SECONDS_PER_HOUR = 3600;
 const GUEST_NAME_MAX = 60;
 const GUEST_ID_LENGTH = 20;
@@ -47,6 +52,7 @@ const UPSERT_MEMBER =
 /** Route undangan: buat (admin room / admin global) dan terima (tamu atau user bersesi). */
 export function inviteRoutes({ db, config }: ApiDeps) {
   const secure = config.nodeEnv === "production";
+  const accepts = createRateLimiter(INVITE_ACCEPT_MAX, INVITE_ACCEPT_WINDOW_MS);
   const roomExists = (roomId: string) => db.query("SELECT 1 FROM rooms WHERE id = ?").get(roomId) !== null;
   const memberRole = (roomId: string, userId: string) =>
     db
@@ -78,6 +84,13 @@ export function inviteRoutes({ db, config }: ApiDeps) {
     .post(
       "/invites/accept",
       ({ body, request, set, status }) => {
+        const ip = clientIp(request, config.trustProxy);
+        const retryAfter = accepts.retryAfter(ip);
+        if (retryAfter > 0) {
+          set.headers["retry-after"] = String(retryAfter);
+          return status(HTTP_TOO_MANY_REQUESTS, err(`Terlalu banyak permintaan. Coba lagi dalam ${Math.ceil(retryAfter / 60)} menit.`));
+        }
+        accepts.hit(ip);
         const invite = verifyInvite(body.invite, config.sessionSecret);
         if (!invite) return status(HTTP_BAD_REQUEST, err("invite invalid or expired"));
         const name = body.name.trim();

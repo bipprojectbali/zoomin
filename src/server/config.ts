@@ -16,6 +16,8 @@ export type Config = {
   publicAppUrl: string;
   /** Path sertifikat + kunci TLS (PEM). Diset → server HTTPS; kosong → HTTP. */
   tls?: { certPath: string; keyPath: string };
+  /** TRUST_PROXY=true → IP klien dari X-Forwarded-For (hanya bila app hanya bisa dicapai lewat reverse proxy). */
+  trustProxy: boolean;
 };
 
 export const SESSION_SECRET_MIN_LENGTH = 32;
@@ -69,5 +71,6 @@ export function loadConfig(env: Env = process.env): Config {
     adminPassword,
     publicAppUrl: env.PUBLIC_APP_URL?.trim() || DEFAULT_PUBLIC_APP_URL,
     tls: certPath && keyPath ? { certPath, keyPath } : undefined,
+    trustProxy: env.TRUST_PROXY?.trim() === "true",
   };
 }

@@ -3,6 +3,7 @@ import { RoomServiceClient } from "livekit-server-sdk";
 import index from "../web/index.html";
 import type { ApiDeps } from "./api.deps";
 import { createApi } from "./api";
+import { CLIENT_IP_HEADER } from "./auth.ratelimit";
 import { loadConfig } from "./config";
 import { openDb } from "./db";
 
@@ -19,7 +20,11 @@ export function createServer(deps: ApiDeps, port: number) {
     tls: loadTls(deps.config.tls),
     development: deps.config.nodeEnv !== "production",
     routes: {
-      "/api/*": (req) => api.fetch(req),
+      "/api/*": (req, server) => {
+        // Selalu timpa: header internal ini sumber IP peer untuk rate limit (auth.ratelimit.ts), klien tak boleh mengisinya.
+        req.headers.set(CLIENT_IP_HEADER, server.requestIP(req)?.address ?? "");
+        return api.fetch(req);
+      },
       "/*": index,
     },
   });
