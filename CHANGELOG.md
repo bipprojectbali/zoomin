@@ -4,6 +4,16 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikut
 
 ## [Unreleased]
 
+### Added
+
+- **Single binary**: `bun run build:binary` (host) atau `bun run build:binary:all` (Linux x64/arm64, macOS
+  arm64/x64, Windows x64) menghasilkan satu file `bin/zoomin-<os>-<arch>` berisi server, SPA, dan migrasi. Bisa
+  dijalankan di mesin tanpa Bun maupun file repo; default mode produksi.
+- Perintah `zoomin check` dan `zoomin migrate` untuk memvalidasi konfigurasi dan menerapkan migrasi tanpa start
+  server.
+- Saat server listen di semua interface, log start menampilkan `http://localhost:<port>/` (bukan `0.0.0.0`, yang
+  membuat kamera/share layar/clipboard gagal) plus alamat LAN untuk perangkat lain.
+
 ## [0.1.0] - 2026-11-14
 
 Rilis stabil pertama. Disiapkan 2026-11-14, **belum dideploy**; deploy menunggu perintah user (langkah di

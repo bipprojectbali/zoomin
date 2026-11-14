@@ -178,6 +178,33 @@ dengan `Cache-Control: public, max-age=31536000, immutable`, `index.html` dengan
 `encode`. Tanpa `dist/web/index.html`, `NODE_ENV=production` gagal start dengan pesan "jalankan `bun run build`".
 Build dilakukan di mesin dev agar server tidak perlu menjalankan bundler; `bun run dev` tetap memakai HTML import + HMR.
 
+## Opsi: deploy via single binary
+
+Alternatif tarball di atas: satu file executable, server tidak perlu Bun maupun `bun install`. Migrasi dan SPA ikut
+tertanam, jadi rollback = ganti symlink binary.
+
+```bash
+VER=0.1.0
+bun install --frozen-lockfile && bun scripts/build.binary.ts --target bun-linux-x64   # atau bun-linux-arm64
+# salin bin/zoomin-linux-x64 ke server, lalu di server:
+sudo install -D -m 0755 zoomin-linux-x64 /opt/zoomin/releases/$VER/zoomin
+sudo -u zoomin /opt/zoomin/releases/$VER/zoomin check --env-file /etc/zoomin/zoomin.env   # nilai secret tidak dicetak
+sudo ln -sfn /opt/zoomin/releases/$VER /opt/zoomin/current
+```
+
+Ubah unit `zoomin.service` (drop-in `sudo systemctl edit zoomin`):
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/opt/zoomin/current/zoomin serve
+```
+
+`Environment=`/`EnvironmentFile=` di unit tetap berlaku (binary otomatis `NODE_ENV=production`).
+`BUN_RUNTIME_TRANSPILER_CACHE_PATH` tidak lagi diperlukan dan `dist/web` tidak perlu ada di server. Migrasi tetap
+jalan otomatis saat start; `zoomin migrate --db /var/lib/zoomin/zoomin.sqlite` bisa dipakai untuk menjalankannya
+terpisah (sesudah backup).
+
 ## Backup SQLite
 
 `backup-sqlite.sh` memakai `sqlite3 .backup` (aman saat app jalan dengan WAL), `PRAGMA integrity_check` pada hasil,

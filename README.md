@@ -42,6 +42,33 @@ Buka http://localhost:3000 dan login sebagai admin dengan `ADMIN_PASSWORD` (defa
 Mode production menolak start bila `dist/web/index.html` belum ada. `bun run build` menghasilkan aset ber-hash yang
 diperkecil dan dipecah per halaman (`scripts/build.web.ts`); sourcemap dibuat terpisah dan tidak disajikan server.
 
+### Single binary
+
+`zoomin` bisa dibangun menjadi satu file executable (`bun build --compile`) yang membawa runtime Bun, server, SPA
+(prebuild `dist/web`, minified + Tailwind), dan migrasi SQL. Saat dijalankan tidak butuh Bun, `dist/`,
+`migrations/`, atau `node_modules`.
+
+```bash
+bun run build:binary       # host → bin/zoomin-<os>-<arch>
+bun run build:binary:all   # linux-x64, linux-arm64, darwin-arm64, darwin-x64, windows-x64
+bun scripts/build.binary.ts --target bun-linux-x64-musl --target bun-linux-arm64   # target tertentu
+```
+
+Pakai:
+
+```bash
+zoomin --help              # perintah dan opsi (--port, --host, --db, --env-file)
+zoomin env > .env          # contoh .env, lalu isi secret
+zoomin check               # validasi konfigurasi tanpa start; secret hanya ditampilkan "diset"/"kosong"
+zoomin migrate             # terapkan migrasi lalu keluar
+zoomin                     # jalankan server (= zoomin serve)
+```
+
+Binary berjalan sebagai `NODE_ENV=production` kecuali `NODE_ENV` diset eksplisit, jadi secret produksi wajib diisi
+(`zoomin check` memberi tahu yang kurang). `.env` di direktori kerja dimuat otomatis. `--env-file` hanya mengisi
+variabel yang belum diset di env proses; flag `--port/--host/--db` menimpa keduanya. Ukuran sekitar 90-110 MB per
+target (sebagian besar runtime Bun).
+
 ### HTTPS lokal (uji dari perangkat lain)
 
 Kamera, mic, dan share layar butuh secure context. `localhost` dikecualikan, tapi akses dari perangkat lain
