@@ -11,6 +11,8 @@ import { VisibilityToggle } from "@/room-settings/VisibilityToggle";
 import { createRoom } from "@/api.client";
 import { errorMessage } from "@/error.message";
 import { InvitePicker, type InvitePickerHandle } from "@/invite-picker/InvitePicker";
+import { PasswordField } from "@/room-password/PasswordField";
+import { PasswordOnceDialog } from "@/room-password/PasswordOnceDialog";
 import { validInvites, type InviteEntry } from "@/invite-picker/invite.parse";
 import { INVITE_PICKER_TEXT } from "@/invite-picker/invite-picker.labels";
 import { SAFE_ID_PATTERN, type RoomSummary, type RoomVisibility } from "../../shared/api.types";
@@ -46,6 +48,9 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
   const [expiryPreset, setExpiryPreset] = useState<ExpiryPreset>("none");
   const [expiryDate, setExpiryDate] = useState("");
   const [invites, setInvites] = useState<InviteEntry[]>([]);
+  const [password, setPassword] = useState("");
+  // W2: password hanya bisa dilihat sekali, tepat setelah room dibuat.
+  const [createdPassword, setCreatedPassword] = useState<string | null>(null);
   const picker = useRef<InvitePickerHandle>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,9 +72,12 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
     try {
       // Picker hanya tampil untuk Private; undangan yang tersisa saat beralih ke Public tidak dikirim.
       const members = visibility === "private" ? validInvites(picker.current?.flush() ?? invites) : [];
-      const room = await createRoom({ id, title: title.trim(), visibility, expiresAt, ...(members.length ? { members } : {}) });
+      const withPassword = visibility === "password" ? { password } : {};
+      const room = await createRoom({ id, title: title.trim(), visibility, expiresAt, ...withPassword, ...(members.length ? { members } : {}) });
       onCreated(room);
       toast.success(TEXT.created(room.title));
+      if (visibility === "password") setCreatedPassword(password);
+      setPassword("");
       setTitle("");
       setCustomId(null);
       setSuffix(slugifyRoomId(""));
@@ -125,6 +133,7 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
           </p>
         </div>
       )}
+      {visibility === "password" && <PasswordField id="create-room-password" value={password} onChange={setPassword} disabled={busy} />}
       <details className="group text-sm">
         <summary className="flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
           <ChevronRight className="size-4 transition-transform group-open:rotate-90" aria-hidden="true" />
@@ -180,6 +189,7 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
           {error}
         </p>
       )}
+      <PasswordOnceDialog password={createdPassword} onClose={() => setCreatedPassword(null)} />
     </form>
   );
 }

@@ -15,6 +15,7 @@ import type {
   CreateRoomBody,
   InvitePreview,
   GlobalRole,
+  JoinRoomResponse,
   LayoutResponse,
   ListRoomsQuery,
   MySession,
@@ -166,7 +167,7 @@ export const createInvite = (roomId: string, body: CreateInviteBody) =>
 export const previewInvite = (invite: string) =>
   request<InvitePreview>("GET", `/api/invites/preview?${new URLSearchParams({ invite })}`);
 
-/** POST /api/invites/accept (wajib sesi; 401 bila belum login). */
+/** POST /api/invites/accept (wajib sesi; 401 bila belum login). Room password + bukan anggota → `password` wajib (W6). */
 export const acceptInvite = (body: AcceptInviteBody) => request<AcceptInviteResponse>("POST", "/api/invites/accept", body);
 
 /** GET /api/rooms?limit=&cursor=. */
@@ -176,13 +177,13 @@ export const listRooms = (query: ListRoomsQuery = {}) => request<Page<RoomSummar
 export const searchUsers = (q: string, limit?: number) =>
   request<UserSearchResponse>("GET", `/api/users/search${queryString({ q, limit })}`);
 
-/** POST /api/rooms (admin+; user → 403 insufficient_role); `members` opsional dibuat dalam transaksi yang sama. */
+/** POST /api/rooms (admin+; user → 403 insufficient_role); `members` opsional; `visibility:"password"` wajib `password`. */
 export const createRoom = (body: CreateRoomBody) => request<RoomSummary>("POST", "/api/rooms", body);
 
 /** GET /api/rooms/:roomId: detail satu room (member / admin global). */
 export const getRoom = (roomId: string) => request<RoomSummary>("GET", roomPath(roomId));
 
-/** PATCH /api/rooms/:roomId (pengelola): judul, tipe, aktif, kadaluarsa. */
+/** PATCH /api/rooms/:roomId (pengelola): judul, tipe (+ `password` untuk set/ganti), aktif, kadaluarsa. */
 export const updateRoom = (roomId: string, body: UpdateRoomBody) => request<RoomSummary>("PATCH", roomPath(roomId), body);
 
 /** DELETE /api/rooms/:roomId (pengelola). */
@@ -208,7 +209,11 @@ export const removeRoomMember = (roomId: string, userId: string) =>
 export const cancelRoomInvitation = (roomId: string, email: string) =>
   request<void>("DELETE", `${roomPath(roomId)}/invitations/${encodeURIComponent(email)}`);
 
-/** POST /api/rooms/:roomId/token: role & identity ditentukan server dari sesi. */
+/** POST /api/rooms/:roomId/join (W5): masuk room ber-password → anggota `participant`; 403 password_invalid, 429 rate_limited. */
+export const joinRoomWithPassword = (roomId: string, password: string) =>
+  request<JoinRoomResponse>("POST", `${roomPath(roomId)}/join`, { password });
+
+/** POST /api/rooms/:roomId/token (403 `password_required` untuk non-anggota room password): role & identity ditentukan server dari sesi. */
 export const getRoomToken = (roomId: string) => request<TokenResponse>("POST", `${roomPath(roomId)}/token`);
 
 /** GET /api/rooms/:roomId/layout. */

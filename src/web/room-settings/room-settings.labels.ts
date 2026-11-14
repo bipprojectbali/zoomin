@@ -72,6 +72,7 @@ export const ROOM_SETTINGS_TEXT = {
 /** Label + deskripsi singkat tiap tipe room. */
 export const VISIBILITY_TEXT: Record<RoomVisibility, { label: string; hint: string }> = {
   public: { label: "Public", hint: "Siapa pun yang punya link undangan bisa masuk" },
+  password: { label: "Password", hint: "Siapa pun yang punya link atau ID room + password bisa masuk" },
   private: { label: "Private", hint: "Hanya orang yang Anda undang lewat email" },
 };
 

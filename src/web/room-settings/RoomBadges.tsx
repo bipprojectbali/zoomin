@@ -1,10 +1,10 @@
-import { Lock } from "lucide-react";
+import { Lock, LockKeyhole } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { RoomSummary } from "../../shared/api.types";
 import { statusBadgeStatus } from "./room.expiry";
 import { STATUS_TEXT, VISIBILITY_TEXT } from "./room-settings.labels";
 
-/** Badge Private (gembok) dan status Nonaktif/Kadaluarsa; room public aktif tidak diberi badge. */
+/** Badge Private (gembok), Password (kunci-bulat), dan status Nonaktif/Kadaluarsa; room public aktif tidak diberi badge. */
 export function RoomBadges({ room }: { room: Pick<RoomSummary, "visibility" | "status"> }) {
   const status = statusBadgeStatus(room.status);
   return (
@@ -13,6 +13,12 @@ export function RoomBadges({ room }: { room: Pick<RoomSummary, "visibility" | "s
         <Badge variant="outline" className="gap-1" data-testid="room-badge-private">
           <Lock className="size-3" aria-hidden="true" />
           {VISIBILITY_TEXT.private.label}
+        </Badge>
+      )}
+      {room.visibility === "password" && (
+        <Badge variant="outline" className="gap-1" data-testid="room-badge-password">
+          <LockKeyhole className="size-3" aria-hidden="true" />
+          {VISIBILITY_TEXT.password.label}
         </Badge>
       )}
       {status && (

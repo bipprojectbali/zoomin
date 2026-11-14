@@ -89,7 +89,7 @@ export function InvitePicker({ value, onChange, inputId, describedBy, disabled, 
       if (option) pick(option);
       else commitText();
     } else if (e.key === "Escape" && expanded) {
-      e.preventDefault(); // jangan tutup dialog induk
+      e.preventDefault(); // tutup saran saja; dialog induk menahan Escape ini lewat onEscapeKeyDown (RoomSettingsDialog)
       setOpen(false);
     } else if (e.key === "Backspace" && !text && value.length) {
       onChange(value.slice(0, -1));

@@ -60,6 +60,14 @@ describe("joinErrorFor", () => {
   });
 });
 
+describe("joinErrorFor password_required", () => {
+  test("403 password_required → kind non-terminal yang memicu PasswordGate (W6)", () => {
+    const err = new ApiRequestError(403, { error: "password required", code: "password_required" }, "POST /x");
+    expect(joinErrorFor(err)).toEqual({ kind: "password_required", message: errorMessage(err) });
+    expect(canRetry(joinErrorFor(err))).toBe(true);
+  });
+});
+
 describe("canRetry", () => {
   test("room_not_found/forbidden/unauthorized tidak bisa retry (UX-24)", () => {
     expect(canRetry(joinErrorFor(apiError(404)))).toBe(false);

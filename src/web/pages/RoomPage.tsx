@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getRoom } from "@/api.client";
+import { ApiRequestError, getRoom, getRoomToken, joinRoomWithPassword } from "@/api.client";
 import { takeFirstJoinChoices } from "@/prejoin/media.preferences";
 import { PreJoin } from "@/prejoin/PreJoin";
+import { PasswordGate } from "@/room-password/PasswordGate";
 import type { PreJoinChoices } from "@/prejoin/prejoin.types";
 import { ConnectionBanner } from "@/room/ConnectionBanner";
 import { ControlBar } from "@/room/ControlBar";
@@ -21,6 +22,21 @@ import { hasRole, RequireSession, useSession } from "@/session.context";
 import { useLayoutSync } from "@/stage/layout.sync";
 import { Stage } from "@/stage/Stage";
 import type { RoomRole, RoomSummary } from "../../shared/api.types";
+
+/**
+ * GET /rooms/:id menjawab 403 `forbidden` untuk semua non-anggota; hanya endpoint token yang membedakan room ber-password
+ * (W6, 403 `password_required`). Jadi 403 dari info room diperiksa sekali lewat token. Token yang (tak terduga) berhasil dibuang.
+ */
+async function needsPassword(roomId: string, err: unknown): Promise<boolean> {
+  if (err instanceof ApiRequestError && err.code === "password_required") return true;
+  if (!(err instanceof ApiRequestError && err.status === 403 && err.code === "forbidden")) return false;
+  try {
+    await getRoomToken(roomId);
+    return false;
+  } catch (probe) {
+    return probe instanceof ApiRequestError && probe.code === "password_required";
+  }
+}
 
 /** Halaman /rooms/:roomId (terlindung sesi). */
 export function RoomPage() {
@@ -43,15 +59,20 @@ function RoomView({ roomId }: { roomId: string }) {
   const [choices, setChoices] = useState<PreJoinChoices | null>(() => takeFirstJoinChoices(roomId));
   const conn = useRoomConnection(roomId, choices);
   const [summaryAttempt, setSummaryAttempt] = useState(0);
+  // Non-anggota room password (W4/W6): form password sebelum info room / token bisa diambil.
+  const [gate, setGate] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setSummaryError(null);
     getRoom(roomId)
       .then((s) => !cancelled && setSummary(s))
-      .catch((err: unknown) => {
+      .catch(async (err: unknown) => {
         const error = logJoinFailure(`room ${roomId}: muat info room gagal`, err);
-        if (!cancelled) setSummaryError(error);
+        const locked = await needsPassword(roomId, err);
+        if (cancelled) return;
+        if (locked) setGate(true);
+        else setSummaryError(error);
       });
     return () => {
       cancelled = true;
@@ -64,8 +85,21 @@ function RoomView({ roomId }: { roomId: string }) {
   const toLobby = () => navigate("/app");
   const { status, room } = conn;
 
+  async function unlock(password: string) {
+    await joinRoomWithPassword(roomId, password);
+    setGate(false);
+    setSummaryAttempt((n) => n + 1);
+    if (conn.error?.kind === "password_required") conn.retry();
+  }
+
   let body;
-  if (status === "left" || status === "disconnected" || status === "error" || (summaryError && !choices)) {
+  if (gate || conn.error?.kind === "password_required") {
+    body = (
+      <div className="flex flex-1 p-4">
+        <PasswordGate roomTitle={title} onSubmit={unlock} onLobby={toLobby} />
+      </div>
+    );
+  } else if (status === "left" || status === "disconnected" || status === "error" || (summaryError && !choices)) {
     const kind = status === "left" || status === "disconnected" ? status : "error";
     body = <RoomStatusScreen kind={kind} error={conn.error ?? summaryError} onRejoin={summaryError && !choices ? () => setSummaryAttempt((n) => n + 1) : conn.retry} onLobby={toLobby} />;
   } else if (room && (status === "connected" || status === "reconnecting")) {

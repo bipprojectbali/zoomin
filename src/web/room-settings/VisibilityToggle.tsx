@@ -1,13 +1,13 @@
-import { Globe, Lock } from "lucide-react";
+import { Globe, Lock, LockKeyhole } from "lucide-react";
 import { useId } from "react";
 import { cn } from "@/lib/utils";
 import type { RoomVisibility } from "../../shared/api.types";
 import { ROOM_SETTINGS_TEXT as TEXT, VISIBILITY_TEXT } from "./room-settings.labels";
 
-const OPTIONS: readonly RoomVisibility[] = ["public", "private"];
-const ICON = { public: Globe, private: Lock } as const;
+const OPTIONS: readonly RoomVisibility[] = ["public", "password", "private"];
+const ICON = { public: Globe, password: LockKeyhole, private: Lock } as const;
 
-/** Segmented control Public/Private (radio native, bisa keyboard) + deskripsi singkat opsi terpilih. */
+/** Segmented control Public/Password/Private (radio native, bisa keyboard) + deskripsi singkat opsi terpilih. */
 export function VisibilityToggle({ value, onChange, disabled }: { value: RoomVisibility; onChange: (v: RoomVisibility) => void; disabled?: boolean }) {
   const id = useId();
   return (
@@ -27,7 +27,7 @@ export function VisibilityToggle({ value, onChange, disabled }: { value: RoomVis
               data-testid="visibility-option"
               data-value={v}
               className={cn(
-                "flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-4 py-1 text-sm font-medium text-muted-foreground transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring sm:flex-none",
+                "flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring sm:flex-none",
                 value === v && "bg-background text-foreground shadow-xs dark:bg-white/15",
                 disabled && "cursor-not-allowed opacity-60",
               )}

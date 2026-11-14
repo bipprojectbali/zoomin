@@ -16,6 +16,8 @@ export type ConnectionErrorKind =
   | "forbidden"
   | "unauthorized"
   | "duplicate_session"
+  /** Room ber-password & bukan anggota (W6): bukan akhir alur, RoomPage menampilkan PasswordGate. */
+  | "password_required"
   | "network"
   | "server"
   | "unknown";
@@ -67,6 +69,7 @@ export function canRetry(error: ConnectionError | null): boolean {
 /** Error saat join (token API / connect LiveKit) → kind + pesan. */
 export function joinErrorFor(err: unknown): ConnectionError {
   if (err instanceof ApiRequestError) {
+    if (err.code === "password_required") return { kind: "password_required", message: errorMessage(err) };
     if (ROOM_DENIED_CODES.includes(err.code)) return { kind: "forbidden", message: errorMessage(err) };
     const known = API_ERROR[err.status];
     if (known) return known;
@@ -79,7 +82,7 @@ export function joinErrorFor(err: unknown): ConnectionError {
   return { kind: "unknown", message: errorMessage(err) };
 }
 
-const EXPECTED_JOIN_ERRORS: readonly ConnectionErrorKind[] = ["unauthorized", "forbidden", "room_not_found"];
+const EXPECTED_JOIN_ERRORS: readonly ConnectionErrorKind[] = ["unauthorized", "forbidden", "room_not_found", "password_required"];
 
 /** Error join + log (QA-10): 4xx wajar (sesi habis, bukan anggota, room hilang) → warn tanpa stack; lainnya error lengkap. */
 export function logJoinFailure(context: string, err: unknown): ConnectionError {

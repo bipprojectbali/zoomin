@@ -3,6 +3,7 @@ import { listRooms } from "@/api.client";
 import { AppShell } from "@/app/AppShell";
 import { errorMessage } from "@/error.message";
 import { CreateRoomForm } from "@/lobby/CreateRoomForm";
+import { JoinByIdForm } from "@/lobby/JoinByIdForm";
 import { RoomList } from "@/lobby/RoomList";
 import { hasRole, RequireSession, useSession } from "@/session.context";
 import type { RoomSummary } from "../../shared/api.types";
@@ -61,6 +62,8 @@ function Lobby() {
       <p className="-mt-4 text-sm text-muted-foreground">{canCreate ? TEXT.subtitleAdmin : TEXT.subtitleUser}</p>
 
       {canCreate && <CreateRoomForm onCreated={onCreated} />}
+
+      <JoinByIdForm />
 
       {error && (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">

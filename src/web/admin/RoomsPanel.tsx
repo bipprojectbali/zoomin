@@ -1,4 +1,4 @@
-import { ExternalLink, Globe, Lock, MoreHorizontal, Settings, Trash2, Video } from "lucide-react";
+import { ExternalLink, Globe, Lock, LockKeyhole, MoreHorizontal, Settings, Trash2, Video } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -159,7 +159,7 @@ function RoomIdentity({ room }: { room: AdminRoomSummary }) {
 }
 
 function RoomType({ room }: { room: AdminRoomSummary }) {
-  const Icon = room.visibility === "private" ? Lock : Globe;
+  const Icon = { public: Globe, password: LockKeyhole, private: Lock }[room.visibility];
   return (
     <span className="flex items-center gap-1 text-sm" data-testid="room-admin-type" data-value={room.visibility}>
       <Icon className="size-3.5 text-muted-foreground" aria-hidden="true" />

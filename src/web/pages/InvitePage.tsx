@@ -10,6 +10,7 @@ import { acceptInvite, ApiRequestError, previewInvite } from "@/api.client";
 import { errorMessage } from "@/error.message";
 import { saveMediaPreferences, stashFirstJoinChoices } from "@/prejoin/media.preferences";
 import { PreJoin } from "@/prejoin/PreJoin";
+import { PasswordGate } from "@/room-password/PasswordGate";
 import { inviteSubtitle, roleKeptNote } from "@/prejoin/prejoin.labels";
 import type { PreJoinChoices } from "@/prejoin/prejoin.types";
 import { GoogleMark } from "@/landing/GoogleMark";
@@ -52,6 +53,8 @@ export function InvitePage() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Room password (W6): password yang sudah diterima server di gate; dikirim lagi saat accept final.
+  const [password, setPassword] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setState({ kind: "loading" });
@@ -75,7 +78,7 @@ export function InvitePage() {
     setBusy(true);
     setError(null);
     try {
-      const { roomId } = await acceptInvite({ invite });
+      const { roomId } = await acceptInvite({ invite, ...(password !== null ? { password } : {}) });
       saveMediaPreferences(choices);
       stashFirstJoinChoices(roomId, choices);
       navigate(`/rooms/${encodeURIComponent(roomId)}`, { replace: true });
@@ -185,6 +188,23 @@ export function InvitePage() {
             {busy ? TEXT.redirecting : TEXT.signIn}
           </Button>
         </section>
+      </main>
+    );
+  }
+
+  if (preview.passwordRequired && password === null) {
+    return (
+      <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/40 p-4">
+        <AppBrand />
+        <PasswordGate
+          roomTitle={preview.roomTitle}
+          onLobby={() => navigate("/app")}
+          // Accept dengan password = validasi + jadi anggota (W3); error (password_invalid/rate_limited) tampil di gate.
+          onSubmit={async (pw) => {
+            await acceptInvite({ invite, password: pw });
+            setPassword(pw);
+          }}
+        />
       </main>
     );
   }

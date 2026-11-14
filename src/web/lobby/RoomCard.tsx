@@ -37,7 +37,7 @@ export function RoomCard({ room, onChanged, onDeleted }: Props) {
   const [deleting, setDeleting] = useState(false);
   const panelId = `invite-panel-${room.id}`;
   const blocked = isRoomBlocked(room);
-  const linkInvites = room.canManage && room.visibility === "public";
+  const linkInvites = room.canManage && room.visibility !== "private";
 
   function invite() {
     if (linkInvites) setInviteOpen((o) => !o);
