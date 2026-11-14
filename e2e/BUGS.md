@@ -3,7 +3,10 @@
 Ditemukan suite Playwright (`bun run test:e2e`). Test repro ditandai `test.fail()` + `// BUG(e2e): E2E-xx`;
 begitu bug diperbaiki test itu jadi "unexpectedly passed" → hapus `test.fail()`.
 
-## E2E-01 — Dialog yang dibuka ulang cepat tertutup overlay-nya sendiri (tidak bisa diklik)
+## E2E-01 — Dialog yang dibuka ulang cepat tertutup overlay-nya sendiri (tidak bisa diklik) ✅ diperbaiki
+
+- **Status:** ✅ diperbaiki di commit `28159c6`: overlay `z-40` (konten tetap di atasnya) + durasi animasi overlay
+  dan konten disamakan. Regresi dijaga `e2e/dialog.spec.ts` (tanpa `test.fail()`).
 
 - **Test:** `e2e/dialog.spec.ts` › "dialog konfirmasi Keluar dibuka ulang cepat tetap bisa diklik"
 - **Dampak:** sedang. Konfirmasi Keluar (room) dan konfirmasi Logout tamu (lobby) tampil redup dan semua tombolnya

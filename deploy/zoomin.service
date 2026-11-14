@@ -11,11 +11,17 @@ Group=zoomin
 # Symlink ke rilis aktif; rollback = arahkan ulang symlink lalu restart (README §Rollback).
 WorkingDirectory=/opt/zoomin/current
 Environment=NODE_ENV=production
+# HOST + TRUST_PROXY berpasangan: TRUST_PROXY=true mempercayai X-Forwarded-For (bisa dipalsukan klien), jadi port app
+# tidak boleh terjangkau langsung; listen hanya di loopback, satu-satunya jalan masuk lewat Caddy.
+# Diset di unit (bukan hanya env file) agar invarian keamanan ikut ter-review di repo. EnvironmentFile MENIMPA
+# Environment=, jadi hapus baris NODE_ENV/HOST/TRUST_PROXY/DB_PATH dari /etc/zoomin/zoomin.env (README).
+Environment=HOST=127.0.0.1
+Environment=TRUST_PROXY=true
 # DB di luar folder rilis agar tidak ikut terganti saat deploy. StateDirectory membuat /var/lib/zoomin (0750).
 Environment=DB_PATH=/var/lib/zoomin/zoomin.sqlite
 # Matikan cache transpiler (default menulis ke cache dir platform, read-only di bawah ProtectSystem=strict).
 Environment=BUN_RUNTIME_TRANSPILER_CACHE_PATH=0
-# Secret (LIVEKIT_API_KEY/SECRET, SESSION_SECRET, ADMIN_PASSWORD) + PORT, URL, TRUST_PROXY=true. Mode 640 root:zoomin.
+# Secret (LIVEKIT_API_KEY/SECRET, SESSION_SECRET, ADMIN_PASSWORD) + PORT, URL. Mode 640 root:zoomin.
 EnvironmentFile=/etc/zoomin/zoomin.env
 # Butuh dist/web (bun run build, ikut di tarball rilis); tanpanya start gagal dan systemd mengulang (Restart=on-failure).
 ExecStart=/usr/local/bin/bun src/server/main.ts

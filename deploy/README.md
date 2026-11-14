@@ -27,8 +27,8 @@ di-parse oleh binary 1.13.11, log `turn.externalTLS: true, turn.proxyProtocol: t
     3 subdomain tanpa ubah desain). TURN/TLS biasanya tidak diperlukan di tailnet; bila dimatikan
     (`turn.enabled: false`), hapus blok `servers` + site TURN di Caddyfile dan pakai Caddy standar (tanpa l4).
 - **K3 (domain)**: isi `APP_DOMAIN`, `LK_DOMAIN`, `TURN_DOMAIN`. TURN wajib domain terpisah (SNI).
-- **Versi rilis**: `package.json` belum punya `version` dan `CHANGELOG.md` belum punya entry versi; keduanya wajib
-  sebelum deploy (aturan global Rule 5).
+- **Versi rilis**: `package.json` `version` = `0.1.0` dan `CHANGELOG.md` punya entri `[0.1.0]`. Rilis berikutnya
+  wajib menaikkan keduanya sebelum deploy (aturan global Rule 5).
 
 ## Kenapa Caddy butuh plugin layer4
 
@@ -97,19 +97,22 @@ unset KEY SECRET
 sudo nano /etc/zoomin/zoomin.env
 ```
 
-Isi `/etc/zoomin/zoomin.env` (selain di atas):
+Isi `/etc/zoomin/zoomin.env` (selain di atas). `EnvironmentFile` menimpa `Environment=` di unit, jadi var yang
+"diset unit" **harus dihapus** dari env file (salinan `.env.example` berisi `NODE_ENV=development`, `HOST=0.0.0.0`,
+`TRUST_PROXY=false`):
 
 | Var | Nilai produksi |
 |---|---|
-| `NODE_ENV` | `production` (juga diset unit) |
+| `NODE_ENV` | diset unit: `production` (hapus baris dari env file) |
 | `PORT` | `3000` |
+| `HOST` | diset unit: `127.0.0.1` (hapus baris dari env file) |
 | `DB_PATH` | diset unit: `/var/lib/zoomin/zoomin.sqlite` (hapus baris dari env file agar tidak bentrok) |
 | `LIVEKIT_URL` | `ws://127.0.0.1:7880` (server-ke-server, tanpa lewat Caddy) |
 | `PUBLIC_LIVEKIT_URL` | `wss://<LK_DOMAIN>` |
 | `PUBLIC_APP_URL` | `https://<APP_DOMAIN>` |
 | `SESSION_SECRET` | `openssl rand -base64 48` (≥ 32 char) |
 | `ADMIN_PASSWORD` | password kuat |
-| `TRUST_PROXY` | `true` (wajib di belakang Caddy; tanpa ini semua user berbagi IP proxy dan rate limit login mengunci semua orang) |
+| `TRUST_PROXY` | diset unit: `true` (hapus baris dari env file; wajib di belakang Caddy, tanpa ini semua user berbagi IP proxy dan rate limit login mengunci semua orang) |
 | `TLS_CERT_PATH`/`TLS_KEY_PATH` | kosong (TLS di Caddy) |
 
 ### LiveKit config + unit
@@ -144,9 +147,10 @@ sudo ufw allow 7881/tcp && sudo ufw allow 3478/udp && sudo ufw allow 50000:60000
 sudo ufw enable && sudo ufw status verbose
 ```
 
-App `Bun.serve` saat ini listen di semua interface (belum ada opsi hostname), dan LiveKit 7880/5349 juga. Karena
-`TRUST_PROXY=true` mempercayai `X-Forwarded-For`, firewall di atas **satu-satunya** penghalang akses langsung ke
-3000. Cek dari luar: `curl -m 5 http://<ip-server>:3000/api/health` harus timeout.
+App listen di `HOST` (default config `0.0.0.0`; unit produksi `127.0.0.1`), jadi 3000 hanya terjangkau dari
+loopback/Caddy. Karena `TRUST_PROXY=true` mempercayai `X-Forwarded-For`, jangan ubah `HOST` ke interface publik.
+LiveKit 7880/5349 tetap listen di semua interface; untuk itu firewall di atas penghalangnya. Cek dari luar:
+`curl -m 5 http://<ip-server>:3000/api/health` harus gagal (connection refused/timeout).
 
 ## Deploy rilis app
 
@@ -162,7 +166,7 @@ cd /opt/zoomin/releases/$VER && sudo bun install --production --frozen-lockfile
 [ -f /var/lib/zoomin/zoomin.sqlite ] && sudo -u zoomin /usr/local/bin/zoomin-backup-sqlite   # backup pra-deploy; deploy pertama belum ada DB
 sudo ln -sfn /opt/zoomin/releases/$VER /opt/zoomin/current
 sudo systemctl enable zoomin && sudo systemctl restart zoomin
-journalctl -u zoomin -n 20   # "zoomin: http://localhost:3000/ (... env production)"
+journalctl -u zoomin -n 20   # "zoomin: http://127.0.0.1:3000/ (... env production)"
 sudo systemctl reload caddy
 ```
 
@@ -207,7 +211,7 @@ Salin `/var/backups/zoomin` ke mesin lain secara berkala; backup di disk yang sa
    UDP selain DNS) dan blokir TCP 7881. Join room di Chrome, buka `chrome://webrtc-internals`: candidate pair
    terpilih harus `relay` dengan `relayProtocol: tls`, url `turns:<TURN_DOMAIN>:443`. Di server,
    `journalctl -u livekit | grep -i turn` menampilkan alokasi dengan IP klien asli (bukan 127.0.0.1).
-5. **Port tertutup:** dari luar, `curl -m 5 http://<ip>:3000` dan `:7880` harus timeout.
+5. **Port tertutup:** dari luar, `curl -m 5 http://<ip>:3000` dan `:7880` harus gagal (refused/timeout).
 6. **Header keamanan + CSP:** buka app di browser, konsol DevTools tidak boleh berisi pelanggaran CSP saat login,
    join, publish kamera, dan tambah layar. Bila ada, longgarkan direktif terkait di `Caddyfile` (blok
    `security_headers`) lalu `systemctl reload caddy`.
