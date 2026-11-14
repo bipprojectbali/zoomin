@@ -21,7 +21,7 @@ export function NotFoundPage() {
         <p className="text-muted-foreground">{TEXT.body}</p>
       </div>
       <Button asChild>
-        <Link to="/">
+        <Link to="/app">
           <ArrowLeft />
           {TEXT.back}
         </Link>

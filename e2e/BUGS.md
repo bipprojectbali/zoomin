@@ -32,15 +32,16 @@ begitu bug diperbaiki test itu jadi "unexpectedly passed" → hapus `test.fail()
 - **Bukti:** jalankan test tanpa `test.fail()` → pesan berisi daftar jeda yang macet (mis. `[160, 165, …, 195]`),
   trace & screenshot di `e2e/.artifacts/results/dialog-dialog-konfirmasi-*/` (folder artefak di-reset tiap run).
 
-## E2E-02 — Tombol "Ke lobby" di halaman 404 membuka landing `/`, bukan lobby `/app`
+## E2E-02 — Tombol "Ke lobby" di halaman 404 membuka landing `/`, bukan lobby `/app` ✅ diperbaiki
 
 - **Test:** `e2e/auth.spec.ts` › "404: route tak dikenal menampilkan halaman tidak ditemukan dengan jalan pulang"
-  (`test.fail()`).
+  (kini test normal; `test.fail()` dihapus).
 - **Dampak:** rendah. Sejak lobby pindah ke `/app` (A10), label "Ke lobby" (dan teks "kembali ke lobby") tidak
   sesuai tujuan: user login dibawa ke landing promosi dan harus klik CTA lagi.
 - **Langkah reproduksi:** buka `/tidak/ada` → klik "Ke lobby".
 - **Ekspektasi:** ke `/app` (tanpa sesi → `/login`).
-- **Aktual:** ke `/` (landing).
+- **Aktual (sebelum fix):** ke `/` (landing).
+- **Fix:** `src/web/pages/NotFoundPage.tsx` — `<Link to="/app">`.
 - **Dugaan akar:** `src/web/pages/NotFoundPage.tsx` masih `<Link to="/">` dari sebelum rute A10. Arah perbaikan:
   `to="/app"` (atau ganti label jadi "Ke beranda" bila landing memang tujuannya).
 

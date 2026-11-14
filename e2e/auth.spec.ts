@@ -77,11 +77,9 @@ test("user biasa buka /admin & /dev → halaman tidak punya akses, jalan pulang 
 });
 
 test("404: route tak dikenal menampilkan halaman tidak ditemukan dengan jalan pulang", async ({ page }) => {
-  // BUG(e2e): E2E-02 — lihat e2e/BUGS.md; hapus test.fail() setelah NotFoundPage diperbaiki.
-  test.fail();
   await page.goto("/tidak/ada/halaman-ini");
   await expect(page.getByRole("heading", { name: "Halaman tidak ditemukan" })).toBeVisible();
   await page.getByRole("link", { name: "Ke lobby" }).click();
-  // "Ke lobby" = /app; tanpa sesi → /login. Aktual: link ke "/" (landing).
+  // "Ke lobby" = /app; tanpa sesi → /login.
   await expect(page).toHaveURL(/\/login$/);
 });
