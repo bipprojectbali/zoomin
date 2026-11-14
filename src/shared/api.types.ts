@@ -16,7 +16,10 @@
 // GET  /api/rooms?limit=&cursor=                -> Page<RoomSummary> (limit default 20, max 100)
 // POST /api/rooms             CreateRoomBody (admin+) -> RoomSummary (creator jadi host) | 403 insufficient_role
 // GET  /api/rooms/:roomId                       -> RoomSummary (member / admin+)         | 401 | 403 | 404 room_not_found
-// POST /api/rooms/:roomId/token                 -> TokenResponse
+// PATCH  /api/rooms/:roomId UpdateRoomBody (pengelola) -> RoomSummary            | 403 forbidden | 404
+// DELETE /api/rooms/:roomId (pengelola)         -> 204
+// /api/rooms/:roomId/members*                   -> anggota & undangan pending (RND/plan/06-room-access.md)
+// POST /api/rooms/:roomId/token                 -> TokenResponse                        | 403 room_inactive | room_expired
 // GET  /api/rooms/:roomId/layout                -> LayoutResponse
 // PUT  /api/rooms/:roomId/layout PutLayoutBody  -> PutLayoutResponse | 409 LayoutConflictError
 // Admin (admin+) & dev (super_admin): lihat tabel endpoint di RND/plan/05-auth-roles.md dan fungsi di src/web/api.client.ts.
@@ -62,6 +65,14 @@ export type AuditAction =
   | "user.sessions.revoke"
   | "room.create"
   | "room.delete"
+  | "room.update"
+  | "room.visibility"
+  | "room.activate"
+  | "room.deactivate"
+  | "room.expiry"
+  | "room.member.add"
+  | "room.member.role"
+  | "room.member.remove"
   | "setting.update";
 
 /** Satu baris audit log. */
@@ -105,8 +116,8 @@ export type MySession = { id: string; current: boolean; userAgent: string | null
 /** Body POST /api/test/login (test-only, A12). */
 export type TestLoginBody = { email: string; name?: string };
 
-/** Ringkasan room di panel admin. */
-export type AdminRoomSummary = RoomSummary & { members: number; active: boolean; participants: number };
+/** Ringkasan room di panel admin; `live` = sedang ada di LiveKit (R11, beda dengan `status`). */
+export type AdminRoomSummary = RoomSummary & { members: number; live: boolean; participants: number };
 
 /** Kode error mesin-terbaca; web menerjemahkan `code` ke pesan user, `error` hanya teks teknis. */
 export type ApiErrorCode =
@@ -123,10 +134,24 @@ export type ApiErrorCode =
   | "email_domain_not_allowed"
   | "cannot_modify_self"
   | "insufficient_role"
-  | "user_not_found";
+  | "user_not_found"
+  | "room_inactive"
+  | "room_expired"
+  | "room_private"
+  | "last_host"
+  | "member_not_found";
 
 /** Bentuk body error semua endpoint; `path` = field yang gagal validasi. */
 export type ApiError = { error: string; code?: ApiErrorCode; path?: string };
+
+/** Mode akses room (R1): public = link undangan berlaku; private = hanya anggota. */
+export type RoomVisibility = "public" | "private";
+
+/** Status turunan server (R5): inactive bila dinonaktifkan, else expired bila lewat expiresAt, else active. */
+export type RoomStatus = "active" | "inactive" | "expired";
+
+/** Batas atas kadaluarsa room dari sekarang (R7). */
+export const ROOM_EXPIRY_MAX_DAYS = 365;
 
 /** Satu baris daftar room di lobby. */
 export type RoomSummary = {
@@ -135,7 +160,27 @@ export type RoomSummary = {
   /** null = admin global yang bukan member room ini. */
   role: RoomRole | null;
   createdAt: number;
+  visibility: RoomVisibility;
+  status: RoomStatus;
+  /** Epoch ms; null = tanpa batas. */
+  expiresAt: number | null;
+  /** true bila pemanggil pengelola room (host room atau admin+, R3). */
+  canManage: boolean;
 };
+
+/** Body PATCH /api/rooms/:roomId (pengelola). expiresAt null = tanpa batas. */
+export type UpdateRoomBody = { title?: string; visibility?: RoomVisibility; enabled?: boolean; expiresAt?: number | null };
+
+/** Satu baris daftar anggota room: member (sudah punya akun) atau pending (undangan email belum diklaim). */
+export type RoomMemberItem =
+  | { kind: "member"; userId: string; name: string; email: string; image: string | null; role: RoomRole }
+  | { kind: "pending"; email: string; role: RoomRole; invitedAt: number };
+
+/** Body POST /api/rooms/:roomId/members. */
+export type AddRoomMemberBody = { email: string; role: RoomRole };
+
+/** Body PATCH /api/rooms/:roomId/members/:userId. */
+export type UpdateRoomMemberBody = { role: RoomRole };
 
 /** Halaman hasil list ber-cursor. */
 export type Page<T> = { items: T[]; nextCursor: string | null };
@@ -172,7 +217,7 @@ export type InvitePreview = {
 export type ListRoomsQuery = { limit?: number; cursor?: string };
 
 /** Body POST /api/rooms. */
-export type CreateRoomBody = { id: string; title: string };
+export type CreateRoomBody = { id: string; title: string; visibility?: RoomVisibility; expiresAt?: number | null };
 
 /** Respons POST /api/rooms/:roomId/token. */
 export type TokenResponse = { token: string; url: string; role: RoomRole };

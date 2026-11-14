@@ -141,3 +141,37 @@ describe("kode error umum", () => {
     expect((await call("POST", "/auth/admin-login", { password: "x" })).status).toBe(404);
   });
 });
+
+describe("R1/R4/R5: visibility & status room di link undangan", () => {
+  const setRoom = (sql: string) => deps.db.run(`UPDATE rooms SET ${sql} WHERE id = 'r1'`);
+  const accept = (invite: string, cookie: string) => call("POST", "/invites/accept", { invite }, cookie);
+
+  test("room private: membuat link → 403 room_private (admin juga); preview/accept non-member → room_private", async () => {
+    const invite = inviteFor("viewer"); // link lama dibuat saat masih public (R4)
+    setRoom("visibility = 'private'");
+    expect(await codeOf(call("POST", "/rooms/r1/invites", { role: "viewer" }, owner.cookie))).toBe("room_private");
+    expect(await codeOf(call("POST", "/rooms/r1/invites", { role: "viewer" }, admin.cookie))).toBe("room_private");
+    const stranger = await createTestUser(deps, { email: "stranger@example.test" });
+    expect(await codeOf(preview(invite))).toBe("room_private");
+    expect(await codeOf(preview(invite, stranger.cookie))).toBe("room_private");
+    expect(await codeOf(accept(invite, stranger.cookie))).toBe("room_private");
+    expect(roleOf(stranger.user.id)).toBeUndefined();
+    // Anggota yang sudah ada tetap bisa memakai link (R1: masuk bila sudah anggota).
+    expect((await preview(invite, guest.cookie)).status).toBe(200);
+    expect((await accept(invite, guest.cookie)).status).toBe(200);
+    // Kembali public → link lama berlaku lagi.
+    setRoom("visibility = 'public'");
+    expect((await accept(invite, stranger.cookie)).status).toBe(200);
+  });
+
+  test("room nonaktif / kadaluarsa → preview & accept 403 room_inactive / room_expired", async () => {
+    const invite = inviteFor("viewer");
+    setRoom(`expires_at = ${Date.now() - 1}`);
+    expect(await codeOf(preview(invite))).toBe("room_expired");
+    expect(await codeOf(accept(invite, guest.cookie))).toBe("room_expired");
+    setRoom("disabled_at = 1");
+    expect(await codeOf(preview(invite, guest.cookie))).toBe("room_inactive");
+    expect(await codeOf(accept(invite, admin.cookie))).toBe("room_inactive");
+    expect(roleOf(admin.user.id)).toBeUndefined();
+  });
+});

@@ -247,24 +247,24 @@ describe("room admin", () => {
     deps.db.query("INSERT INTO room_members (room_id, user_id, role) VALUES ('r1', ?, 'viewer')").run(ana.user.id);
   });
 
-  test("list: members, active & participants dari SATU listRooms", async () => {
+  test("list: members, live & participants dari SATU listRooms", async () => {
     lk = fakeRoomService({ r1: ["a", "b", "c"] });
     deps.roomService = lk.fake;
     app = createApi(deps);
     const page = await json<Page<AdminRoomSummary>>(call("GET", "/admin/rooms", adm.cookie));
-    expect(page.items.map(({ id, members, active, participants, role }) => ({ id, members, active, participants, role })).toSorted((a, b) => a.id.localeCompare(b.id))).toEqual([
-      { id: "r1", members: 2, active: true, participants: 3, role: "host" },
-      { id: "r2", members: 1, active: false, participants: 0, role: null },
+    expect(page.items.map(({ id, members, live, participants, role }) => ({ id, members, live, participants, role })).toSorted((a, b) => a.id.localeCompare(b.id))).toEqual([
+      { id: "r1", members: 2, live: true, participants: 3, role: "host" },
+      { id: "r2", members: 1, live: false, participants: 0, role: null },
     ]);
     expect(lk.calls.listRooms).toBe(1);
   });
 
-  test("LiveKit down → active=false, tetap 200", async () => {
+  test("LiveKit down → live=false, tetap 200", async () => {
     deps.roomService = fakeRoomService({}, { down: true }).fake;
     app = createApi(deps);
     const res = await call("GET", "/admin/rooms", adm.cookie);
     expect(res.status).toBe(200);
-    expect((await json<Page<AdminRoomSummary>>(res)).items.every((r) => !r.active)).toBe(true);
+    expect((await json<Page<AdminRoomSummary>>(res)).items.every((r) => !r.live)).toBe(true);
   });
 
   test("hapus room: DB + member hilang, deleteRoom LiveKit dipanggil (gagal = tetap 204), audit; tak ada → 404", async () => {

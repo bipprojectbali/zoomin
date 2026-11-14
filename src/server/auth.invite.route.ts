@@ -2,9 +2,10 @@ import { Elysia, t } from "elysia";
 import { type AcceptInviteResponse, type CreateInviteResponse, type InvitePreview, type RoomRole, SAFE_ID_PATTERN } from "../shared/api.types";
 import type { ApiDeps } from "./api.deps";
 import { apiError } from "./api.error";
-import { authGuard, getSessionUser, hasRole } from "./auth.guard";
+import { authGuard, getSessionUser } from "./auth.guard";
 import { createInvite, INVITE_DEFAULT_TTL_HOURS, INVITE_MAX_TTL_HOURS, verifyInvite } from "./auth.invite";
 import { clientIp, createRateLimiter } from "./auth.ratelimit";
+import { canManageRoom, roomStatus } from "./room.access";
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_FORBIDDEN = 403;
@@ -37,20 +38,39 @@ export function inviteRoutes(deps: ApiDeps) {
   const { db, config } = deps;
   const secret = config.authSecret;
   const accepts = createRateLimiter(INVITE_ACCEPT_MAX, INVITE_ACCEPT_WINDOW_MS);
-  const roomTitle = (roomId: string) =>
-    db.query<{ title: string }, [string]>("SELECT title FROM rooms WHERE id = ?").get(roomId)?.title ?? null;
+  type GateRoom = { title: string; visibility: string; disabled_at: number | null; expires_at: number | null };
+  const findRoom = (roomId: string) =>
+    db.query<GateRoom, [string]>("SELECT title, visibility, disabled_at, expires_at FROM rooms WHERE id = ?").get(roomId);
   const memberRole = (roomId: string, userId: string) =>
     db
       .query<{ role: RoomRole }, [string, string]>("SELECT role FROM room_members WHERE room_id = ? AND user_id = ?")
       .get(roomId, userId)?.role ?? null;
+
+  /**
+   * Gerbang link undangan (R1/R4/R5): room harus ada, private hanya untuk yang sudah anggota (visibility dicek saat
+   * dipakai, bukan di token undangan), dan status harus active. Mengembalikan judul room atau error untuk route.
+   */
+  const gate = (roomId: string, userId: string | null) => {
+    const room = findRoom(roomId);
+    if (!room) return { ok: false, code: HTTP_NOT_FOUND, body: apiError("room_not_found", "room not found") } as const;
+    if (room.visibility === "private" && !(userId && memberRole(roomId, userId))) {
+      return { ok: false, code: HTTP_FORBIDDEN, body: apiError("room_private", "room is private") } as const;
+    }
+    const st = roomStatus(room);
+    if (st === "inactive") return { ok: false, code: HTTP_FORBIDDEN, body: apiError("room_inactive", "room is inactive") } as const;
+    if (st === "expired") return { ok: false, code: HTTP_FORBIDDEN, body: apiError("room_expired", "room has expired") } as const;
+    return { ok: true, title: room.title } as const;
+  };
 
   return new Elysia({ name: "auth.invite" })
     .use(authGuard(deps))
     .post(
       "/rooms/:roomId/invites",
       ({ params: { roomId }, body, user, status }) => {
-        if (roomTitle(roomId) === null) return status(HTTP_NOT_FOUND, apiError("room_not_found", "room not found"));
-        if (!hasRole(user, "admin") && memberRole(roomId, user.id) !== "host") return status(HTTP_FORBIDDEN, apiError("forbidden", "forbidden"));
+        const room = findRoom(roomId);
+        if (!room) return status(HTTP_NOT_FOUND, apiError("room_not_found", "room not found"));
+        if (!canManageRoom(db, user, roomId)) return status(HTTP_FORBIDDEN, apiError("forbidden", "forbidden"));
+        if (room.visibility === "private") return status(HTTP_FORBIDDEN, apiError("room_private", "room is private: add members by email"));
         const ttlSeconds = Math.round((body.ttlHours ?? INVITE_DEFAULT_TTL_HOURS) * SECONDS_PER_HOUR);
         const now = Math.floor(Date.now() / 1000);
         const invite = createInvite({ roomId, role: body.role, ttlSeconds }, secret, now);
@@ -73,12 +93,12 @@ export function inviteRoutes(deps: ApiDeps) {
       async ({ query, request, status }) => {
         const invite = verifyInvite(query.invite, secret);
         if (!invite) return status(HTTP_BAD_REQUEST, apiError("invite_invalid", "invite invalid or expired"));
-        const title = roomTitle(invite.roomId);
-        if (title === null) return status(HTTP_NOT_FOUND, apiError("room_not_found", "room not found"));
         const user = await getSessionUser(request, deps);
+        const room = gate(invite.roomId, user?.id ?? null);
+        if (!room.ok) return status(room.code, room.body);
         return {
           roomId: invite.roomId,
-          roomTitle: title,
+          roomTitle: room.title,
           role: invite.role,
           expiresAt: invite.exp * MS_PER_SECOND,
           currentUser: user,
@@ -99,7 +119,8 @@ export function inviteRoutes(deps: ApiDeps) {
         accepts.hit(ip);
         const invite = verifyInvite(body.invite, secret);
         if (!invite) return status(HTTP_BAD_REQUEST, apiError("invite_invalid", "invite invalid or expired"));
-        if (roomTitle(invite.roomId) === null) return status(HTTP_NOT_FOUND, apiError("room_not_found", "room not found"));
+        const room = gate(invite.roomId, user.id);
+        if (!room.ok) return status(room.code, room.body);
         const role = db.transaction(() => {
           db.query(UPSERT_MEMBER).run(invite.roomId, user.id, invite.role);
           return memberRole(invite.roomId, user.id) ?? invite.role;

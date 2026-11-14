@@ -134,7 +134,7 @@ function RoomIdentity({ room }: { room: AdminRoomSummary }) {
 }
 
 function RoomStatus({ room }: { room: AdminRoomSummary }) {
-  if (!room.active) return <span className="text-sm text-muted-foreground">{TEXT.roomInactive}</span>;
+  if (!room.live) return <span className="text-sm text-muted-foreground">{TEXT.roomInactive}</span>;
   return (
     <Badge variant="outline" className="gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
       <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden="true" />

@@ -4,7 +4,7 @@ import type { ApiDeps } from "./api.deps";
 import { apiError } from "./api.error";
 import { authGuard, hasRole } from "./auth.guard";
 import { syncRoomLayout } from "./layout.service";
-import { getMembership, roomExists } from "./rooms.repository";
+import { getRoomAccess } from "./room.access";
 import { createJoinToken } from "./token.service";
 
 const HTTP_FORBIDDEN = 403;
@@ -18,9 +18,13 @@ export function tokenRoutes(deps: ApiDeps) {
   return new Elysia({ name: "token" }).use(authGuard(deps)).post(
     "/rooms/:roomId/token",
     async ({ user, params: { roomId }, status }) => {
-      if (!roomExists(deps.db, roomId)) return status(HTTP_NOT_FOUND, apiError("room_not_found", "room not found"));
-      const role: RoomRole | null = getMembership(deps.db, roomId, user.id) ?? (hasRole(user, "admin") ? "host" : null);
+      const room = getRoomAccess(deps.db, user, roomId);
+      if (!room) return status(HTTP_NOT_FOUND, apiError("room_not_found", "room not found"));
+      const role: RoomRole | null = room.role ?? (hasRole(user, "admin") ? "host" : null);
       if (!role) return status(HTTP_FORBIDDEN, apiError("forbidden", "not a member of this room"));
+      // R5: room nonaktif/kadaluarsa tidak bisa dimasuki siapa pun (admin juga); pengelola mengaktifkan dulu.
+      if (room.status === "inactive") return status(HTTP_FORBIDDEN, apiError("room_inactive", "room is inactive"));
+      if (room.status === "expired") return status(HTTP_FORBIDDEN, apiError("room_expired", "room has expired"));
 
       // Siapkan room LiveKit + metadata layout dari SQLite sebelum client join (late joiner langsung dapat layout).
       await syncRoomLayout(deps, roomId);

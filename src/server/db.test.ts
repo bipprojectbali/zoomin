@@ -150,3 +150,19 @@ describe("0003_admin", () => {
     expect(count(db, "app_settings")).toBe(1);
   });
 });
+
+describe("0004_room_access", () => {
+  test("room lama → public, aktif, tanpa batas; visibility asing ditolak; room_invitations ikut terhapus bersama room", () => {
+    const db = connectDb(":memory:");
+    runMigrations(db, MIGRATIONS.slice(0, 3));
+    addUser(db, "u1");
+    db.run("INSERT INTO rooms (id, title, created_by, created_at) VALUES ('r1', 'R1', 'u1', 1)");
+    expect(runMigrations(db)).toEqual(["0004_room_access.sql"]);
+    expect(db.query("SELECT visibility, disabled_at, expires_at FROM rooms").get()).toEqual({ visibility: "public", disabled_at: null, expires_at: null });
+    expect(() => db.run("UPDATE rooms SET visibility = 'secret'")).toThrow();
+    db.run("INSERT INTO room_invitations (room_id, email, role, invited_by, created_at) VALUES ('r1', 'x@example.test', 'viewer', 'u1', 1)");
+    expect(() => db.run("INSERT INTO room_invitations (room_id, email, role, created_at) VALUES ('r1', 'y@example.test', 'admin', 1)")).toThrow();
+    db.run("DELETE FROM rooms WHERE id = 'r1'");
+    expect(count(db, "room_invitations")).toBe(0);
+  });
+});

@@ -95,6 +95,14 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "user.sessions.revoke": "Cabut sesi",
   "room.create": "Buat room",
   "room.delete": "Hapus room",
+  "room.update": "Ubah judul room",
+  "room.visibility": "Ubah tipe room",
+  "room.activate": "Aktifkan room",
+  "room.deactivate": "Nonaktifkan room",
+  "room.expiry": "Ubah kadaluarsa room",
+  "room.member.add": "Tambah anggota room",
+  "room.member.role": "Ubah peran anggota room",
+  "room.member.remove": "Keluarkan anggota room",
   "setting.update": "Ubah pengaturan",
 };
 

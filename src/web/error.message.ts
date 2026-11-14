@@ -29,6 +29,11 @@ const CODE_TEXT: Record<ApiErrorCode, string> = {
   cannot_modify_self: "Anda tidak bisa mengubah atau menghapus akun Anda sendiri dari sini.",
   insufficient_role: "Peran akun Anda tidak cukup untuk tindakan ini.",
   user_not_found: "Akun tidak ditemukan. Mungkin sudah dihapus.",
+  room_inactive: "Room ini sedang dinonaktifkan. Minta host room mengaktifkannya kembali.",
+  room_expired: "Masa berlaku room ini sudah habis. Minta host room memperpanjangnya.",
+  room_private: "Room ini privat: hanya orang yang diundang lewat email yang bisa masuk. Minta host room menambahkan email Anda.",
+  last_host: "Room harus punya minimal satu host. Jadikan anggota lain host terlebih dahulu.",
+  member_not_found: "Anggota atau undangan tidak ditemukan. Mungkin sudah dihapus.",
 };
 
 /**
@@ -72,6 +77,8 @@ const FIELD_LABEL: Record<string, string> = {
   name: "Nama",
   role: "Peran",
   invite: "Link undangan",
+  expiresAt: "Tanggal kadaluarsa (maks 365 hari dari sekarang)",
+  email: "Email",
 };
 
 const HTTP_SERVER_ERROR = 500;

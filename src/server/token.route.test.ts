@@ -93,4 +93,16 @@ describe("POST /api/rooms/:roomId/token", () => {
     await Promise.all([postToken("r1"), postToken("r1", STRANGER), postToken("ghost", VIEWER)]);
     expect(synced).toEqual([]);
   });
+
+  test("R5: room nonaktif → 403 room_inactive, kadaluarsa → 403 room_expired (admin juga), tanpa menyentuh LiveKit", async () => {
+    synced.length = 0;
+    const codeOf = async (res: Response) => [res.status, ((await res.json()) as { code?: string }).code];
+    db.query("UPDATE rooms SET expires_at = ? WHERE id = 'r1'").run(Date.now() - 1);
+    expect(await codeOf(await postToken("r1", VIEWER))).toEqual([403, "room_expired"]);
+    db.query("UPDATE rooms SET disabled_at = 1 WHERE id = 'r1'").run();
+    expect(await codeOf(await postToken("r1", ADMIN))).toEqual([403, "room_inactive"]);
+    expect(synced).toEqual([]);
+    db.query("UPDATE rooms SET disabled_at = NULL, expires_at = NULL WHERE id = 'r1'").run();
+    expect((await postToken("r1", VIEWER)).status).toBe(200);
+  });
 });

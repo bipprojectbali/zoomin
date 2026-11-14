@@ -1,6 +1,7 @@
 import { type Database, SQLiteError } from "bun:sqlite";
-import type { Page, RoomRole, RoomSummary, SessionUser } from "../shared/api.types";
+import type { Page, RoomRole, RoomSummary, RoomVisibility, SessionUser } from "../shared/api.types";
 import { recordAudit } from "./audit.repository";
+import { ROOM_COLUMNS, type RoomRow, toRoomSummary } from "./room.access";
 
 /** Default dan batas atas `limit` daftar room (kontrak GET /api/rooms). */
 export const ROOMS_PAGE_DEFAULT = 20;
@@ -12,7 +13,6 @@ export class RoomExistsError extends Error {}
 /** Dilempar listRoomsForUser bila cursor bukan hasil encodeCursor (dipetakan ke 400 oleh route). */
 export class InvalidCursorError extends Error {}
 
-type RoomRow = { id: string; title: string; role: RoomRole | null; created_at: number };
 type Cursor = { createdAt: number; id: string };
 
 // Cursor opaque: base64url("createdAt,id"). id cocok SAFE_ID_PATTERN (tanpa koma), jadi split pertama aman.
@@ -42,21 +42,10 @@ export function roomExists(db: Database, roomId: string): boolean {
   return db.query<{ one: number }, [string]>("SELECT 1 AS one FROM rooms WHERE id = ?").get(roomId) !== null;
 }
 
-/** Satu room beserta role user (null = bukan member); null bila room tidak ada. Hak akses diputuskan route. */
-export function getRoomForUser(db: Database, roomId: string, userId: string): RoomSummary | null {
-  const row = db
-    .query<RoomRow, [string, string]>(
-      "SELECT r.id, r.title, m.role, r.created_at FROM rooms r " +
-        "LEFT JOIN room_members m ON m.room_id = r.id AND m.user_id = ? WHERE r.id = ?",
-    )
-    .get(userId, roomId);
-  return row ? { id: row.id, title: row.title, role: row.role, createdAt: row.created_at } : null;
-}
-
 // Urutan terbaru dulu; keyset (created_at, id) agar stabil walau created_at kembar.
 // Admin/super_admin global: LEFT JOIN (semua room, role null bila bukan member). user: JOIN (hanya room member).
 const LIST_SQL = (join: "LEFT JOIN" | "JOIN") => `
-  SELECT r.id, r.title, m.role, r.created_at
+  SELECT ${ROOM_COLUMNS}
   FROM rooms r ${join} room_members m ON m.room_id = r.id AND m.user_id = ?1
   WHERE ?2 IS NULL OR r.created_at < ?2 OR (r.created_at = ?2 AND r.id < ?3)
   ORDER BY r.created_at DESC, r.id DESC
@@ -73,7 +62,8 @@ export function listRoomsForUser(
   const rows = db
     .query<RoomRow, [string, number | null, string | null, number]>(LIST_SQL(user.role === "user" ? "JOIN" : "LEFT JOIN"))
     .all(user.id, after?.createdAt ?? null, after?.id ?? null, limit + 1);
-  const items = rows.slice(0, limit).map((r) => ({ id: r.id, title: r.title, role: r.role, createdAt: r.created_at }));
+  const now = Date.now();
+  const items = rows.slice(0, limit).map((r) => toRoomSummary(r, user, now));
   const last = items.at(-1);
   return { items, nextCursor: rows.length > limit && last ? encodeCursor(last) : null };
 }
@@ -83,15 +73,22 @@ export function listRoomsForUser(
  * `actorEmail` diisi → audit `room.create` (A8) ikut di transaksi yang sama (room tanpa audit / audit tanpa room
  * tak mungkin). Opsional hanya agar fixture test bisa membuat room tanpa audit; route wajib mengisinya.
  */
-export function createRoom(db: Database, input: { id: string; title: string; createdBy: string; actorEmail?: string }): RoomSummary {
+export function createRoom(
+  db: Database,
+  input: { id: string; title: string; createdBy: string; actorEmail?: string; visibility?: RoomVisibility; expiresAt?: number | null },
+): RoomSummary {
   const createdAt = Date.now();
+  const visibility = input.visibility ?? "public";
+  const expiresAt = input.expiresAt ?? null;
   try {
     db.transaction(() => {
-      db.query("INSERT INTO rooms (id, title, created_by, created_at) VALUES (?, ?, ?, ?)").run(
+      db.query("INSERT INTO rooms (id, title, created_by, created_at, visibility, expires_at) VALUES (?, ?, ?, ?, ?, ?)").run(
         input.id,
         input.title,
         input.createdBy,
         createdAt,
+        visibility,
+        expiresAt,
       );
       db.query("INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, 'host')").run(input.id, input.createdBy);
       if (input.actorEmail !== undefined) {
@@ -101,7 +98,7 @@ export function createRoom(db: Database, input: { id: string; title: string; cre
           action: "room.create",
           targetType: "room",
           targetId: input.id,
-          detail: { title: input.title },
+          detail: { title: input.title, visibility, expiresAt },
         });
       }
     })();
@@ -111,5 +108,6 @@ export function createRoom(db: Database, input: { id: string; title: string; cre
     }
     throw new Error(`createRoom: gagal membuat room ${input.id}`, { cause });
   }
-  return { id: input.id, title: input.title, role: "host", createdAt };
+  const row: RoomRow = { id: input.id, title: input.title, role: "host", created_at: createdAt, visibility, disabled_at: null, expires_at: expiresAt };
+  return toRoomSummary(row, { role: "user" }, createdAt);
 }

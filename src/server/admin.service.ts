@@ -2,6 +2,7 @@ import type { AdminRoomSummary, AdminUser, AuditAction, GlobalRole, Page, Sessio
 import { countMembers, getAdminUser } from "./admin.repository";
 import type { ApiDeps } from "./api.deps";
 import { recordAudit } from "./audit.repository";
+import { deleteRoom } from "./room.service";
 import { listRoomsForUser } from "./rooms.repository";
 
 const HTTP_FORBIDDEN = 403;
@@ -121,7 +122,7 @@ export async function setGlobalRole(deps: ApiDeps, actor: SessionUser, targetId:
 
 /**
  * Daftar room admin: halaman DB (semua room) + jumlah member (1 query) + status LiveKit dari SATU listRooms per request.
- * LiveKit down → semua active=false, participants=0, warn.
+ * LiveKit down → semua live=false, participants=0, warn.
  */
 export async function listAdminRooms(deps: ApiDeps, actor: SessionUser, opts: { limit?: number; cursor?: string }): Promise<Page<AdminRoomSummary>> {
   const page = listRoomsForUser(deps.db, actor, opts);
@@ -130,26 +131,15 @@ export async function listAdminRooms(deps: ApiDeps, actor: SessionUser, opts: { 
   try {
     live = new Map((await deps.roomService.listRooms(page.items.map((r) => r.id))).map((r) => [r.name, r.numParticipants]));
   } catch (cause) {
-    console.warn("listAdminRooms: listRooms LiveKit gagal, status aktif dianggap false", cause);
+    console.warn("listAdminRooms: listRooms LiveKit gagal, status live dianggap false", cause);
   }
   return {
     nextCursor: page.nextCursor,
-    items: page.items.map((r) => ({ ...r, members: members.get(r.id) ?? 0, active: live.has(r.id), participants: live.get(r.id) ?? 0 })),
+    items: page.items.map((r) => ({ ...r, members: members.get(r.id) ?? 0, live: live.has(r.id), participants: live.get(r.id) ?? 0 })),
   };
 }
 
-/** Hapus room dari DB (member ikut terhapus) lalu dari LiveKit (gagal LiveKit = warn), audit. */
+/** Hapus room (logika di room.service.ts#deleteRoom: DB + audit + LiveKit); 404 bila tidak ada. */
 export async function deleteAdminRoom(deps: ApiDeps, actor: SessionUser, roomId: string): Promise<void> {
-  const room = deps.db.query<{ title: string }, [string]>("SELECT title FROM rooms WHERE id = ?").get(roomId);
-  if (!room) throw new AdminActionError("room_not_found", `room ${roomId} tidak ditemukan`);
-  deps.db.transaction(() => {
-    deps.db.query("DELETE FROM rooms WHERE id = ?").run(roomId);
-    audit(deps, actor, "room.delete", roomId, { title: room.title });
-  })();
-  try {
-    await deps.roomService.deleteRoom(roomId);
-  } catch (cause) {
-    // Room belum pernah aktif di LiveKit → not found; bukan kegagalan penghapusan DB.
-    console.warn(`deleteAdminRoom: deleteRoom LiveKit ${roomId} gagal`, cause);
-  }
+  if (!(await deleteRoom(deps, actor, roomId))) throw new AdminActionError("room_not_found", `room ${roomId} tidak ditemukan`);
 }

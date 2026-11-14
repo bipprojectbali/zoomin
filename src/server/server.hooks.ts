@@ -9,6 +9,7 @@ import { listUsersForCli, setUserRoleByEmail, unbanUserByEmail } from "./auth.us
 import { type Config, DEFAULT_DB_PATH, loadConfig } from "./config";
 import { connectDb, openDb, runMigrations } from "./db";
 import { createServer, displayUrl, installShutdown, lanAddress, loadTls, toHttpUrl } from "./main";
+import { startRoomEnforcer } from "./room.enforcer";
 
 type Env = Record<string, string | undefined>;
 
@@ -50,7 +51,9 @@ export function createServerHooks(env: Env = process.env, standalone = Bun.isSta
       const db = openDb(config.dbPath);
       const roomService = new RoomServiceClient(toHttpUrl(config.livekitUrl), config.livekitApiKey, config.livekitApiSecret);
       const server = createServer({ db, config, roomService, auth: createAuth({ db, config }) }, config.port);
-      installShutdown(server, db);
+      // R6: tutup room LiveKit yang di DB nonaktif/kadaluarsa/terhapus; dihentikan sebelum server berhenti & DB ditutup.
+      const stopEnforcer = startRoomEnforcer({ db, roomService });
+      installShutdown({ stop: (closeActive) => (stopEnforcer(), server.stop(closeActive)) }, db);
       console.info(`zoomin: ${displayUrl(server.hostname ?? config.host, server.port ?? config.port, Boolean(config.tls))} (LiveKit ${config.livekitUrl}, env ${config.nodeEnv})`);
       const lan = config.host === "0.0.0.0" || config.host === "::" ? lanAddress() : undefined;
       if (lan) console.info(`zoomin: juga terjangkau di jaringan: ${displayUrl(lan, server.port ?? config.port, Boolean(config.tls))} (perangkat lain butuh HTTPS untuk kamera/layar)`);
