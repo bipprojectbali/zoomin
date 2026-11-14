@@ -1,0 +1,204 @@
+/**
+ * Model layout stage: tipe, validasi, dan transformasi murni (tanpa SDK/DOM).
+ * Dipakai server (validasi PUT layout) dan web (render + edit admin).
+ * Port dari RND/spike/lk-bun/src/layout.ts; publish ke LiveKit ada di server (layout.service.ts).
+ */
+
+/** Batas layout kita jauh di bawah batas metadata LiveKit 512 KiB; layout wajar < 2 KiB. */
+export const LAYOUT_MAX_BYTES = 16 * 1024;
+export const LAYOUT_MAX_SLOTS = 49; // grid 7x7
+export const LAYOUT_TEMPLATES = ["side-by-side", "grid", "focus"] as const;
+export const SLOT_SIZES = ["small", "medium", "large"] as const;
+/** Toleransi total panelSizes terhadap 100 (pembulatan dari react-resizable-panels). */
+export const PANEL_SIZES_TOTAL_TOLERANCE = 0.5;
+
+export type LayoutTemplate = (typeof LAYOUT_TEMPLATES)[number];
+export type SlotSize = (typeof SLOT_SIZES)[number];
+export type TrackRef = { identity: string; trackName: string };
+export type LayoutSlot = { trackRef: TrackRef; size?: SlotSize };
+/** State layout yang disiarkan ke semua klien via room metadata. */
+export type LayoutState = {
+  version: number;
+  template: LayoutTemplate;
+  slots: LayoutSlot[];
+  /** Ukuran panel dalam persen (total 100); jumlah = panelCountFor(template, slots.length). */
+  panelSizes?: number[];
+  updatedBy: string;
+  updatedAt: number;
+};
+
+/** Error validasi layout; `path` menunjuk field yang salah (mis. `slots[2].trackRef.identity`). */
+export class LayoutValidationError extends Error {
+  constructor(
+    readonly path: string,
+    detail: string,
+    options?: ErrorOptions,
+  ) {
+    super(`${path}: ${detail}`, options);
+    this.name = "LayoutValidationError";
+  }
+}
+
+const ROOT = "$";
+
+const isObj = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+const byteLength = (s: string) => new TextEncoder().encode(s).byteLength;
+
+function nonEmptyString(v: unknown, path: string): string {
+  if (typeof v !== "string" || v.length === 0) throw new LayoutValidationError(path, "harus string non-kosong");
+  return v;
+}
+
+function parseSlot(v: unknown, i: number): LayoutSlot {
+  const p = `slots[${i}]`;
+  if (!isObj(v)) throw new LayoutValidationError(p, "harus object");
+  if (!isObj(v.trackRef)) throw new LayoutValidationError(`${p}.trackRef`, "harus object");
+  const trackRef = {
+    identity: nonEmptyString(v.trackRef.identity, `${p}.trackRef.identity`),
+    trackName: nonEmptyString(v.trackRef.trackName, `${p}.trackRef.trackName`),
+  };
+  if (v.size === undefined) return { trackRef };
+  if (!SLOT_SIZES.includes(v.size as SlotSize)) {
+    throw new LayoutValidationError(`${p}.size`, `"${String(v.size)}" bukan salah satu dari ${SLOT_SIZES.join("|")}`);
+  }
+  return { trackRef, size: v.size as SlotSize };
+}
+
+/**
+ * Jumlah panel resizable per template: side-by-side = satu per slot,
+ * focus = 2 (stage + strip), grid = 0 (tidak memakai panelSizes).
+ */
+export function panelCountFor(template: LayoutTemplate, slotCount: number): number {
+  switch (template) {
+    case "side-by-side":
+      return slotCount;
+    case "focus":
+      return 2;
+    case "grid":
+      return 0;
+  }
+}
+
+/** Validasi panelSizes terhadap template + jumlah slot; mengembalikan salinan array. */
+function validatePanelSizes(v: unknown, template: LayoutTemplate, slotCount: number): number[] {
+  if (!Array.isArray(v)) throw new LayoutValidationError("panelSizes", "harus array angka");
+  const expected = panelCountFor(template, slotCount);
+  if (expected === 0) throw new LayoutValidationError("panelSizes", `template ${template} tidak memakai panelSizes`);
+  if (v.length !== expected) {
+    throw new LayoutValidationError("panelSizes", `jumlah ${v.length}, template ${template} butuh ${expected}`);
+  }
+  v.forEach((n, i) => {
+    if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) {
+      throw new LayoutValidationError(`panelSizes[${i}]`, "harus angka finite > 0");
+    }
+  });
+  const total = (v as number[]).reduce((a, b) => a + b, 0);
+  if (Math.abs(total - 100) > PANEL_SIZES_TOTAL_TOLERANCE) {
+    throw new LayoutValidationError("panelSizes", `total ${total}, harus 100 (±${PANEL_SIZES_TOTAL_TOLERANCE})`);
+  }
+  return [...(v as number[])];
+}
+
+/** Parse + validasi ketat JSON layout (dari room.metadata / body PUT). Field asing dibuang. */
+export function parseLayout(json: string): LayoutState {
+  if (byteLength(json) > LAYOUT_MAX_BYTES) {
+    throw new LayoutValidationError(ROOT, `layout melebihi ${LAYOUT_MAX_BYTES} byte`);
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch (e) {
+    throw new LayoutValidationError(ROOT, `layout bukan JSON valid: ${(e as Error).message}`, { cause: e });
+  }
+  if (!isObj(raw)) throw new LayoutValidationError(ROOT, "layout harus object");
+  if (!Number.isSafeInteger(raw.version) || (raw.version as number) < 0) {
+    throw new LayoutValidationError("version", "harus integer >= 0");
+  }
+  if (!LAYOUT_TEMPLATES.includes(raw.template as LayoutTemplate)) {
+    throw new LayoutValidationError("template", `"${String(raw.template)}" tidak dikenal`);
+  }
+  const template = raw.template as LayoutTemplate;
+  if (!Array.isArray(raw.slots)) throw new LayoutValidationError("slots", "harus array");
+  if (raw.slots.length > LAYOUT_MAX_SLOTS) throw new LayoutValidationError("slots", `maks ${LAYOUT_MAX_SLOTS}`);
+  const slots = raw.slots.map(parseSlot);
+  const seen = new Set<string>();
+  slots.forEach((s, i) => {
+    const k = refKey(s.trackRef);
+    if (seen.has(k)) throw new LayoutValidationError(`slots[${i}].trackRef`, "trackRef duplikat");
+    seen.add(k);
+  });
+  if (typeof raw.updatedAt !== "number" || !Number.isFinite(raw.updatedAt)) {
+    throw new LayoutValidationError("updatedAt", "harus angka (epoch ms)");
+  }
+  const state: LayoutState = {
+    version: raw.version as number,
+    template,
+    slots,
+    updatedBy: nonEmptyString(raw.updatedBy, "updatedBy"),
+    updatedAt: raw.updatedAt,
+  };
+  if (raw.panelSizes !== undefined) state.panelSizes = validatePanelSizes(raw.panelSizes, template, slots.length);
+  return state;
+}
+
+/** Serialisasi layout; melempar bila melewati LAYOUT_MAX_BYTES. */
+export function serializeLayout(state: LayoutState): string {
+  const json = JSON.stringify(state);
+  const bytes = byteLength(json);
+  if (bytes > LAYOUT_MAX_BYTES) {
+    throw new LayoutValidationError(ROOT, `layout ${bytes} byte melebihi ${LAYOUT_MAX_BYTES}`);
+  }
+  return json;
+}
+
+const refKey = (r: TrackRef) => `${r.identity}\u0000${r.trackName}`;
+const sameRef = (a: TrackRef, b: TrackRef) => refKey(a) === refKey(b);
+
+/** Tukar trackRef slot i dan j (size ikut posisi slot). */
+export function swapSlots(state: LayoutState, i: number, j: number, by: string): LayoutState {
+  const n = state.slots.length;
+  if (!Number.isInteger(i) || !Number.isInteger(j) || i < 0 || j < 0 || i >= n || j >= n) {
+    throw new LayoutValidationError("slots", `swapSlots: index ${i},${j} di luar 0..${n - 1}`);
+  }
+  const slots = state.slots.map((s) => ({ ...s }));
+  const a = slots[i]!;
+  const b = slots[j]!;
+  [a.trackRef, b.trackRef] = [b.trackRef, a.trackRef];
+  return touch(state, { slots }, by);
+}
+
+/** Template focus: trackRef ke slot 0 ukuran large, sisanya small di strip. */
+export function setFocus(state: LayoutState, trackRef: TrackRef, by: string): LayoutState {
+  const rest = state.slots.filter((s) => !sameRef(s.trackRef, trackRef));
+  if (rest.length === state.slots.length) {
+    throw new LayoutValidationError("trackRef", `setFocus: track ${trackRef.identity}/${trackRef.trackName} tidak ada di layout`);
+  }
+  const slots: LayoutSlot[] = [
+    { trackRef, size: "large" },
+    ...rest.map((s) => ({ trackRef: s.trackRef, size: "small" as const })),
+  ];
+  // panelSizes focus (stage/strip) tetap berlaku bila sudah focus; dari template lain dibuang.
+  return touch(state, { template: "focus", slots, panelSizes: state.template === "focus" ? state.panelSizes : undefined }, by);
+}
+
+/** Ganti template; panelSizes dibuang karena jumlah panel template lain berbeda (render pakai default). */
+export function setTemplate(state: LayoutState, template: LayoutTemplate, by: string): LayoutState {
+  if (!LAYOUT_TEMPLATES.includes(template)) {
+    throw new LayoutValidationError("template", `"${String(template)}" tidak dikenal`);
+  }
+  return touch(state, { template, panelSizes: undefined }, by);
+}
+
+/** Set ukuran panel (hasil resize); divalidasi terhadap template + jumlah slot saat ini. */
+export function setPanelSizes(state: LayoutState, sizes: number[], by: string): LayoutState {
+  return touch(state, { panelSizes: validatePanelSizes(sizes, state.template, state.slots.length) }, by);
+}
+
+/** State baru: version TIDAK diubah (dikelola server via CAS), updatedBy/updatedAt diisi. */
+function touch(state: LayoutState, patch: Partial<LayoutState>, by: string): LayoutState {
+  const next: LayoutState = { ...state, ...patch, updatedBy: by, updatedAt: Date.now() };
+  if (next.panelSizes === undefined) delete next.panelSizes;
+  return next;
+}

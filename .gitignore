@@ -8,6 +8,7 @@ node_modules/
 *.pem
 *.key
 dist/
+data/
 .DS_Store
 RND/spike/.bin/
 RND/spike/.run/

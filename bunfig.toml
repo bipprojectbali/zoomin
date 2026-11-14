@@ -1,0 +1,7 @@
+# Plugin Tailwind untuk HTML import di Bun.serve (docs bun.com/docs/bundler/fullstack).
+[serve.static]
+plugins = ["bun-plugin-tailwind"]
+
+[test]
+# Test spike di RND/ punya dependency & server sendiri; jangan ikut `bun test` produk.
+pathIgnorePatterns = ["RND/**", "node_modules/**"]
