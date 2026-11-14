@@ -4,6 +4,8 @@ test.describe("landing", () => {
   test("anonim di / → landing dengan CTA login ke /login", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByTestId("landing")).toBeVisible();
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", /zoomin/);
+    await expect(page.locator('link[rel="icon"]')).toHaveCount(2);
     await expect(page.getByTestId("landing-cta-app")).toHaveCount(0);
     await page.getByTestId("landing-cta-login").click();
     await expect(page).toHaveURL(/\/login$/);

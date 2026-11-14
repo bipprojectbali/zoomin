@@ -113,7 +113,7 @@ describe("aset di-resolve per request (rebuild saat server jalan)", () => {
   writeFileSync(join(web, "index.html"), '<div id="root"></div>');
   writeFileSync(join(tmp, "secret.txt"), "TOP-SECRET");
   writeFileSync(join(tmp, "web-evil", "x.js"), "TOP-SECRET");
-  const handler = staticRoutes(web)["/*"]!;
+  const handler = staticRoutes(web, "https://app.example.test")["/*"]!;
   const call = (path: string, init?: RequestInit) => handler(new Request(`http://localhost${path}`, init));
   afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
@@ -164,7 +164,7 @@ test("WEB_DIST_DIR menimpa direktori SPA (source & binary); kosong → default",
 });
 
 test("produksi tanpa dist → throw dengan petunjuk build", () => {
-  expect(() => staticRoutes(join(dist, "tidak-ada"))).toThrow("jalankan `bun run build`");
+  expect(() => staticRoutes(join(dist, "tidak-ada"), "https://app.example.test")).toThrow("jalankan `bun run build`");
   expect(() => createServer(deps, 0, join(dist, "tidak-ada"))).toThrow("index.html tidak ada");
 });
 

@@ -1,4 +1,4 @@
-import { renameSync, rmSync } from "node:fs";
+import { cpSync, renameSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
 import { parseArgs } from "node:util";
 import tailwind from "bun-plugin-tailwind";
@@ -53,3 +53,5 @@ const rows = await Promise.all(
 );
 console.table(rows);
 renameSync(html.path, join(OUT_DIR, "index.html"));
+// Ikon/manifest/og-image bernama tetap di root (disajikan seoRoutes); salinan ber-hash di atas dipakai <link> index.html.
+cpSync("src/web/public", OUT_DIR, { recursive: true });

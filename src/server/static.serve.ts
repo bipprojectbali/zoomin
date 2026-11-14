@@ -1,5 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
+import { absolutizeSeoUrls } from "./seo.serve";
 
 /** Direktori hasil `bun run build` (scripts/build.web.ts), relatif ke WorkingDirectory. */
 export const WEB_DIST_DIR = "dist/web";
@@ -38,14 +39,15 @@ type Handler = (req: Request) => Response;
  * Kenapa bukan "segmen mengandung titik → 404": token undangan `base64url(payload).signature` mengandung titik,
  * sehingga `/invite/<token>` di produksi sempat 404 (dev tidak kena karena disajikan dev server Bun).
  * `/api/*` tidak lewat sini: route Elysia lebih spesifik dari "/*".
+ * Meta SEO index.html (og:url/og:image/canonical) dijadikan absolut dari `publicAppUrl` per request (seo.serve.ts).
  */
-export function staticRoutes(dir: string = DEFAULT_WEB_DIR): Record<string, Handler> {
+export function staticRoutes(dir: string, publicAppUrl: string): Record<string, Handler> {
   const indexPath = join(dir, "index.html");
   if (!existsSync(indexPath)) {
     throw new Error(`staticRoutes: ${indexPath} tidak ada; jalankan \`bun run build\` sebelum start produksi`);
   }
   const root = resolve(dir);
-  const index = () => serveFile(indexPath, "no-cache");
+  const index = () => absolutizeSeoUrls(serveFile(indexPath, "no-cache"), publicAppUrl);
   return {
     "/*": (req) => {
       const pathname = new URL(req.url).pathname;

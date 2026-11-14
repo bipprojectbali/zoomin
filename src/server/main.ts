@@ -4,6 +4,7 @@ import type { ApiDeps } from "./api.deps";
 import { createApi } from "./api";
 import { CLIENT_IP_HEADER } from "./auth.ratelimit";
 import { LIVEKIT_PROXY_PREFIX, livekitProxy, livekitWebSocket } from "./livekit.proxy";
+import { DEV_PUBLIC_DIR, seoRoutes } from "./seo.serve";
 import { DEFAULT_WEB_DIR, staticRoutes } from "./static.serve";
 
 /**
@@ -26,7 +27,10 @@ export function createServer(deps: ApiDeps, port: number, webDir: string = DEFAU
   const api = createApi(deps);
   const isProd = deps.config.nodeEnv === "production";
   // Binary dengan NODE_ENV=development eksplisit tidak punya devIndex → tetap sajikan SPA tertanam.
-  const web: Record<string, Bun.HTMLBundle | ((req: Request) => Response)> = isProd || !devIndex ? staticRoutes(webDir) : { "/*": devIndex };
+  const servePrebuilt = isProd || !devIndex;
+  const web: Record<string, Bun.HTMLBundle | ((req: Request) => Response)> = servePrebuilt ? staticRoutes(webDir, deps.config.publicAppUrl) : { "/*": devIndex };
+  // robots.txt/sitemap.xml + ikon bernama tetap: produksi dari salinan di dist/web, dev langsung dari src/web/public.
+  const seo = seoRoutes(deps.config.publicAppUrl, servePrebuilt ? webDir : DEV_PUBLIC_DIR);
   const lkProxy = livekitProxy(deps.config.livekitUrl);
   return Bun.serve({
     port,
@@ -42,6 +46,7 @@ export function createServer(deps: ApiDeps, port: number, webDir: string = DEFAU
         req.headers.set(CLIENT_IP_HEADER, server.requestIP(req)?.address ?? "");
         return api.fetch(req);
       },
+      ...seo,
       ...web,
     },
   });

@@ -6,6 +6,11 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikut
 
 ### Added
 
+- Favicon, ikon aplikasi (apple-touch-icon, ikon 192/512 + `site.webmanifest`), dan gambar pratinjau `og-image.png`
+  untuk tautan yang dibagikan. Halaman punya meta SEO (deskripsi, Open Graph, Twitter card, canonical, theme-color);
+  URL absolut di dalamnya mengikuti `PUBLIC_APP_URL`. `/robots.txt` mengizinkan landing dan menutup halaman privat
+  (`/app`, `/rooms`, `/invite`, `/admin`, `/dev`, `/settings`, `/api`); `/sitemap.xml` berisi landing. Ikon dibuat
+  ulang dengan `bun scripts/build.icons.ts`.
 - **Room dengan password**: selain Public dan Private, room bisa bertipe Password. Orang yang tahu ID room atau
   memegang link undangan bisa masuk dengan password, lalu otomatis jadi anggota. Host bisa memasang, mengganti, atau
   menghapus password kapan saja; anggota lama tidak dikeluarkan saat password diganti. Password disimpan sebagai

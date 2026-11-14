@@ -3,7 +3,33 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>zoomin</title>
+    <title>zoomin — bandingkan banyak layar dalam satu meeting</title>
+    <!-- Title & description = LANDING_META (landing.copy.ts); static.serve.test.ts menjaga keduanya sinkron. -->
+    <meta name="description" content="Ruang meeting video self-hosted: tiap peserta bisa membagikan beberapa layar sekaligus, host menata layout panggung yang sama untuk semua." />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+    <!-- URL relatif di sini; produksi/binary mengubahnya jadi absolut dengan PUBLIC_APP_URL (static.serve.ts). -->
+    <link rel="canonical" href="/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="zoomin" />
+    <meta property="og:locale" content="id_ID" />
+    <meta property="og:title" content="zoomin — bandingkan banyak layar dalam satu meeting" />
+    <meta property="og:description" content="Ruang meeting video self-hosted: tiap peserta bisa membagikan beberapa layar sekaligus, host menata layout panggung yang sama untuk semua." />
+    <meta property="og:url" content="/" />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Logo zoomin dan tagline: Meeting video dengan banyak layar sekaligus" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="zoomin — bandingkan banyak layar dalam satu meeting" />
+    <meta name="twitter:description" content="Ruang meeting video self-hosted: tiap peserta bisa membagikan beberapa layar sekaligus, host menata layout panggung yang sama untuk semua." />
+    <meta name="twitter:image" content="/og-image.png" />
+    <!-- Di-bundle Bun (nama ber-hash); salinan nama tetap di root disajikan publicRoutes (static.serve.ts). -->
+    <link rel="icon" href="./public/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="./public/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./public/apple-touch-icon.png" />
+    <link rel="manifest" href="./public/site.webmanifest" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>

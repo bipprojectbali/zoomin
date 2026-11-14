@@ -38,3 +38,17 @@ test("prod: deep link /rooms/:id + reload → app tampil (login dengan next)", a
   expect(res?.status()).toBe(200);
   await expect(page.getByTestId("login-google")).toBeVisible();
 });
+
+test("prod: meta SEO absolut dari PUBLIC_APP_URL; ikon, manifest, robots, sitemap tersaji", async ({ page, request, baseURL }) => {
+  await page.goto("/");
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", `${baseURL}/og-image.png`);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${baseURL}/`);
+  for (const sel of ['link[rel="icon"][type="image/svg+xml"]', 'link[rel="apple-touch-icon"]', 'link[rel="manifest"]']) {
+    const href = await page.locator(sel).getAttribute("href");
+    expect((await request.get(href!)).status(), sel).toBe(200);
+  }
+  for (const path of ["/favicon.ico", "/og-image.png", "/site.webmanifest", "/robots.txt", "/sitemap.xml"]) {
+    expect((await request.get(path)).status(), path).toBe(200);
+  }
+  expect(await (await request.get("/robots.txt")).text()).toContain(`Sitemap: ${baseURL}/sitemap.xml`);
+});
