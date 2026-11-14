@@ -36,7 +36,13 @@ export function RoomSettingsDialog({ room, open, onOpenChange, initialTab = "gen
   const [deleting, setDeleting] = useState(false);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl" data-testid="room-settings-dialog">
+      <DialogContent
+        className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"
+        data-testid="room-settings-dialog"
+        // Radix menangkap Escape di document (capture) sebelum handler input: saran pemilih undangan yang terbuka
+        // ditutup dulu oleh InvitePicker, dialog baru tertutup pada Escape berikutnya.
+        onEscapeKeyDown={(e) => document.activeElement?.getAttribute("aria-expanded") === "true" && e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{TEXT.title}</DialogTitle>
           <DialogDescription>{TEXT.description(room.title)}</DialogDescription>
