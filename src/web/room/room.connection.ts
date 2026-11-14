@@ -46,6 +46,9 @@ const API_ERROR: Record<number, ConnectionError> = {
   404: { kind: "room_not_found", message: TEXT.notFound },
 };
 
+/** 403 dengan kode status room punya pesan sendiri (E2E-03); kind `forbidden` = tanpa retry, log warn. */
+const ROOM_DENIED_CODES: readonly (string | undefined)[] = ["room_inactive", "room_expired", "room_private"];
+
 /** Viewer hanya subscribe; tombol publish disembunyikan (spike 03: penolakan server baru datang ~10 dtk). */
 export function canPublishFor(role: RoomRole | null): boolean {
   return role === "host" || role === "participant";
@@ -64,6 +67,7 @@ export function canRetry(error: ConnectionError | null): boolean {
 /** Error saat join (token API / connect LiveKit) → kind + pesan. */
 export function joinErrorFor(err: unknown): ConnectionError {
   if (err instanceof ApiRequestError) {
+    if (ROOM_DENIED_CODES.includes(err.code)) return { kind: "forbidden", message: errorMessage(err) };
     const known = API_ERROR[err.status];
     if (known) return known;
     if (err.status >= HTTP_SERVER_ERROR) return { kind: "server", message: TEXT.server };

@@ -37,6 +37,14 @@ describe("joinErrorFor", () => {
     expect(joinErrorFor(apiError(404))).toEqual({ kind: "room_not_found", message: "Room tidak ditemukan atau sudah dihapus" });
   });
 
+  test("403 room_inactive/room_expired/room_private → pesan khusus, bukan 'bukan anggota' (E2E-03)", () => {
+    for (const code of ["room_inactive", "room_expired", "room_private"] as const) {
+      const err = new ApiRequestError(403, { error: "x", code }, "POST /x");
+      expect(joinErrorFor(err)).toEqual({ kind: "forbidden", message: errorMessage(err) });
+      expect(errorMessage(err)).not.toBe("Anda bukan anggota room ini");
+    }
+  });
+
   test("5xx → server; 4xx lain → unknown dengan errorMessage()", () => {
     expect(joinErrorFor(apiError(503)).kind).toBe("server");
     const bad = apiError(400, "id tidak valid");

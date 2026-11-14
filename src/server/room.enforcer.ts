@@ -8,8 +8,9 @@ export const ROOM_ENFORCER_INTERVAL_MS = 60_000;
 type EnforcerDeps = Pick<ApiDeps, "db" | "roomService">;
 
 /**
- * Satu putaran enforcer (R6): untuk tiap room yang sedang live di LiveKit tapi di DB tidak `active` (nonaktif,
- * kadaluarsa, atau sudah dihapus) → deleteRoom (semua peserta terputus). Mengembalikan nama room yang ditutup.
+ * Satu putaran enforcer (R6): untuk tiap room yang sedang live di LiveKit, ADA di DB, dan tidak `active` (nonaktif
+ * atau kadaluarsa) → deleteRoom (semua peserta terputus). Room yang tidak dikenal DB dibiarkan: LiveKit bisa dipakai
+ * bersama instance/app lain (E2E-04), dan room yang dihapus sudah ditutup saat dihapus. Mengembalikan nama room yang ditutup.
  * ponytail: token yang sudah terbit (TTL 2 jam) bisa bergabung ulang ≤60 s sebelum ditendang lagi; cek join-time
  * di LiveKit (webhook/room metadata) bila celah itu penting.
  */
@@ -20,7 +21,7 @@ export async function runEnforcerOnce(deps: EnforcerDeps, now = Date.now()): Pro
   );
   const stale = live.map((r) => r.name).filter((name) => {
     const row = lookup.get(name);
-    return !row || roomStatus(row, now) !== "active";
+    return row != null && roomStatus(row, now) !== "active";
   });
   await Promise.all(stale.map((name) => closeLiveRoom(deps, name, "roomEnforcer")));
   return stale;

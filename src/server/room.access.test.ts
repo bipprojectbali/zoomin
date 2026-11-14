@@ -35,7 +35,7 @@ describe("canManageRoom (R3)", () => {
 });
 
 describe("runEnforcerOnce (R6)", () => {
-  // test-only: LiveKit palsu; room "gone" live tapi tidak ada di DB; deleteRoom "off" gagal (harus tetap lanjut).
+  // test-only: LiveKit palsu; room "gone" live tapi tidak ada di DB (milik instance lain); deleteRoom "off" gagal (harus tetap lanjut).
   const fake = (live: string[]) => {
     const deleted: string[] = [];
     const roomService = {
@@ -48,10 +48,16 @@ describe("runEnforcerOnce (R6)", () => {
     return { roomService, deleted };
   };
 
-  test("room live yang nonaktif/kadaluarsa/terhapus ditutup; room aktif dibiarkan", async () => {
-    const lk = fake(["ok", "off", "old", "gone"]);
-    expect(await runEnforcerOnce({ db, roomService: lk.roomService })).toEqual(["off", "old", "gone"]);
-    expect(lk.deleted.toSorted()).toEqual(["gone", "off", "old"]);
+  test("room live yang nonaktif/kadaluarsa ditutup; room aktif dibiarkan", async () => {
+    const lk = fake(["ok", "off", "old"]);
+    expect(await runEnforcerOnce({ db, roomService: lk.roomService })).toEqual(["off", "old"]);
+    expect(lk.deleted.toSorted()).toEqual(["off", "old"]);
+  });
+
+  test("room live yang tidak ada di DB (instance/app lain) TIDAK ditutup (E2E-04)", async () => {
+    const lk = fake(["gone"]);
+    expect(await runEnforcerOnce({ db, roomService: lk.roomService })).toEqual([]);
+    expect(lk.deleted).toEqual([]);
   });
 
   test("tanpa room live → tidak ada deleteRoom", async () => {
