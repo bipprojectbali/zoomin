@@ -24,7 +24,7 @@ export function tokenRoutes(deps: ApiDeps) {
 
       // Siapkan room LiveKit + metadata layout dari SQLite sebelum client join (late joiner langsung dapat layout).
       await syncRoomLayout(deps, roomId);
-      const token = await createJoinToken({ room: roomId, identity: user.id, name: user.name, role }, deps.config);
+      const token = await createJoinToken({ room: roomId, identity: user.id, name: user.name, role, image: user.image }, deps.config);
       const res: TokenResponse = { token, url: deps.config.publicLivekitUrl, role };
       return res;
     },

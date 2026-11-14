@@ -67,7 +67,7 @@ describe("POST /api/rooms/:roomId/token", () => {
     expect(c.name).toBe("Nama vic");
     expect(c.video?.room).toBe("r1");
     expect(c.video?.canPublish).toBe(false);
-    expect(JSON.parse(c.metadata ?? "{}")).toEqual({ role: "viewer" });
+    expect(JSON.parse(c.metadata ?? "{}")).toEqual({ role: "viewer", image: null });
     expect(synced).toContain("r1");
   });
 
@@ -79,6 +79,13 @@ describe("POST /api/rooms/:roomId/token", () => {
     const c = await verifier.verify(json.token);
     expect(c.video?.canPublish).toBe(true);
     expect(c.video?.roomAdmin).toBeUndefined();
+  });
+
+  test("foto profil https user ikut di metadata token", async () => {
+    const image = "https://lh3.googleusercontent.com/a/vic=s96-c"; // test-only
+    db.query('UPDATE "user" SET image = ? WHERE id = ?').run(image, vic.user.id);
+    const c = await verifier.verify(((await (await postToken("r1", VIEWER)).json()) as TokenResponse).token);
+    expect(JSON.parse(c.metadata ?? "{}")).toEqual({ role: "viewer", image });
   });
 
   test("ditolak (401/403/404) tidak menyentuh LiveKit", async () => {

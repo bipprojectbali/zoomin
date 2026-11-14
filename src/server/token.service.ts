@@ -14,8 +14,22 @@ const PUBLISH_SOURCES = [
   TrackSource.SCREEN_SHARE_AUDIO,
 ];
 
-/** Input token join; identity = user.id, role dari room_members (bukan dari client). */
-export type JoinTokenInput = { room: string; identity: string; name?: string; role: RoomRole };
+/** Batas panjang URL foto di metadata (metadata ikut ke semua peserta, jangan besar). */
+export const AVATAR_URL_MAX = 2048;
+
+/** Input token join; identity = user.id, role dari room_members (bukan dari client), image = user.image. */
+export type JoinTokenInput = { room: string; identity: string; name?: string; role: RoomRole; image?: string | null };
+
+/** URL foto aman untuk metadata: hanya https absolut ≤ AVATAR_URL_MAX; selain itu null. */
+export function avatarUrlOrNull(value: string | null | undefined): string | null {
+  if (!value || value.length > AVATAR_URL_MAX) return null;
+  try {
+    return new URL(value).protocol === "https:" ? value : null;
+  } catch {
+    // URL tak bisa di-parse = foto tidak ditampilkan (fallback inisial), bukan kegagalan join.
+    return null;
+  }
+}
 
 /**
  * Pemetaan role -> VideoGrant (tanpa field `room`). host = grant participant; hak layout/undangan host ditegakkan
@@ -31,7 +45,7 @@ export function grantsForRole(role: RoomRole): VideoGrant {
 
 /** Membuat JWT join room LiveKit sesuai role; throw bila room/identity/role tidak valid. */
 export async function createJoinToken(
-  { room, identity, name, role }: JoinTokenInput,
+  { room, identity, name, role, image }: JoinTokenInput,
   config: Pick<Config, "livekitApiKey" | "livekitApiSecret">,
 ): Promise<string> {
   if (!SAFE_ID.test(room)) throw new Error(`createJoinToken: room tidak valid (${JSON.stringify(room)})`);
@@ -42,7 +56,7 @@ export async function createJoinToken(
     identity,
     name: name ?? identity,
     ttl: JOIN_TOKEN_TTL_SECONDS,
-    metadata: JSON.stringify({ role }),
+    metadata: JSON.stringify({ role, image: avatarUrlOrNull(image) }),
   });
   at.addGrant({ ...grantsForRole(role), room });
   return at.toJwt();

@@ -3,7 +3,7 @@ import { useIsMuted, useIsSpeaking, VideoTrack, type TrackReference } from "@liv
 import { Track, type Participant } from "livekit-client";
 import { CircleSlash, MicOff, MonitorUp, UserRound, VideoOff } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { STAGE_LABELS } from "./stage.labels";
@@ -15,11 +15,12 @@ const ROOMY_ONLY = "hidden [@container(min-width:200px)_and_(min-height:150px)]:
 const SMALL_ONLY = "flex [@container(min-width:200px)_and_(min-height:150px)]:hidden";
 const AVATAR_SIZE = "size-10 [@container(min-width:200px)_and_(min-height:150px)]:size-12 [@container(min-width:320px)_and_(min-height:220px)]:size-20";
 
-/** Avatar inisial (peserta keluar: ikon netral, bukan inisial) + nama & status di tile yang cukup lebar. */
-export function TileAvatar({ name, status, left }: { name: string; status?: string; left?: boolean }) {
+/** Avatar foto profil (fallback inisial; peserta keluar: ikon netral) + nama & status di tile yang cukup lebar. */
+export function TileAvatar({ name, status, left, image }: { name: string; status?: string; left?: boolean; image?: string | null }) {
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-2 pb-8 text-center">
       <Avatar className={AVATAR_SIZE}>
+        {image && !left && <AvatarImage src={image} alt={name} referrerPolicy="no-referrer" loading="lazy" className="object-cover" />}
         <AvatarFallback className="bg-primary/15 text-base font-semibold [@container(min-width:320px)_and_(min-height:220px)]:text-2xl">
           {left ? <UserRound aria-hidden className="size-1/2 text-muted-foreground" /> : initialsOf(name)}
         </AvatarFallback>

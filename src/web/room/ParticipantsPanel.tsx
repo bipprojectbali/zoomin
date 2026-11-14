@@ -2,13 +2,13 @@ import { useParticipants } from "@livekit/components-react";
 import { ConnectionQuality, RoomEvent, type Participant, type Room } from "livekit-client";
 import { Mic, MicOff, MonitorUp, SignalHigh, SignalLow, SignalMedium, SignalZero } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { ROLE_LABEL } from "@/role.label";
-import { countScreens, displayName, initials, roleFromMetadata, sortParticipants } from "./participants.model";
+import { countScreens, displayName, imageFromMetadata, initials, roleFromMetadata, sortParticipants } from "./participants.model";
 
 const TEXT = {
   title: (n: number) => `Peserta (${n})`,
@@ -78,6 +78,7 @@ export function ParticipantsPanel({ room, open, onOpenChange }: Props) {
 function ParticipantRow({ participant: p }: { participant: Participant }) {
   const name = displayName(p);
   const role = roleFromMetadata(p.metadata);
+  const image = imageFromMetadata(p.metadata);
   const screens = countScreens([...p.trackPublications.values()].map((pub) => pub.trackName));
   const QualityIcon = QUALITY_ICON[p.connectionQuality];
   const micOn = p.isMicrophoneEnabled;
@@ -90,6 +91,7 @@ function ParticipantRow({ participant: p }: { participant: Participant }) {
       className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/50"
     >
       <Avatar className={cn("size-9 ring-2 ring-transparent", p.isSpeaking && "ring-primary")}>
+        {image && <AvatarImage src={image} alt={name} referrerPolicy="no-referrer" loading="lazy" />}
         <AvatarFallback>{initials(name) || "?"}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">

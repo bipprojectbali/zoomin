@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { TokenVerifier } from "livekit-server-sdk";
 import type { RoomRole } from "../shared/api.types";
 import { loadConfig } from "./config";
-import { createJoinToken, grantsForRole, JOIN_TOKEN_TTL_SECONDS } from "./token.service";
+import { AVATAR_URL_MAX, avatarUrlOrNull, createJoinToken, grantsForRole, JOIN_TOKEN_TTL_SECONDS } from "./token.service";
 
 const config = loadConfig({});
 const verifier = new TokenVerifier(config.livekitApiKey, config.livekitApiSecret);
@@ -43,7 +43,7 @@ describe("createJoinToken grants", () => {
   });
 
   test.each(["host", "participant", "viewer"] as const)("metadata role %s", async (role) => {
-    expect(JSON.parse((await decode(role)).metadata ?? "{}")).toEqual({ role });
+    expect(JSON.parse((await decode(role)).metadata ?? "{}")).toEqual({ role, image: null });
   });
 
   test("TTL sesuai konstanta (2 jam)", async () => {
@@ -62,5 +62,28 @@ describe("createJoinToken grants", () => {
     { room: "r", identity: "a", role: "admin" }, // peran room lama, kini host
   ])("input invalid ditolak: %o", async (input) => {
     await expect(createJoinToken({ ...input, role: input.role as RoomRole }, config)).rejects.toThrow("createJoinToken");
+  });
+});
+
+describe("metadata image", () => {
+  const meta = async (image: string | null | undefined) =>
+    JSON.parse((await verifier.verify(await createJoinToken({ room: ROOM, identity: "u-img", role: "participant", image }, config))).metadata ?? "{}");
+
+  test("https valid ikut di metadata", async () => {
+    const url = "https://lh3.googleusercontent.com/a/abc=s96-c"; // test-only
+    expect(await meta(url)).toEqual({ role: "participant", image: url });
+  });
+
+  test.each([null, undefined, "", "http://x.test/a.png", "javascript:alert(1)", "data:image/png;base64,AA", "bukan url"])(
+    "%p → null",
+    async (image) => {
+      expect(await meta(image)).toEqual({ role: "participant", image: null });
+    },
+  );
+
+  test("lebih dari batas panjang → null", () => {
+    const long = `https://x.test/${"a".repeat(AVATAR_URL_MAX)}`;
+    expect(avatarUrlOrNull(long)).toBeNull();
+    expect(avatarUrlOrNull(long.slice(0, AVATAR_URL_MAX))).toBe(long.slice(0, AVATAR_URL_MAX));
   });
 });

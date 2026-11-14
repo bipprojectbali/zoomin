@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { TrackRef } from "../../shared/layout.model";
 import { parseTrackName } from "../../shared/track.naming";
+import { imageFromMetadata } from "../room/participants.model";
 import { useStage } from "./stage.context";
 import { STAGE_LABELS } from "./stage.labels";
 import { keyOf } from "./stage.resolve";
@@ -71,7 +72,7 @@ export function TileView({ trackRef, track, slotIndex, adminItems = [], drag, ba
     : [];
 
   const inactiveStatus = person.present && isCamera ? STAGE_LABELS.cameraOff : `${kindLabel(trackRef.trackName)} · ${STAGE_LABELS.inactive}`;
-  const avatar = <TileAvatar name={person.name} status={track ? STAGE_LABELS.cameraOff : inactiveStatus} left={!person.present} />;
+  const avatar = <TileAvatar name={person.name} status={track ? STAGE_LABELS.cameraOff : inactiveStatus} left={!person.present} image={imageFromMetadata(participant?.metadata)} />;
   const ownScreen = track?.source === Track.Source.ScreenShare && person.isLocal;
   const media = ownScreen ? (
     <OwnScreenNotice text={STAGE_LABELS.sharingOwn(kindLabel(trackRef.trackName))} />

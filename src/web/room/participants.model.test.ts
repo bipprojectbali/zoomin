@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   countScreens,
   displayName,
+  imageFromMetadata,
   initials,
   presenceToastText,
   roleFromMetadata,
@@ -26,6 +27,22 @@ describe("roleFromMetadata", () => {
     expect(roleFromMetadata("bukan json")).toBeNull();
     expect(roleFromMetadata("null")).toBeNull();
     expect(roleFromMetadata(undefined)).toBeNull();
+  });
+});
+
+describe("imageFromMetadata", () => {
+  test("https valid dibaca; non-https, kepanjangan, metadata lama/rusak → null", () => {
+    const url = "https://lh3.googleusercontent.com/a/x=s96-c"; // test-only
+    expect(imageFromMetadata(JSON.stringify({ role: "host", image: url }))).toBe(url);
+    expect(imageFromMetadata(JSON.stringify({ role: "host", image: null }))).toBeNull();
+    expect(imageFromMetadata('{"role":"host"}')).toBeNull(); // metadata lama tanpa image
+    expect(imageFromMetadata(JSON.stringify({ image: "http://x.test/a.png" }))).toBeNull();
+    expect(imageFromMetadata(JSON.stringify({ image: "javascript:alert(1)" }))).toBeNull();
+    expect(imageFromMetadata(JSON.stringify({ image: "bukan url" }))).toBeNull();
+    expect(imageFromMetadata(JSON.stringify({ image: 42 }))).toBeNull();
+    expect(imageFromMetadata(JSON.stringify({ image: `https://x.test/${"a".repeat(2048)}` }))).toBeNull();
+    expect(imageFromMetadata("bukan json")).toBeNull();
+    expect(imageFromMetadata(undefined)).toBeNull();
   });
 });
 

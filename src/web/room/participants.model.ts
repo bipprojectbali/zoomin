@@ -20,6 +20,21 @@ export function roleFromMetadata(metadata: string | undefined): RoomRole | null 
   }
 }
 
+const AVATAR_URL_MAX = 2048; // = batas server (token.service)
+
+/** URL foto profil dari participant metadata `{"image": ...}`; hanya https ≤ 2048, selain itu/metadata lama → null. */
+export function imageFromMetadata(metadata: string | undefined): string | null {
+  if (!metadata) return null;
+  try {
+    const image: unknown = JSON.parse(metadata)?.image;
+    if (typeof image !== "string" || image.length > AVATAR_URL_MAX) return null;
+    return new URL(image).protocol === "https:" ? image : null;
+  } catch {
+    // Metadata bukan JSON / URL tak valid = tanpa foto (fallback inisial), bukan kegagalan.
+    return null;
+  }
+}
+
 /** Nama tampil: name LiveKit, fallback identity. */
 export function displayName(p: Pick<ParticipantLike, "identity" | "name">): string {
   return p.name?.trim() || p.identity;

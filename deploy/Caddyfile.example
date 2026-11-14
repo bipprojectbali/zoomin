@@ -34,8 +34,9 @@
 		Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=(), usb=()"
 		# SPA Bun: script/style dari chunk /chunk-*.js|css (tanpa inline script, dicek NODE_ENV=production).
 		# style 'unsafe-inline': sonner/radix menyisipkan <style> saat runtime.
+		# img-src googleusercontent: foto profil Google di avatar room (URL https lain diblokir → fallback inisial).
 		# connect-src: signaling wss + fetch https (/rtc/validate) ke LiveKit. Media (srcObject) tidak diatur CSP.
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self' wss://{$LK_DOMAIN} https://{$LK_DOMAIN}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self' data:; media-src 'self' blob:; connect-src 'self' wss://{$LK_DOMAIN} https://{$LK_DOMAIN}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 		-Server
 	}
 }
