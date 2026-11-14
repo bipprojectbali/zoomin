@@ -1,6 +1,7 @@
 // Integration test M2 multi screen share (port RND/spike/lk-bun/src/multishare.test.ts) memakai token dari
 // endpoint produk + nama dari track.naming.ts. Butuh LiveKit dev di ws://127.0.0.1:7880 (devkey/secret).
 import { afterAll, afterEach, expect, test } from "bun:test";
+import { SKIP_LIVEKIT_TESTS } from "./livekit.gate";
 import {
   AudioStream,
   type RemoteTrack,
@@ -128,7 +129,7 @@ async function publishVideo(room: Room, name: string, color: Rgb, source: TrackS
   await room.localParticipant!.publishTrack(media.track, new TrackPublishOptions({ source, simulcast: true }));
 }
 
-test(
+test.skipIf(SKIP_LIVEKIT_TESTS)(
   "presenter publish 3 layar + camera + mic, viewer terima 5 track dengan nama/source benar + frame mengalir",
   async () => {
     const roomId = createRoom({ presenter: "participant", viewer1: "viewer" });
@@ -179,7 +180,7 @@ test(
   TEST_TIMEOUT_MS,
 );
 
-test(
+test.skipIf(SKIP_LIVEKIT_TESTS)(
   "user-a dan user-b masing-masing share 1 layar, viewer terima keduanya",
   async () => {
     const roomId = createRoom({ "user-a": "participant", "user-b": "participant", viewer1: "viewer" });

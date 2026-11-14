@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { SKIP_LIVEKIT_TESTS } from "../../test/livekit.gate";
 import { createTestDeps } from "../../test/auth.helpers";
 import { APP_VERSION } from "../cli/cli.run";
 import { getSystemHealth } from "./dev.health";
@@ -12,7 +13,7 @@ function deadPort(): number {
 }
 
 describe("getSystemHealth", () => {
-  test("LiveKit dev lokal hidup → ok true + latency; info dasar & hitungan DB", async () => {
+  test.skipIf(SKIP_LIVEKIT_TESTS)("LiveKit dev lokal hidup → ok true + latency; info dasar & hitungan DB", async () => {
     const deps = createTestDeps();
     const health = await getSystemHealth(deps);
     expect(health.livekit).toMatchObject({ url: "ws://127.0.0.1:7880", ok: true, error: null });

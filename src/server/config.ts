@@ -33,7 +33,7 @@ export type Config = {
 export const AUTH_SECRET_MIN_LENGTH = 32;
 /** Env yang wajib diset di production (loadConfig throw bila kosong). Sumber tunggal untuk docs/CLI. */
 export const REQUIRED_IN_PRODUCTION = ["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] as const;
-const DEFAULT_PORT = 3000;
+export const DEFAULT_PORT = 3000;
 const DEFAULT_HOST = "0.0.0.0";
 export const DEFAULT_DB_PATH = "./data/zoomin.sqlite";
 const DEFAULT_LIVEKIT_URL = "ws://127.0.0.1:7880";

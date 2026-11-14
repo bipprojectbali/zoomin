@@ -6,12 +6,16 @@ import { summarizeConfig } from "../cli/cli.check";
 import type { CliServerHooks } from "../cli/cli.run";
 import { createAuth } from "./auth.better";
 import { listUsersForCli, setUserRoleByEmail, unbanUserByEmail } from "./auth.user.repository";
-import { type Config, DEFAULT_DB_PATH, loadConfig } from "./config";
+import { type Config, DEFAULT_DB_PATH, DEFAULT_PORT, loadConfig } from "./config";
 import { connectDb, openDb, runMigrations } from "./db";
 import { createServer, displayUrl, installShutdown, lanAddress, loadTls, toHttpUrl } from "./main";
 import { startRoomEnforcer } from "./room.enforcer";
 
 type Env = Record<string, string | undefined>;
+
+/** Batas waktu `zoomin healthcheck`; HEALTHCHECK Docker punya timeout sendiri, ini mencegah hang tanpa batas. */
+const HEALTHCHECK_TIMEOUT_MS = 3000;
+const WILDCARD_LISTEN = new Set(["", "0.0.0.0", "::", "[::]"]);
 
 const BINARY_HINT = "binary berjalan sebagai NODE_ENV=production; buat .env dengan `zoomin env > .env`, isi secret, lalu `zoomin check`";
 
@@ -82,6 +86,20 @@ export function createServerHooks(env: Env = process.env, standalone = Bun.isSta
       } finally {
         db.close();
       }
+    },
+
+    async healthcheck(overrides) {
+      // Tanpa loadConfig: cukup port/host/TLS, jadi tetap jalan walau config lain bermasalah.
+      const resolved = resolveEnv(overrides, env, standalone);
+      const host = resolved.HOST?.trim() ?? "";
+      const target = WILDCARD_LISTEN.has(host) ? "127.0.0.1" : host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+      const url = `${resolved.TLS_CERT_PATH?.trim() ? "https" : "http"}://${target}:${resolved.PORT?.trim() || DEFAULT_PORT}/api/health`;
+      // Sertifikat lokal (mkcert/tailscale) tidak cocok dengan 127.0.0.1; ini hanya probe liveness proses sendiri.
+      const res = await fetch(url, { signal: AbortSignal.timeout(HEALTHCHECK_TIMEOUT_MS), tls: { rejectUnauthorized: false } }).catch((cause) => {
+        throw new Error(`${url} tidak terjangkau: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+      });
+      if (!res.ok) throw new Error(`${url} status ${res.status}`);
+      return url;
     },
 
     async check(overrides) {

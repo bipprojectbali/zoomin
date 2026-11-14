@@ -15,6 +15,7 @@ const noopHooks: CliServerHooks = {
   serve: async () => {},
   migrate: async () => ({ applied: [] }),
   check: async () => ({ ok: true, summary: {} }),
+  healthcheck: async () => "http://127.0.0.1:3000/api/health",
   user: async () => [],
 };
 
@@ -41,7 +42,7 @@ describe("runCli", () => {
     }
   });
 
-  test.each(["serve", "migrate", "check", "user", "env", "docs", "help"])("bantuan per perintah: %s", async (cmd) => {
+  test.each(["serve", "migrate", "check", "healthcheck", "user", "env", "docs", "help"])("bantuan per perintah: %s", async (cmd) => {
     const { code, stdout } = await run([cmd, "--help"]);
     expect(code).toBe(0);
     expect(stdout).toStartWith(`zoomin ${cmd} - `);
@@ -82,6 +83,14 @@ describe("runCli", () => {
     expect(code).toBe(0);
     expect(stdout).toContain("BETTER_AUTH_SECRET=");
     expect(stdout).not.toContain("SESSION_SECRET=");
+  });
+
+  test("healthcheck: sehat → exit 0 + URL; gagal → exit 1 + alasan", async () => {
+    const ok = await run(["healthcheck"]);
+    expect([ok.code, ok.stdout]).toEqual([0, "OK http://127.0.0.1:3000/api/health\n"]);
+    const bad = await run(["healthcheck"], { ...noopHooks, healthcheck: async () => { throw new Error("status 503"); } });
+    expect(bad.code).toBe(1);
+    expect(bad.stderr).toContain("zoomin healthcheck gagal: status 503");
   });
 
   test("argumen salah → stderr + exit 2, hooks tidak dipanggil", async () => {

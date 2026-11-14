@@ -23,6 +23,8 @@ export interface CliServerHooks {
   serve(overrides: CliOverrides): Promise<void>;
   migrate(overrides: CliOverrides): Promise<{ applied: string[] }>;
   check(overrides: CliOverrides): Promise<{ ok: true; summary: Record<string, string> } | { ok: false; errors: string[] }>;
+  /** `zoomin healthcheck`: GET /api/health server lokal; resolve URL yang dicek, throw bila gagal/non-2xx. */
+  healthcheck(overrides: CliOverrides): Promise<string>;
   /** `zoomin user`: list → semua baris (dibatasi hooks); promote/unban → [baris setelah diubah]. Throw bila email tak ada. */
   user(overrides: CliOverrides, action: UserAction): Promise<CliUserRow[]>;
 }
@@ -97,6 +99,9 @@ export async function runCli(argv: string[], io: CliIo, hooks: CliServerHooks): 
         io.out(`${color.green("Konfigurasi valid.")}\n${rows.join("\n")}\n`);
         return 0;
       }
+      case "healthcheck":
+        io.out(`${color.green("OK")} ${await hooks.healthcheck(command.overrides)}\n`);
+        return 0;
       case "user": {
         const rows = await hooks.user(command.overrides, command.user);
         const action = command.user;

@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { SKIP_LIVEKIT_TESTS } from "./livekit.gate";
 import { Room, RoomEvent } from "@livekit/rtc-node";
 import type { TokenResponse } from "../src/shared/api.types";
 import { createApi } from "../src/server/api";
@@ -14,11 +15,12 @@ const roomId = `ban-${crypto.randomUUID().slice(0, 8)}`;
 const room = new Room();
 
 afterAll(async () => {
+  if (SKIP_LIVEKIT_TESTS) return;
   await room.disconnect();
   await deps.roomService.deleteRoom(roomId).catch((cause: unknown) => console.warn(`cleanup deleteRoom ${roomId}`, cause));
 });
 
-describe("ban admin → keluar dari LiveKit (A6)", () => {
+describe.skipIf(SKIP_LIVEKIT_TESTS)("ban admin → keluar dari LiveKit (A6)", () => {
   test(
     "participant terhubung, admin ban → participant terputus & hilang dari room",
     async () => {

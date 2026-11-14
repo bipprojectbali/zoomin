@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { SKIP_LIVEKIT_TESTS } from "./livekit.gate";
 import { Room, TrackPublishOptions, TrackSource } from "@livekit/rtc-node";
 import type { TokenResponse } from "../src/shared/api.types";
 import { createApi } from "../src/server/api";
@@ -38,6 +39,7 @@ function publishMic(room: Room) {
 }
 
 beforeAll(async () => {
+  if (SKIP_LIVEKIT_TESTS) return;
   const admin = await createTestUser(deps, { email: "admin@example.test", role: "admin" });
   createRoom(db, { id: roomId, title: "Join IT", createdBy: admin.user.id });
   const [p, v] = await Promise.all([fetchToken(await addMember("p1", "participant")), fetchToken(await addMember("v1", "viewer"))]);
@@ -47,12 +49,13 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (SKIP_LIVEKIT_TESTS) return;
   await Promise.all([participant.disconnect(), viewer.disconnect()]);
   await Promise.all(stops.map((stop) => stop()));
   await roomService.deleteRoom(roomId);
 });
 
-describe("join dengan token dari endpoint", () => {
+describe.skipIf(SKIP_LIVEKIT_TESTS)("join dengan token dari endpoint", () => {
   test("participant & viewer terkoneksi", () => {
     expect(participant.isConnected).toBe(true);
     expect(viewer.isConnected).toBe(true);

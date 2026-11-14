@@ -1,5 +1,6 @@
 // Integrasi layout dengan LiveKit dev nyata (ws://127.0.0.1:7880, devkey/secret). Port dari spike layout-sync.test.ts.
 import { afterAll, beforeAll, expect, test } from "bun:test";
+import { SKIP_LIVEKIT_TESTS } from "./livekit.gate";
 import { Room, RoomEvent } from "@livekit/rtc-node";
 import type { RoomRole } from "../src/shared/api.types";
 import { type LayoutState, parseLayout } from "../src/shared/layout.model";
@@ -73,6 +74,7 @@ let alice: Room;
 let bob: Room;
 
 beforeAll(async () => {
+  if (SKIP_LIVEKIT_TESTS) return;
   db.run("INSERT INTO rooms (id, title, created_by, created_at) VALUES (?, 'Sync', ?, 1)", [roomId, host.user.id]);
   db.run("INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, 'host')", [roomId, host.user.id]);
   await syncRoomLayout({ db, roomService }, roomId); // seperti saat token pertama diterbitkan
@@ -80,11 +82,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (SKIP_LIVEKIT_TESTS) return;
   await Promise.all(rooms.map((r) => r.disconnect()));
   await roomService.deleteRoom(roomId);
 });
 
-test("PUT host sampai ke semua klien dengan isi sama", async () => {
+test.skipIf(SKIP_LIVEKIT_TESTS)("PUT host sampai ke semua klien dengan isi sama", async () => {
   const waits = [nextMetadata(alice, "alice"), nextMetadata(bob, "bob")];
   const res = await putLayout(0, layout);
   expect(res.status).toBe(200);
@@ -94,7 +97,7 @@ test("PUT host sampai ke semua klien dengan isi sama", async () => {
   expect(parseLayout(a!)).toMatchObject({ version: 1, template: "grid", updatedBy: host.user.id });
 });
 
-test("late joiner langsung dapat layout terkini dari room.metadata", async () => {
+test.skipIf(SKIP_LIVEKIT_TESTS)("late joiner langsung dapat layout terkini dari room.metadata", async () => {
   const wait = nextMetadata(alice, "alice");
   expect((await putLayout(1, { ...layout, template: "focus" })).status).toBe(200);
   const latest = await wait;
@@ -103,7 +106,7 @@ test("late joiner langsung dapat layout terkini dari room.metadata", async () =>
   expect(parseLayout(carol.metadata!).version).toBe(2);
 });
 
-test("room LiveKit dibuat ulang: syncRoomLayout memulihkan metadata dari SQLite", async () => {
+test.skipIf(SKIP_LIVEKIT_TESTS)("room LiveKit dibuat ulang: syncRoomLayout memulihkan metadata dari SQLite", async () => {
   const other = `${roomId}-re`;
   db.run("INSERT INTO rooms (id, title, created_by, layout_json, layout_version, created_at) VALUES (?, 'Re', ?, ?, 3, 1)", [
     other,
@@ -116,7 +119,7 @@ test("room LiveKit dibuat ulang: syncRoomLayout memulihkan metadata dari SQLite"
   expect(parseLayout(listed!.metadata).version).toBe(3);
 });
 
-test("token participant dan host (tanpa roomAdmin) -> Twirp UpdateRoomMetadata 401", async () => {
+test.skipIf(SKIP_LIVEKIT_TESTS)("token participant dan host (tanpa roomAdmin) -> Twirp UpdateRoomMetadata 401", async () => {
   const before = (await roomService.listRooms([roomId]))[0]!.metadata;
   for (const role of ["participant", "host"] as const) {
     const res = await twirpUpdateMetadata(await token(`mallory-${role}`, role), "hacked");

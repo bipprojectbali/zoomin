@@ -14,6 +14,7 @@ describe("parseCliArgs", () => {
       .toEqual({ kind: "serve", overrides: expected });
     expect(parseCliArgs(["migrate", "--db", "x.sqlite"])).toEqual({ kind: "migrate", overrides: { dbPath: "x.sqlite" } });
     expect(parseCliArgs(["check", "-p", "1"])).toEqual({ kind: "check", overrides: { port: 1 } });
+    expect(parseCliArgs(["healthcheck", "-p", "8080"])).toEqual({ kind: "healthcheck", overrides: { port: 8080 } });
   });
 
   test.each(["0", "65536", "-1", "abc", "80.5", "", "1e3"])("port tidak valid %p → error exit 2", (port) => {

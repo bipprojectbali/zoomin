@@ -12,6 +12,7 @@ export type CliCommand =
   | { kind: "user"; overrides: CliOverrides; user: UserAction }
   | { kind: "migrate"; overrides: CliOverrides }
   | { kind: "check"; overrides: CliOverrides }
+  | { kind: "healthcheck"; overrides: CliOverrides }
   | { kind: "env-example" }
   | { kind: "version" }
   | { kind: "help"; topic?: string }
@@ -19,8 +20,8 @@ export type CliCommand =
   | { kind: "error"; message: string; exitCode: 2 };
 
 /** Nama perintah yang dikenal (dipakai juga oleh teks bantuan). */
-export const COMMANDS = ["serve", "migrate", "check", "user", "env", "docs", "help"] as const;
-const OVERRIDE_COMMANDS = new Set(["serve", "migrate", "check", "user"]);
+export const COMMANDS = ["serve", "migrate", "check", "healthcheck", "user", "env", "docs", "help"] as const;
+const OVERRIDE_COMMANDS = new Set(["serve", "migrate", "check", "healthcheck", "user"]);
 const PROMOTE_ROLES = ["admin", "user"] as const;
 const HINT = "Jalankan `zoomin --help` untuk daftar perintah dan opsi.";
 
@@ -92,7 +93,7 @@ export function parseCliArgs(argv: string[]): CliCommand {
     if (value !== undefined && !value.trim()) return error(`Nilai ${flag} tidak boleh kosong`);
   }
   if (user) return { kind: "user", overrides, user };
-  return { kind: command as "serve" | "migrate" | "check", overrides };
+  return { kind: command as "serve" | "migrate" | "check" | "healthcheck", overrides };
 }
 
 /** `user list | promote <email> --role admin|user | unban <email>` → UserAction, atau pesan error. */

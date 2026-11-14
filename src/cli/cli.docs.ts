@@ -60,6 +60,7 @@ menjadi super_admin; angkat admin dari halaman /dev atau \`zoomin user promote <
 - \`zoomin [serve]\` jalankan server (default).
 - \`zoomin migrate\` terapkan migrasi SQLite lalu keluar.
 - \`zoomin check\` validasi konfigurasi; exit 1 bila tidak valid. Secret tidak pernah dicetak.
+- \`zoomin healthcheck\` cek \`/api/health\` server lokal; exit 0 sehat, 1 tidak (HEALTHCHECK Docker).
 - \`zoomin user list|promote <email> --role admin|user|unban <email>\` kelola akun darurat langsung di DB.
 - \`zoomin env\` cetak contoh \`.env\`.
 - \`zoomin --docs <topik>\` dokumentasi; \`zoomin <perintah> --help\` bantuan per perintah.

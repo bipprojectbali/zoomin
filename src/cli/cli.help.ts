@@ -17,6 +17,7 @@ export const GLOBAL_HELP = `zoomin - ruang meeting self-hosted di atas LiveKit
   serve           Jalankan server (default bila tanpa perintah)
   migrate         Terapkan migrasi SQLite lalu keluar
   check           Validasi konfigurasi tanpa menjalankan server
+  healthcheck     Cek server lokal (GET /api/health), exit 0 sehat / 1 tidak (HEALTHCHECK Docker)
   user            Kelola akun darurat: list | promote <email> --role admin|user | unban <email>
   env             Cetak contoh file .env
   docs [topik]    Cetak dokumentasi (sama dengan --docs)
@@ -69,6 +70,15 @@ ${SERVE_OPTIONS}
 
 # Examples
   NODE_ENV=production zoomin check --env-file /etc/zoomin/zoomin.env`,
+  healthcheck: `zoomin healthcheck - cek server lokal lewat GET /api/health (exit 0 sehat, 1 tidak sehat)
+Dipakai HEALTHCHECK image Docker (tanpa curl). Port dari PORT/--port, https bila TLS_CERT_PATH diset.
+
+# Usage
+  zoomin healthcheck [-p <port>] [--env-file <path>]
+
+# Examples
+  zoomin healthcheck
+  zoomin healthcheck -p 8080`,
   user: `zoomin user - kelola akun langsung di DB (jalan darurat, hanya di server)
 Peran super_admin tidak bisa diatur di sini: selalu dari SUPER_ADMIN_EMAILS (disinkronkan saat login).
 

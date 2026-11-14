@@ -70,6 +70,22 @@ describe("hooks", () => {
   });
 });
 
+describe("hooks.healthcheck", () => {
+  test("server /api/health 200 → URL; 503 → throw status; port mati → throw tidak terjangkau", async () => {
+    let status = 200;
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (req) => new Response(new URL(req.url).pathname === "/api/health" ? "{}" : "", { status }) });
+    try {
+      const hooks = createServerHooks({ HOST: "0.0.0.0", PORT: String(server.port) }, true);
+      expect(await hooks.healthcheck({})).toBe(`http://127.0.0.1:${server.port}/api/health`);
+      status = 503;
+      await expect(hooks.healthcheck({})).rejects.toThrow("status 503");
+    } finally {
+      await server.stop(true);
+    }
+    await expect(createServerHooks({}, true).healthcheck({ port: server.port })).rejects.toThrow("tidak terjangkau");
+  });
+});
+
 describe("hooks.user (A11)", () => {
   test("list → promote admin/user → unban; super_admin & email tak dikenal ditolak", async () => {
     // Siapkan DB file berisi user Better Auth asli, lalu jalankan hooks seperti binary (tanpa secret produksi).

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { SKIP_LIVEKIT_TESTS } from "../../test/livekit.gate";
 import { createTestDeps, createTestUser, TEST_SUPER_ADMIN_EMAIL } from "../../test/auth.helpers";
 import type { AdminUser, ApiError, AppSettings, AuditEntry, Page, SessionUser, SystemHealth, UserResponse } from "../shared/api.types";
 import { createApi } from "./api";
@@ -60,7 +61,7 @@ describe("akses /api/dev/*", () => {
 });
 
 describe("GET /api/dev/health", () => {
-  test("LiveKit dev lokal hidup → ok; hitungan DB dari user test", async () => {
+  test.skipIf(SKIP_LIVEKIT_TESTS)("LiveKit dev lokal hidup → ok; hitungan DB dari user test", async () => {
     const health = await json<SystemHealth>(call("GET", "/dev/health", root.cookie));
     expect(health.livekit.ok).toBe(true);
     expect(health.db.users).toBe(3);

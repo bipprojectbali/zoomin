@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { SKIP_LIVEKIT_TESTS } from "../../test/livekit.gate";
 import { Room, TrackPublishOptions, TrackSource } from "@livekit/rtc-node";
 import { createTestDeps, createTestUser } from "../../test/auth.helpers";
 import { startSyntheticAudio } from "../../test/synthetic-media";
@@ -137,7 +138,7 @@ describe("proxy ke upstream palsu", () => {
 });
 
 // Integrasi nyata: butuh LiveKit dev (`livekit-server --dev`, ws://127.0.0.1:7880, devkey/secret).
-describe("proxy ke LiveKit nyata", () => {
+describe.skipIf(SKIP_LIVEKIT_TESTS)("proxy ke LiveKit nyata", () => {
   const real = appServer("ws://127.0.0.1:7880");
   const proxyUrl = `ws://127.0.0.1:${real.server.port}/livekit`;
   const withProxyUrl = appServer("ws://127.0.0.1:7880", { PUBLIC_LIVEKIT_URL: proxyUrl });
