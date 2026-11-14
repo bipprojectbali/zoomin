@@ -273,19 +273,20 @@ callback `/api/auth/callback/google`, `POST /api/auth/sign-out`). Endpoint plugi
 | GET | `/api/me/sessions` | sesi | `{ items }` (sesi login, tanda `current`) |
 | DELETE | `/api/me/sessions` · `/api/me/sessions/:id` | sesi | 204 (cabut semua sesi lain / satu sesi) |
 | GET | `/api/rooms?limit=&cursor=` | sesi | `{ items, nextCursor }` (user: room yang diikuti; admin+: semua; limit default 20, maks 100) |
-| POST | `/api/rooms` | admin+, `{ id, title, visibility?, expiresAt?, members? }` | `RoomSummary`; pembuat jadi host; `members` (`[{ email, role }]`, maks 100) dibuat sekaligus (akun ada → anggota, belum → tertunda; gagal satu = room tidak dibuat) \| 400 `email_domain_not_allowed` (`path` `/members/<i>/email`) \| 403 `insufficient_role` |
+| POST | `/api/rooms` | admin+, `{ id, title, visibility?, password?, expiresAt?, members? }` | `RoomSummary`; pembuat jadi host; `visibility: "password"` wajib `password` 6–64 karakter (disimpan sebagai hash, tidak pernah dikembalikan); `members` (`[{ email, role }]`, maks 100) dibuat sekaligus (akun ada → anggota, belum → tertunda; gagal satu = room tidak dibuat) \| 400 `email_domain_not_allowed` (`path` `/members/<i>/email`) \| 403 `insufficient_role` |
 | GET | `/api/users/search?q=&limit=` | admin+ / host di minimal satu room | `{ items: [{ id, name, email, image }] }` (q 2–100 huruf, nama/email; tanpa akun di-ban; limit default 8, maks 10) \| 403 `insufficient_role` \| 429 `rate_limited` (30/menit per user) |
 | GET | `/api/rooms/:roomId` | anggota / admin+ | `RoomSummary` \| 401 \| 403 \| 404 |
-| PATCH | `/api/rooms/:roomId` | host room / admin+, `{ title?, visibility?, enabled?, expiresAt? }` | `RoomSummary` (`enabled: false` memutus semua peserta) |
+| PATCH | `/api/rooms/:roomId` | host room / admin+, `{ title?, visibility?, password?, enabled?, expiresAt? }` | `RoomSummary` (`enabled: false` memutus semua peserta; `password` = set/ganti password room tipe `password`; pindah ke `public`/`private` menghapus password) |
+| POST | `/api/rooms/:roomId/join` | sesi, `{ password }` | `{ roomId, role }` (room tipe `password`; jadi anggota `participant`) \| 403 `password_invalid`/`room_private`/`forbidden`/`room_inactive`/`room_expired` \| 429 (5 / menit per user+room) |
 | DELETE | `/api/rooms/:roomId` | host room / admin+ | 204 (hapus room di DB + LiveKit) |
 | GET | `/api/rooms/:roomId/members?limit=&cursor=` | host room / admin+ | `Page<RoomMemberItem>` (anggota lalu undangan tertunda; limit default 50, maks 200) |
 | POST | `/api/rooms/:roomId/members` | host room / admin+, `{ email, role }` | 201 `RoomMemberItem` (akun ada → anggota; belum → tertunda) |
 | PATCH · DELETE | `/api/rooms/:roomId/members/:userId` | host room / admin+, PATCH `{ role }` | `RoomMemberItem` / 204 \| 404 `member_not_found` \| 409 `last_host` |
 | DELETE | `/api/rooms/:roomId/invitations/:email` | host room / admin+ | 204 (batalkan undangan tertunda) \| 404 `member_not_found` |
 | POST | `/api/rooms/:roomId/invites` | host room / admin+, `{ role, ttlHours? }` | `{ url, expiresAt }` \| 403 `room_private` |
-| GET | `/api/invites/preview?invite=` | publik (sesi opsional) | `InvitePreview` (judul room, peran, sesi saat ini) \| 400 \| 403 `room_private`/`room_inactive`/`room_expired` \| 404 |
-| POST | `/api/invites/accept` | sesi, `{ invite }` | `{ user, roomId, role }` \| 401 \| 403 (seperti preview) \| 429 (200 / jam per IP) |
-| POST | `/api/rooms/:roomId/token` | anggota / admin+ | `{ token, url, role }` (role dari DB, bukan dari body) \| 403 `room_inactive`/`room_expired` |
+| GET | `/api/invites/preview?invite=` | publik (sesi opsional) | `InvitePreview` (judul room, peran, sesi saat ini, `passwordRequired`) \| 400 \| 403 `room_private`/`room_inactive`/`room_expired` \| 404 |
+| POST | `/api/invites/accept` | sesi, `{ invite, password? }` | `{ user, roomId, role }` \| 401 \| 403 (seperti preview; room password non-anggota: `password_required`/`password_invalid`) \| 429 (200 / jam per IP; password 5 / menit per user+room) |
+| POST | `/api/rooms/:roomId/token` | anggota / admin+ | `{ token, url, role }` (role dari DB, bukan dari body) \| 403 `room_inactive`/`room_expired`/`password_required` |
 | GET | `/api/rooms/:roomId/layout` | anggota / admin+ | `{ version, layout \| null }` |
 | PUT | `/api/rooms/:roomId/layout` | host / admin+, `{ baseVersion, layout }` | `{ version }` \| 409 `{ currentVersion }` |
 | GET | `/api/admin/users?q=&role=&banned=&limit=&cursor=` | admin+ | `Page<AdminUser>` |

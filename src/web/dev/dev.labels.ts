@@ -103,6 +103,7 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "room.member.add": "Tambah anggota room",
   "room.member.role": "Ubah peran anggota room",
   "room.member.remove": "Keluarkan anggota room",
+  "room.password": "Ubah password room",
   "setting.update": "Ubah pengaturan",
 };
 

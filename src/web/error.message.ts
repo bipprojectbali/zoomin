@@ -34,6 +34,8 @@ const CODE_TEXT: Record<ApiErrorCode, string> = {
   room_private: "Room ini privat: hanya orang yang diundang lewat email yang bisa masuk. Minta host room menambahkan email Anda.",
   last_host: "Room harus punya minimal satu host. Jadikan anggota lain host terlebih dahulu.",
   member_not_found: "Anggota atau undangan tidak ditemukan. Mungkin sudah dihapus.",
+  password_required: "Room ini dilindungi password. Masukkan password dari host room untuk bergabung.",
+  password_invalid: "Password room salah. Periksa kembali atau minta password ke host room.",
 };
 
 /**

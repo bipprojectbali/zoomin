@@ -2,7 +2,7 @@ import { type Database, SQLiteError } from "bun:sqlite";
 import type { AddRoomMemberBody, Page, RoomRole, RoomSummary, RoomVisibility, SessionUser } from "../shared/api.types";
 import { recordAudit } from "./audit.repository";
 import { addRoomMember } from "./room.members.repository";
-import { ROOM_COLUMNS, type RoomRow, toRoomSummary } from "./room.access";
+import { dbVisibility, ROOM_COLUMNS, type RoomRow, toRoomSummary } from "./room.access";
 
 /** Default dan batas atas `limit` daftar room (kontrak GET /api/rooms). */
 export const ROOMS_PAGE_DEFAULT = 20;
@@ -75,6 +75,7 @@ export function listRoomsForUser(
  * tak mungkin). Opsional hanya agar fixture test bisa membuat room tanpa audit; route wajib mengisinya.
  * `members` (email sudah dinormalisasi & lolos allowlist, tanpa email pembuat) ditambahkan di transaksi yang sama
  * lewat addRoomMember (P5): gagal satu = tidak ada room/anggota/audit yang tersimpan.
+ * `visibility` "password" wajib disertai `passwordHash` (Bun.password, divalidasi route); selain itu hash diabaikan (W1).
  */
 export function createRoom(
   db: Database,
@@ -84,6 +85,7 @@ export function createRoom(
     createdBy: string;
     actorEmail?: string;
     visibility?: RoomVisibility;
+    passwordHash?: string;
     expiresAt?: number | null;
     members?: AddRoomMemberBody[];
   },
@@ -91,16 +93,13 @@ export function createRoom(
   const createdAt = Date.now();
   const visibility = input.visibility ?? "public";
   const expiresAt = input.expiresAt ?? null;
+  const passwordHash = visibility === "password" ? input.passwordHash : undefined;
+  if (visibility === "password" && !passwordHash) throw new Error(`createRoom: room ${input.id} bertipe password tanpa hash`);
   try {
     db.transaction(() => {
-      db.query("INSERT INTO rooms (id, title, created_by, created_at, visibility, expires_at) VALUES (?, ?, ?, ?, ?, ?)").run(
-        input.id,
-        input.title,
-        input.createdBy,
-        createdAt,
-        visibility,
-        expiresAt,
-      );
+      db.query(
+        "INSERT INTO rooms (id, title, created_by, created_at, visibility, password_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      ).run(input.id, input.title, input.createdBy, createdAt, dbVisibility(visibility), passwordHash ?? null, expiresAt);
       db.query("INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, 'host')").run(input.id, input.createdBy);
       if (input.actorEmail !== undefined) {
         recordAudit(db, {
@@ -121,6 +120,15 @@ export function createRoom(
     }
     throw new Error(`createRoom: gagal membuat room ${input.id}`, { cause });
   }
-  const row: RoomRow = { id: input.id, title: input.title, role: "host", created_at: createdAt, visibility, disabled_at: null, expires_at: expiresAt };
+  const row: RoomRow = {
+    id: input.id,
+    title: input.title,
+    role: "host",
+    created_at: createdAt,
+    visibility: dbVisibility(visibility),
+    has_password: passwordHash !== undefined,
+    disabled_at: null,
+    expires_at: expiresAt,
+  };
   return toRoomSummary(row, { role: "user" }, createdAt);
 }

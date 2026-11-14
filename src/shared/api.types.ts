@@ -20,7 +20,8 @@
 // PATCH  /api/rooms/:roomId UpdateRoomBody (pengelola) -> RoomSummary            | 403 forbidden | 404
 // DELETE /api/rooms/:roomId (pengelola)         -> 204
 // /api/rooms/:roomId/members*                   -> anggota & undangan pending (RND/plan/06-room-access.md)
-// POST /api/rooms/:roomId/token                 -> TokenResponse                        | 403 room_inactive | room_expired
+// POST /api/rooms/:roomId/join JoinRoomBody   -> JoinRoomResponse (room password, RND/plan/08) | 403 password_invalid | 429
+// POST /api/rooms/:roomId/token                 -> TokenResponse                        | 403 room_inactive | room_expired | password_required
 // GET  /api/rooms/:roomId/layout                -> LayoutResponse
 // PUT  /api/rooms/:roomId/layout PutLayoutBody  -> PutLayoutResponse | 409 LayoutConflictError
 // Admin (admin+) & dev (super_admin): lihat tabel endpoint di RND/plan/05-auth-roles.md dan fungsi di src/web/api.client.ts.
@@ -74,6 +75,7 @@ export type AuditAction =
   | "room.member.add"
   | "room.member.role"
   | "room.member.remove"
+  | "room.password"
   | "setting.update";
 
 /** Satu baris audit log. */
@@ -140,13 +142,22 @@ export type ApiErrorCode =
   | "room_expired"
   | "room_private"
   | "last_host"
-  | "member_not_found";
+  | "member_not_found"
+  | "password_required"
+  | "password_invalid";
 
 /** Bentuk body error semua endpoint; `path` = field yang gagal validasi. */
 export type ApiError = { error: string; code?: ApiErrorCode; path?: string };
 
-/** Mode akses room (R1): public = link undangan berlaku; private = hanya anggota. */
-export type RoomVisibility = "public" | "private";
+/**
+ * Mode akses room (R1, W1): public = link undangan berlaku; password = link undangan / ID room + password;
+ * private = hanya anggota.
+ */
+export type RoomVisibility = "public" | "password" | "private";
+
+/** Panjang password room (W2, tanpa trim; spasi dihitung). */
+export const ROOM_PASSWORD_MIN = 6;
+export const ROOM_PASSWORD_MAX = 64;
 
 /** Status turunan server (R5): inactive bila dinonaktifkan, else expired bila lewat expiresAt, else active. */
 export type RoomStatus = "active" | "inactive" | "expired";
@@ -169,8 +180,17 @@ export type RoomSummary = {
   canManage: boolean;
 };
 
-/** Body PATCH /api/rooms/:roomId (pengelola). expiresAt null = tanpa batas. */
-export type UpdateRoomBody = { title?: string; visibility?: RoomVisibility; enabled?: boolean; expiresAt?: number | null };
+/**
+ * Body PATCH /api/rooms/:roomId (pengelola). expiresAt null = tanpa batas. `password` wajib saat pindah ke
+ * "password"; saat sudah "password" = ganti, tanpa `password` = tidak berubah (W7).
+ */
+export type UpdateRoomBody = { title?: string; visibility?: RoomVisibility; password?: string; enabled?: boolean; expiresAt?: number | null };
+
+/** Body POST /api/rooms/:roomId/join (W5). */
+export type JoinRoomBody = { password: string };
+
+/** Respons POST /api/rooms/:roomId/join; `role` = role efektif di room. */
+export type JoinRoomResponse = { roomId: string; role: RoomRole };
 
 /** Satu baris daftar anggota room: member (sudah punya akun) atau pending (undangan email belum diklaim). */
 export type RoomMemberItem =
@@ -195,8 +215,8 @@ export type CreateInviteBody = { role: RoomRole; ttlHours?: number };
 /** Respons pembuatan undangan. */
 export type CreateInviteResponse = { url: string; expiresAt: number };
 
-/** Body POST /api/invites/accept (wajib sesi). */
-export type AcceptInviteBody = { invite: string };
+/** Body POST /api/invites/accept (wajib sesi); `password` wajib untuk room password bila bukan anggota (W6). */
+export type AcceptInviteBody = { invite: string; password?: string };
 
 /** Respons terima undangan; `role` = role efektif di room. */
 export type AcceptInviteResponse = { user: SessionUser; roomId: string; role: RoomRole };
@@ -212,13 +232,23 @@ export type InvitePreview = {
   currentUser: SessionUser | null;
   /** Role yang akan didapat bila diterima: max(role undangan, role existing) bila bersesi. */
   effectiveRole: RoomRole;
+  /** true bila room ber-password dan pemanggil belum anggota (W6). */
+  passwordRequired: boolean;
 };
 
 /** Query GET /api/rooms. */
 export type ListRoomsQuery = { limit?: number; cursor?: string };
 
 /** Body POST /api/rooms; `members` (maks CREATE_ROOM_MAX_MEMBERS) dibuat dalam transaksi yang sama. */
-export type CreateRoomBody = { id: string; title: string; visibility?: RoomVisibility; expiresAt?: number | null; members?: AddRoomMemberBody[] };
+/** `password` wajib bila visibility "password" (W7). */
+export type CreateRoomBody = {
+  id: string;
+  title: string;
+  visibility?: RoomVisibility;
+  password?: string;
+  expiresAt?: number | null;
+  members?: AddRoomMemberBody[];
+};
 
 /** Batas jumlah anggota di POST /api/rooms. */
 export const CREATE_ROOM_MAX_MEMBERS = 100;

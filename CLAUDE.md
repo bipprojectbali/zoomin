@@ -39,7 +39,7 @@ src/web/      SPA: pages/, landing/, app/ (header, guard), lobby/, prejoin/, roo
 src/cli/      CLI single binary (args, help, docs, check, run); entrypoint tetap src/server/main.ts
 scripts/      build.web.ts (SPA → dist/web), build.binary.ts (→ bin/)
 migrations/   SQL bernomor: 0001_init, 0002_auth (tabel Better Auth + peran room host), 0003_admin (audit_log, app_settings),
-              0004_room_access (visibility, disabled_at, expires_at, room_invitations)
+              0004_room_access (visibility, disabled_at, expires_at, room_invitations), 0005_room_password (password_hash)
 test/         integrasi dengan LiveKit dev + smoke produksi
 e2e/          Playwright (temuan bug di e2e/BUGS.md)
 deploy/       artefak produksi (systemd/Caddy, stack Portainer LiveKit)
@@ -103,7 +103,11 @@ LiveKit dev lokal: `RND/spike/.bin/livekit-server --dev` (atau Docker `livekit/l
   lewat kelas CSS.
 - **Batas file** (aturan global Rule 8): route 150, service 300, repository 250, types 300, test 400 baris; hard
   limit 500 baris / 20.000 karakter. Pecah, jangan menambah ke file yang sudah lewat batas.
-- **Migrasi**: file SQL bernomor baru di `migrations/` (berikutnya `0005_<nama>.sql`), lalu tambahkan import + entri di
+- **Password room** (RND/plan/08): di-hash `Bun.password` (argon2id) di `rooms.password_hash`; tidak pernah di-log,
+  diaudit isinya, atau dikembalikan API (`RoomSummary` hanya `visibility: "password"`, `ROOM_COLUMNS` memilih flag
+  `has_password`). Tipe API turunan satu fungsi `roomVisibility` (`room.access.ts`). Percobaan join/accept dibatasi
+  per `userId:roomId` (`room.password.ts`).
+- **Migrasi**: file SQL bernomor baru di `migrations/` (berikutnya `0006_<nama>.sql`), lalu tambahkan import + entri di
   `MIGRATIONS` (`src/server/db.ts`); `db.test.ts` gagal bila daftar tak sinkron. Migrasi hanya maju, idempotent.
 - **Secret**: jangan membaca, mencetak, atau commit `.env` (hanya `.env.example`). `zoomin check` menampilkan
   secret sebagai "diset"/"kosong". Variabel baru → tambahkan ke `.env.example` + `src/server/config.ts`

@@ -1,11 +1,21 @@
 import { Elysia, t } from "elysia";
-import { type AcceptInviteResponse, type CreateInviteResponse, type InvitePreview, type RoomRole, SAFE_ID_PATTERN } from "../shared/api.types";
+import {
+  type AcceptInviteResponse,
+  type CreateInviteResponse,
+  type InvitePreview,
+  ROOM_PASSWORD_MAX,
+  type RoomRole,
+  type SessionUser,
+  SAFE_ID_PATTERN,
+} from "../shared/api.types";
 import type { ApiDeps } from "./api.deps";
 import { apiError } from "./api.error";
-import { authGuard, getSessionUser } from "./auth.guard";
+import { authGuard, getSessionUser, hasRole } from "./auth.guard";
 import { createInvite, INVITE_DEFAULT_TTL_HOURS, INVITE_MAX_TTL_HOURS, verifyInvite } from "./auth.invite";
-import { clientIp, createRateLimiter } from "./auth.ratelimit";
-import { canManageRoom, roomStatus } from "./room.access";
+import { clientIp, createRateLimiter, type RateLimiter } from "./auth.ratelimit";
+import { canManageRoom, type DbVisibility, roomStatus, roomVisibility } from "./room.access";
+import { checkRoomPassword, createRoomPasswordLimiter, raiseMembership } from "./room.password";
+import { getMembership } from "./rooms.repository";
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_FORBIDDEN = 403;
@@ -24,42 +34,40 @@ const INVITE_MAX_LENGTH = 2048;
 const roleSchema = t.Union([t.Literal("host"), t.Literal("participant"), t.Literal("viewer")]);
 const MS_PER_SECOND = 1000;
 const ROLE_RANK: Record<RoomRole, number> = { viewer: 1, participant: 2, host: 3 };
-/** Role tertinggi dari dua role (null = belum member). Selaras dengan UPSERT_MEMBER yang hanya menaikkan role. */
+/** Role tertinggi dari dua role (null = belum member). Selaras dengan raiseMembership yang hanya menaikkan role. */
 const maxRole = (a: RoomRole, b: RoomRole | null): RoomRole => (b && ROLE_RANK[b] > ROLE_RANK[a] ? b : a);
 
-// Upsert membership yang hanya menaikkan role (host > participant > viewer), tidak pernah menurunkan.
-const RANK = (col: string) => `(CASE ${col} WHEN 'host' THEN 3 WHEN 'participant' THEN 2 ELSE 1 END)`;
-const UPSERT_MEMBER =
-  "INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, ?) " +
-  `ON CONFLICT(room_id, user_id) DO UPDATE SET role = excluded.role WHERE ${RANK("excluded.role")} > ${RANK("room_members.role")}`;
-
-/** Route undangan: buat (host room / admin global), pratinjau (publik), dan terima (wajib sesi). */
-export function inviteRoutes(deps: ApiDeps) {
+/**
+ * Route undangan: buat (host room / admin global), pratinjau (publik), dan terima (wajib sesi). `passwords` = limiter
+ * percobaan password room, dibagi dengan room.join.route.ts (W6).
+ */
+export function inviteRoutes(deps: ApiDeps, passwords: RateLimiter = createRoomPasswordLimiter()) {
   const { db, config } = deps;
   const secret = config.authSecret;
   const accepts = createRateLimiter(INVITE_ACCEPT_MAX, INVITE_ACCEPT_WINDOW_MS);
-  type GateRoom = { title: string; visibility: string; disabled_at: number | null; expires_at: number | null };
+  type GateRoom = { title: string; visibility: DbVisibility; password_hash: string | null; disabled_at: number | null; expires_at: number | null };
   const findRoom = (roomId: string) =>
-    db.query<GateRoom, [string]>("SELECT title, visibility, disabled_at, expires_at FROM rooms WHERE id = ?").get(roomId);
-  const memberRole = (roomId: string, userId: string) =>
-    db
-      .query<{ role: RoomRole }, [string, string]>("SELECT role FROM room_members WHERE room_id = ? AND user_id = ?")
-      .get(roomId, userId)?.role ?? null;
+    db.query<GateRoom, [string]>("SELECT title, visibility, password_hash, disabled_at, expires_at FROM rooms WHERE id = ?").get(roomId);
+  const memberRole = (roomId: string, userId: string) => getMembership(db, roomId, userId);
 
   /**
    * Gerbang link undangan (R1/R4/R5): room harus ada, private hanya untuk yang sudah anggota (visibility dicek saat
-   * dipakai, bukan di token undangan), dan status harus active. Mengembalikan judul room atau error untuk route.
+   * dipakai, bukan di token undangan), dan status harus active. Mengembalikan judul room + hash password bila
+   * pemanggil wajib memasukkan password (W6: room password, bukan anggota, bukan admin+), atau error untuk route.
    */
-  const gate = (roomId: string, userId: string | null) => {
+  const gate = (roomId: string, user: Pick<SessionUser, "id" | "role"> | null) => {
     const room = findRoom(roomId);
     if (!room) return { ok: false, code: HTTP_NOT_FOUND, body: apiError("room_not_found", "room not found") } as const;
-    if (room.visibility === "private" && !(userId && memberRole(roomId, userId))) {
+    if (room.visibility === "private" && !(user && memberRole(roomId, user.id))) {
       return { ok: false, code: HTTP_FORBIDDEN, body: apiError("room_private", "room is private") } as const;
     }
     const st = roomStatus(room);
     if (st === "inactive") return { ok: false, code: HTTP_FORBIDDEN, body: apiError("room_inactive", "room is inactive") } as const;
     if (st === "expired") return { ok: false, code: HTTP_FORBIDDEN, body: apiError("room_expired", "room has expired") } as const;
-    return { ok: true, title: room.title } as const;
+    const exempt = user !== null && (memberRole(roomId, user.id) !== null || hasRole(user, "admin"));
+    const isPasswordRoom = roomVisibility({ visibility: room.visibility, has_password: room.password_hash !== null }) === "password";
+    const passwordHash = isPasswordRoom && !exempt ? room.password_hash : null;
+    return { ok: true, title: room.title, passwordHash } as const;
   };
 
   return new Elysia({ name: "auth.invite" })
@@ -94,7 +102,7 @@ export function inviteRoutes(deps: ApiDeps) {
         const invite = verifyInvite(query.invite, secret);
         if (!invite) return status(HTTP_BAD_REQUEST, apiError("invite_invalid", "invite invalid or expired"));
         const user = await getSessionUser(request, deps);
-        const room = gate(invite.roomId, user?.id ?? null);
+        const room = gate(invite.roomId, user);
         if (!room.ok) return status(room.code, room.body);
         return {
           roomId: invite.roomId,
@@ -103,13 +111,14 @@ export function inviteRoutes(deps: ApiDeps) {
           expiresAt: invite.exp * MS_PER_SECOND,
           currentUser: user,
           effectiveRole: user ? maxRole(invite.role, memberRole(invite.roomId, user.id)) : invite.role,
+          passwordRequired: room.passwordHash !== null,
         } satisfies InvitePreview;
       },
       { query: t.Object({ invite: t.String({ maxLength: INVITE_MAX_LENGTH }) }) },
     )
     .post(
       "/invites/accept",
-      ({ body, request, user, set, status }) => {
+      async ({ body, request, user, set, status }) => {
         const ip = clientIp(request, config.trustProxy);
         const retryAfter = accepts.retryAfter(ip);
         if (retryAfter > 0) {
@@ -119,15 +128,23 @@ export function inviteRoutes(deps: ApiDeps) {
         accepts.hit(ip);
         const invite = verifyInvite(body.invite, secret);
         if (!invite) return status(HTTP_BAD_REQUEST, apiError("invite_invalid", "invite invalid or expired"));
-        const room = gate(invite.roomId, user.id);
+        const room = gate(invite.roomId, user);
         if (!room.ok) return status(room.code, room.body);
-        const role = db.transaction(() => {
-          db.query(UPSERT_MEMBER).run(invite.roomId, user.id, invite.role);
-          return memberRole(invite.roomId, user.id) ?? invite.role;
-        })();
+        if (room.passwordHash !== null) {
+          if (!body.password) return status(HTTP_FORBIDDEN, apiError("password_required", "room password required"));
+          const denied = await checkRoomPassword(passwords, { userId: user.id, roomId: invite.roomId }, room.passwordHash, body.password);
+          if (denied) {
+            if (denied.retryAfter) set.headers["retry-after"] = String(denied.retryAfter);
+            return status(denied.status, denied.body);
+          }
+        }
+        const role = raiseMembership(db, invite.roomId, user.id, invite.role);
         return { user, roomId: invite.roomId, role } satisfies AcceptInviteResponse;
       },
       // Wajib sesi (login Google dulu); tidak ada lagi akun tamu.
-      { auth: "user", body: t.Object({ invite: t.String({ maxLength: INVITE_MAX_LENGTH }) }) },
+      {
+        auth: "user",
+        body: t.Object({ invite: t.String({ maxLength: INVITE_MAX_LENGTH }), password: t.Optional(t.String({ maxLength: ROOM_PASSWORD_MAX })) }),
+      },
     );
 }

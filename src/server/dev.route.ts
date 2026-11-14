@@ -29,6 +29,7 @@ const AUDIT_ACTIONS: Record<AuditAction, true> = {
   "room.member.add": true,
   "room.member.role": true,
   "room.member.remove": true,
+  "room.password": true,
   "setting.update": true,
 };
 const auditActionSchema = t.Union((Object.keys(AUDIT_ACTIONS) as AuditAction[]).map((a) => t.Literal(a)));

@@ -8,7 +8,9 @@ import { devRoutes } from "./dev.route";
 import { CLIENT_IP_HEADER, clientIp } from "./auth.ratelimit";
 import { testLoginRoutes } from "./auth.test.route";
 import { layoutRoutes } from "./layout.route";
+import { roomJoinRoutes } from "./room.join.route";
 import { roomMembersRoutes } from "./room.members.route";
+import { createRoomPasswordLimiter } from "./room.password";
 import { roomsRoutes } from "./rooms.route";
 import { tokenRoutes } from "./token.route";
 import { usersSearchRoutes } from "./users.search.route";
@@ -25,6 +27,8 @@ const BLOCKED_AUTH_PREFIX = "/api/auth/admin/";
 
 /** App Elysia untuk semua endpoint /api. Tidak listen; dipasang oleh main.ts atau dites via `.handle()`. */
 export function createApi(deps: ApiDeps) {
+  // Satu limiter percobaan password room untuk join + accept undangan (W6: batas yang sama, bukan 2× lipat).
+  const passwords = createRoomPasswordLimiter();
   const app = new Elysia({ prefix: "/api" })
     // Elysia default 422 untuk VALIDATION; kontrak API memakai 400 + code + path field yang gagal.
     // NOT_FOUND/PARSE juga dibungkus supaya semua error /api punya `code`.
@@ -50,8 +54,9 @@ export function createApi(deps: ApiDeps) {
       { parse: "none" },
     )
     .use(meRoutes(deps))
-    .use(inviteRoutes(deps))
+    .use(inviteRoutes(deps, passwords))
     .use(roomsRoutes(deps))
+    .use(roomJoinRoutes(deps, passwords))
     .use(roomMembersRoutes(deps))
     .use(usersSearchRoutes(deps))
     .use(tokenRoutes(deps))

@@ -21,7 +21,11 @@ export function tokenRoutes(deps: ApiDeps) {
       const room = getRoomAccess(deps.db, user, roomId);
       if (!room) return status(HTTP_NOT_FOUND, apiError("room_not_found", "room not found"));
       const role: RoomRole | null = room.role ?? (hasRole(user, "admin") ? "host" : null);
-      if (!role) return status(HTTP_FORBIDDEN, apiError("forbidden", "not a member of this room"));
+      if (!role) {
+        // W6: room password → UI menampilkan form password lalu POST /rooms/:roomId/join.
+        if (room.visibility === "password") return status(HTTP_FORBIDDEN, apiError("password_required", "room password required"));
+        return status(HTTP_FORBIDDEN, apiError("forbidden", "not a member of this room"));
+      }
       // R5: room nonaktif/kadaluarsa tidak bisa dimasuki siapa pun (admin juga); pengelola mengaktifkan dulu.
       if (room.status === "inactive") return status(HTTP_FORBIDDEN, apiError("room_inactive", "room is inactive"));
       if (room.status === "expired") return status(HTTP_FORBIDDEN, apiError("room_expired", "room has expired"));

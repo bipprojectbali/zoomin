@@ -1,6 +1,7 @@
 import { ROOM_EXPIRY_MAX_DAYS, type AuditAction, type SessionUser, type UpdateRoomBody } from "../shared/api.types";
 import type { ApiDeps } from "./api.deps";
 import { recordAudit } from "./audit.repository";
+import { type DbVisibility, dbVisibility, roomVisibility } from "./room.access";
 
 const MS_PER_DAY = 86_400_000;
 
@@ -21,21 +22,36 @@ export async function closeLiveRoom(deps: Pick<ApiDeps, "roomService">, roomId: 
   }
 }
 
-type RoomState = { title: string; visibility: string; disabled_at: number | null; expires_at: number | null };
+type RoomState = { title: string; visibility: DbVisibility; has_password: number; disabled_at: number | null; expires_at: number | null };
+
+/** Hasil updateRoom; `password_missing` = tipe jadi "password" tanpa password baru maupun lama (W7). */
+export type UpdateRoomResult = "ok" | "not_found" | "password_missing";
 
 /**
  * Terapkan UpdateRoomBody (sudah divalidasi & diotorisasi route). Tiap field yang benar-benar berubah = satu UPDATE +
  * satu entri audit (R10) dalam satu transaksi. Menonaktifkan room → putuskan peserta LiveKit (R6).
- * Mengembalikan false bila room tidak ada.
+ * `passwordHash` (Bun.password, dihitung route) = set/ganti password; pindah ke public/private menghapus hash (W7).
+ * Audit `room.password` hanya membawa `{ action }`, tidak pernah password/hash.
  */
-export async function updateRoom(deps: Pick<ApiDeps, "db" | "roomService">, actor: SessionUser, roomId: string, body: UpdateRoomBody): Promise<boolean> {
+export async function updateRoom(
+  deps: Pick<ApiDeps, "db" | "roomService">,
+  actor: SessionUser,
+  roomId: string,
+  body: Omit<UpdateRoomBody, "password">,
+  passwordHash?: string,
+): Promise<UpdateRoomResult> {
   const { db } = deps;
   const now = Date.now();
-  const deactivated = db.transaction((): boolean | null => {
+  const deactivated = db.transaction((): boolean | UpdateRoomResult => {
     const cur = db
-      .query<RoomState, [string]>("SELECT title, visibility, disabled_at, expires_at FROM rooms WHERE id = ?")
+      .query<RoomState, [string]>(
+        "SELECT title, visibility, (password_hash IS NOT NULL) AS has_password, disabled_at, expires_at FROM rooms WHERE id = ?",
+      )
       .get(roomId);
-    if (!cur) return null;
+    if (!cur) return "not_found";
+    const curVis = roomVisibility(cur);
+    const nextVis = body.visibility ?? curVis;
+    if (nextVis === "password" && !passwordHash && !cur.has_password) return "password_missing";
     const audit = (action: AuditAction, detail: Record<string, unknown>) =>
       recordAudit(db, { actorId: actor.id, actorEmail: actor.email, action, targetType: "room", targetId: roomId, detail });
     const set = (column: string, value: string | number | null) => db.query(`UPDATE rooms SET ${column} = ? WHERE id = ?`).run(value, roomId);
@@ -44,9 +60,16 @@ export async function updateRoom(deps: Pick<ApiDeps, "db" | "roomService">, acto
       set("title", body.title);
       audit("room.update", { from: cur.title, to: body.title });
     }
-    if (body.visibility !== undefined && body.visibility !== cur.visibility) {
-      set("visibility", body.visibility);
-      audit("room.visibility", { from: cur.visibility, to: body.visibility });
+    if (nextVis !== curVis) {
+      set("visibility", dbVisibility(nextVis));
+      audit("room.visibility", { from: curVis, to: nextVis });
+    }
+    if (nextVis === "password" && passwordHash) {
+      set("password_hash", passwordHash);
+      audit("room.password", { action: cur.has_password ? "change" : "set" });
+    } else if (nextVis !== "password" && cur.has_password) {
+      set("password_hash", null);
+      audit("room.password", { action: "clear" });
     }
     let off = false;
     if (body.enabled === true && cur.disabled_at !== null) {
@@ -63,9 +86,9 @@ export async function updateRoom(deps: Pick<ApiDeps, "db" | "roomService">, acto
     }
     return off;
   })();
-  if (deactivated === null) return false;
+  if (typeof deactivated === "string") return deactivated;
   if (deactivated) await closeLiveRoom(deps, roomId, "updateRoom");
-  return true;
+  return "ok";
 }
 
 /**

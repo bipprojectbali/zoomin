@@ -6,6 +6,10 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikut
 
 ### Added
 
+- **Room dengan password**: selain Public dan Private, room bisa bertipe Password. Orang yang tahu ID room atau
+  memegang link undangan bisa masuk dengan password, lalu otomatis jadi anggota. Host bisa memasang, mengganti, atau
+  menghapus password kapan saja; anggota lama tidak dikeluarkan saat password diganti. Password disimpan sebagai
+  hash dan percobaan yang salah dibatasi 5 kali per menit.
 - Saat membuat room, admin bisa langsung mengundang orang: akun terdaftar jadi anggota, email yang belum terdaftar
   jadi undangan tertunda. Semua dibuat sekaligus; bila satu email ditolak (mis. domain tidak diizinkan), room tidak
   dibuat.

@@ -69,7 +69,8 @@ describe("GET /invites/preview", () => {
     const body = (await res.json()) as InvitePreview;
     expect(body).toMatchObject({ roomId: "r1", roomTitle: "Rapat Desain", role: "viewer", currentUser: null, effectiveRole: "viewer" });
     expect(body.expiresAt).toBeGreaterThanOrEqual(before + 3600 * 1000 - 1000);
-    expect(Object.keys(body).sort()).toEqual(["currentUser", "effectiveRole", "expiresAt", "role", "roomId", "roomTitle"]);
+    expect(Object.keys(body).sort()).toEqual(["currentUser", "effectiveRole", "expiresAt", "passwordRequired", "role", "roomId", "roomTitle"]);
+    expect(body.passwordRequired).toBe(false);
   });
 
   test("bersesi: currentUser = SessionUser; effectiveRole = max(role undangan, role existing); tidak mengubah DB", async () => {
