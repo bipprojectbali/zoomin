@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { UserSearchItem } from "../shared/api.types";
 
 /** Default `limit` GET /api/users/search (batas atas: USER_SEARCH_MAX_RESULTS di api.types.ts). */
-export const USER_SEARCH_DEFAULT_RESULTS = 8;
+export const USER_SEARCH_DEFAULT_RESULTS = 20;
 
 /** true bila user menjadi host di minimal satu room (syarat akses pencarian akun, P4). */
 export function isHostAnywhere(db: Database, userId: string): boolean {
@@ -11,7 +11,8 @@ export function isHostAnywhere(db: Database, userId: string): boolean {
 
 /**
  * Akun yang nama/email-nya memuat `q` (case-insensitive; % dan _ dicari literal), tanpa user yang ban-nya masih
- * berlaku (aturan sama dengan isBanActive di auth.guard.ts), urut nama. Tanggal Better Auth = TEXT ISO-8601 UTC.
+ * berlaku (aturan sama dengan isBanActive di auth.guard.ts), urut nama. `q` kosong → pola `%%` = semua akun.
+ * Tanggal Better Auth = TEXT ISO-8601 UTC.
  */
 export function searchUsers(db: Database, q: string, limit: number, now = Date.now()): UserSearchItem[] {
   const pattern = `%${q.toLowerCase().replace(/[\\%_]/g, "\\$&")}%`;

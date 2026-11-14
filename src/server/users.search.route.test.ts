@@ -34,8 +34,13 @@ describe("GET /api/users/search — akses (P4)", () => {
 });
 
 describe("GET /api/users/search — hasil", () => {
-  test("q < 2 huruf (setelah trim) → 400 invalid_input /q", async () => {
-    const res = await search(`q=${encodeURIComponent(" a ")}`, admin.cookie);
+  test("q kosong/tanpa q → semua akun non-banned urut nama; 1 huruf bisa; q > 100 → 400 invalid_input /q", async () => {
+    const all = await items(await search("q=", admin.cookie));
+    expect(all.map((u) => u.name)).toEqual(["Adi", "Hana", "Polos"]);
+    expect(await items(await search(`q=${encodeURIComponent("   ")}`, admin.cookie))).toEqual(all);
+    expect(await items(await search("", admin.cookie))).toEqual(all);
+    expect((await items(await search("q=h", admin.cookie))).map((u) => u.name)).toEqual(["Hana"]);
+    const res = await search(`q=${"x".repeat(101)}`, admin.cookie);
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ code: "invalid_input", path: "/q" });
   });
@@ -65,10 +70,11 @@ describe("GET /api/users/search — hasil", () => {
     expect((await items(await search("q=ban.test", admin.cookie))).map((u) => u.name)).toEqual(["Ban Lewat"]);
   });
 
-  test("limit default 8, dipangkas ke maks 10", async () => {
-    for (let i = 0; i < 12; i++) await createTestUser(deps, { email: `many${i}@bulk.test`, name: `Bulk ${String(i).padStart(2, "0")}` });
-    expect(await items(await search("q=bulk", admin.cookie))).toHaveLength(8);
-    expect(await items(await search("q=bulk&limit=50", admin.cookie))).toHaveLength(USER_SEARCH_MAX_RESULTS);
+  test("limit default 20, dipangkas ke maks 50", async () => {
+    for (let i = 0; i < 55; i++) await createTestUser(deps, { email: `many${i}@bulk.test`, name: `Bulk ${String(i).padStart(2, "0")}` });
+    expect(await items(await search("q=bulk", admin.cookie))).toHaveLength(20);
+    expect(await items(await search("q=bulk&limit=500", admin.cookie))).toHaveLength(USER_SEARCH_MAX_RESULTS);
+    expect(USER_SEARCH_MAX_RESULTS).toBe(50);
     expect(await items(await search("q=bulk&limit=3", admin.cookie))).toHaveLength(3);
     expect((await search("q=bulk&limit=0", admin.cookie)).status).toBe(400);
   });

@@ -259,9 +259,8 @@ export type UserSearchItem = { id: string; name: string; email: string; image: s
 /** Respons GET /api/users/search (tanpa paginasi: autocomplete dibatasi limit). */
 export type UserSearchResponse = { items: UserSearchItem[] };
 
-/** Panjang minimum `q` (setelah trim) dan batas atas `limit` GET /api/users/search. */
-export const USER_SEARCH_MIN = 2;
-export const USER_SEARCH_MAX_RESULTS = 10;
+/** Batas atas `limit` GET /api/users/search (q boleh kosong = semua akun, M5). */
+export const USER_SEARCH_MAX_RESULTS = 50;
 
 /** Respons POST /api/rooms/:roomId/token. */
 export type TokenResponse = { token: string; url: string; role: RoomRole };

@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { USER_SEARCH_MAX_RESULTS, USER_SEARCH_MIN, type UserSearchResponse } from "../shared/api.types";
+import { USER_SEARCH_MAX_RESULTS, type UserSearchResponse } from "../shared/api.types";
 import type { ApiDeps } from "./api.deps";
 import { apiError } from "./api.error";
 import { authGuard, hasRole } from "./auth.guard";
@@ -31,10 +31,11 @@ export function usersSearchRoutes(deps: ApiDeps) {
         return status(HTTP_TOO_MANY_REQUESTS, apiError("rate_limited", "too many searches"));
       }
       limiter.hit(user.id);
-      const q = query.q.trim();
-      if (q.length < USER_SEARCH_MIN || q.length > USER_SEARCH_Q_MAX) {
-        return status(HTTP_BAD_REQUEST, apiError("invalid_input", `q must be ${USER_SEARCH_MIN}-${USER_SEARCH_Q_MAX} characters`, "/q"));
+      const q = (query.q ?? "").trim();
+      if (q.length > USER_SEARCH_Q_MAX) {
+        return status(HTTP_BAD_REQUEST, apiError("invalid_input", `q must be at most ${USER_SEARCH_Q_MAX} characters`, "/q"));
       }
+      // Sengaja tanpa cursor (M5): daftar dropdown dibatasi limit; akun yang tak terlihat dicari lewat q.
       // limit > max dipangkas (bukan 400): autocomplete, klien lama tidak perlu gagal.
       const limit = Math.min(query.limit ?? USER_SEARCH_DEFAULT_RESULTS, USER_SEARCH_MAX_RESULTS);
       const body: UserSearchResponse = { items: searchUsers(db, q, limit) };
@@ -43,7 +44,7 @@ export function usersSearchRoutes(deps: ApiDeps) {
     {
       auth: "user",
       query: t.Object({
-        q: t.String({ maxLength: USER_SEARCH_Q_MAX * 2 }),
+        q: t.Optional(t.String({ maxLength: USER_SEARCH_Q_MAX * 2 })),
         limit: t.Optional(t.Numeric({ minimum: 1 })),
       }),
     },
