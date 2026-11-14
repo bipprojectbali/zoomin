@@ -9,6 +9,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.E2E_PORT ?? 3101);
 const BASE_URL = `http://localhost:${PORT}`;
+/** Server kedua mode produksi (dist hasil `bun run build`), untuk regresi yang tak tampak di dev server. */
+const PROD_PORT = Number(process.env.E2E_PROD_PORT ?? 3102);
+const PROD_BASE_URL = `http://localhost:${PROD_PORT}`;
 // Config dievaluasi ulang di tiap worker; env diwariskan dari proses utama, jadi folder DB sama untuk semua.
 process.env.E2E_DB_DIR ??= mkdtempSync(join(tmpdir(), "zoomin-e2e-"));
 /** Password admin test-only, hanya dipakai server e2e lokal. */
@@ -36,6 +39,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: "prod.spec.ts",
       use: {
         ...devices["Desktop Chrome"],
         launchOptions: {
@@ -45,8 +49,13 @@ export default defineConfig({
         },
       },
     },
+    {
+      name: "prod",
+      testMatch: "prod.spec.ts",
+      use: { ...devices["Desktop Chrome"], baseURL: PROD_BASE_URL },
+    },
   ],
-  webServer: {
+  webServer: [{
     command: "bun src/server/main.ts",
     url: `${BASE_URL}/api/health`,
     reuseExistingServer: false,
@@ -61,5 +70,24 @@ export default defineConfig({
       TRUST_PROXY: "true",
       LIVEKIT_URL: process.env.LIVEKIT_URL ?? "ws://127.0.0.1:7880",
     },
-  },
+  }, {
+    // Build dulu agar dist/web sesuai source; lalu start seperti `bun run start`.
+    command: "bun run build && bun src/server/main.ts",
+    url: `${PROD_BASE_URL}/api/health`,
+    reuseExistingServer: false,
+    timeout: 120_000,
+    env: {
+      NODE_ENV: "production",
+      PORT: String(PROD_PORT),
+      DB_PATH: join(process.env.E2E_DB_DIR, "zoomin-prod.sqlite"),
+      ADMIN_PASSWORD: process.env.E2E_ADMIN_PASSWORD,
+      PUBLIC_APP_URL: PROD_BASE_URL,
+      TRUST_PROXY: "true",
+      LIVEKIT_URL: process.env.LIVEKIT_URL ?? "ws://127.0.0.1:7880",
+      // Secret wajib produksi; nilai test-only untuk LiveKit dev lokal (--dev: devkey/secret).
+      LIVEKIT_API_KEY: "devkey", // test-only
+      LIVEKIT_API_SECRET: "secret", // test-only
+      SESSION_SECRET: "e2e-prod-session-secret-0123456789abcdef", // test-only
+    },
+  }],
 });

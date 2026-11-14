@@ -31,7 +31,15 @@ afterAll(() => {
   rmSync(dist, { recursive: true, force: true });
 });
 
-const get = (path: string) => fetch(new URL(path, server.url));
+const get = (path: string, init?: RequestInit) => fetch(new URL(path, server.url), init);
+/** Header navigasi browser (pindah halaman / reload). */
+const NAV = { headers: { accept: "text/html,application/xhtml+xml,*/*;q=0.8" } };
+
+async function expectIndex(res: Response): Promise<void> {
+  expect(res.status).toBe(200);
+  expect(res.headers.get("cache-control")).toBe("no-cache");
+  expect(await res.text()).toContain('<div id="root">');
+}
 
 describe("produksi: SPA statis dari dist", () => {
   test("asset ber-hash → 200, content-type benar, cache immutable", async () => {
@@ -53,12 +61,35 @@ describe("produksi: SPA statis dari dist", () => {
     }
   });
 
+  test("regresi: /invite/<token bertitik> (navigasi) → index.html, bukan 404", async () => {
+    // Token undangan = base64url(payload).signature; dulu segmen bertitik dianggap aset → 404.
+    for (const path of ["/invite/eyJyIjoiYWJjIn0.c2lnbmF0dXJl", "/invite/a.b.js", "/rooms/x.y"]) await expectIndex(await get(path, NAV));
+  });
+
+  test("non-navigasi, segmen bertitik tanpa ekstensi aset dikenal → index.html", async () => {
+    for (const path of ["/invite/eyJyIjoiYWJjIn0.c2lnbmF0dXJl", "/rooms/v1.2"]) await expectIndex(await get(path));
+  });
+
+  test("HEAD navigasi → index.html", async () => {
+    const res = await get("/invite/a.b", { method: "HEAD", ...NAV });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-cache");
+  });
+
+  test("/api tetap ke Elysia walau Accept text/html", async () => {
+    expect((await get("/api/health", NAV)).status).toBe(200);
+    expect((await get("/api/tidak.ada", NAV)).status).toBe(404);
+  });
+
   test("asset tidak dikenal → 404, bukan HTML", async () => {
+    expect((await get("/missing.js")).status).toBe(404);
+    expect((await get("/fonts/x.WOFF2")).status).toBe(404);
     const res = await get("/index-zzz.js");
     expect(res.status).toBe(404);
   });
 
   test("sourcemap .map tidak disajikan → 404", async () => {
+    expect((await get("/x.js.map")).status).toBe(404);
     const res = await get("/index-abc123.js.map");
     expect(res.status).toBe(404);
     expect(await res.text()).not.toContain("secret.tsx");
