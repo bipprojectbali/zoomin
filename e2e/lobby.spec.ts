@@ -5,18 +5,18 @@ test("lobby: admin buat room cukup judul, muncul di daftar, buat link undangan p
   await page.goto("/app");
   const form = page.getByTestId("create-room-form");
   const title = `Judul ${roomId}`;
-  await form.getByLabel("Judul room").fill(title);
-  // ID otomatis dari judul (Opsi lanjutan); ditimpa agar unik & bisa dicari.
-  await form.getByText("Opsi lanjutan").click();
-  await expect(form.getByLabel("ID room")).toHaveValue(/^judul-e2e-/);
-  await form.getByLabel("ID room").fill(roomId);
-  await form.getByRole("button", { name: "Buat room" }).click();
+  await form.getByLabel("Room title").fill(title);
+  // ID otomatis dari judul (Advanced options); ditimpa agar unik & bisa dicari.
+  await form.getByText("Advanced options").click();
+  await expect(form.getByLabel("Room ID")).toHaveValue(/^judul-e2e-/);
+  await form.getByLabel("Room ID").fill(roomId);
+  await form.getByRole("button", { name: "Create room" }).click();
 
   const item = page.locator(`[data-testid="room-item"][data-room-id="${roomId}"]`);
   await expect(item).toBeVisible();
   await expect(item.getByRole("heading", { name: title })).toBeVisible();
   // Form direset setelah sukses.
-  await expect(form.getByLabel("Judul room")).toHaveValue("");
+  await expect(form.getByLabel("Room title")).toHaveValue("");
 
   // Panel undangan per kartu collapsed sampai invite-toggle diklik.
   const toggle = item.getByTestId("invite-toggle");

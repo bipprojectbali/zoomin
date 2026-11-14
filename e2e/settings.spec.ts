@@ -8,7 +8,7 @@ test("settings: ubah nama tersimpan dan tampil di menu akun AppShell", async ({ 
   await expect(name).toHaveValue("Nama Lama");
   await name.fill("  Nama Baru E2E  ");
   await page.getByTestId("settings-profile").getByTestId("settings-save").click();
-  await expect(toast(page, "Profil disimpan")).toBeVisible();
+  await expect(toast(page, "Profile saved")).toBeVisible();
 
   await page.reload();
   await expect(page.getByTestId("settings-name")).toHaveValue("Nama Baru E2E");
@@ -28,11 +28,11 @@ test("settings: sesi aktif tampil; cabut sesi lain → context kedua 401", async
   await page.goto("/settings");
   const rows = page.getByTestId("session-row");
   await expect(rows).toHaveCount(2);
-  await expect(rows.first()).toContainText("Perangkat ini");
+  await expect(rows.first()).toContainText("This device");
   await page.getByTestId("session-revoke-others").click();
-  await expect(toast(page, "Semua perangkat lain sudah dikeluarkan")).toBeVisible();
+  await expect(toast(page, "Signed out of all other devices")).toBeVisible();
   await expect(rows).toHaveCount(1);
-  await expect(page.getByText("Perangkat ini")).toBeVisible();
+  await expect(page.getByText("This device")).toBeVisible();
 
   expect((await other.request.get("/api/me")).status()).toBe(401);
   expect((await page.request.get("/api/me")).status()).toBe(200);

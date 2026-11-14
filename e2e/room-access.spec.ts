@@ -6,11 +6,11 @@ import type { APIRequestContext, Page } from "@playwright/test";
 import type { RoomRole, RoomVisibility } from "../src/shared/api.types";
 import { createInvite, expect, expectConnected, loginAdmin, loginAs, newIdentity, openRoom, passPreJoin, test, toast } from "./fixtures";
 
-/** Pesan Indonesia (= CODE_TEXT di src/web/error.message.ts). */
+/** Pesan UI (= CODE_TEXT di src/web/error.message.ts). */
 const MSG = {
-  private: "Room ini privat",
-  inactive: "Room ini sedang dinonaktifkan",
-  lastHost: "Room harus punya minimal satu host",
+  private: "This is a private room",
+  inactive: "This room is inactive",
+  lastHost: "A room needs at least one host",
 };
 
 const card = (page: Page, roomId: string) => page.locator(`[data-testid="room-item"][data-room-id="${roomId}"]`);
@@ -47,18 +47,18 @@ test("room private: buat lewat form, tambah email belum terdaftar (pending), use
   await loginAdmin(page, root);
   await page.goto("/app");
   const form = page.getByTestId("create-room-form");
-  await form.getByLabel("Judul room").fill(`Private ${roomId}`);
+  await form.getByLabel("Room title").fill(`Private ${roomId}`);
   await form.locator('[data-testid="visibility-option"][data-value="private"]').click();
-  await form.getByText("Opsi lanjutan").click();
-  await form.getByLabel("ID room").fill(roomId);
-  await form.getByRole("button", { name: "Buat room" }).click();
+  await form.getByText("Advanced options").click();
+  await form.getByLabel("Room ID").fill(roomId);
+  await form.getByRole("button", { name: "Create room" }).click();
   await expect(card(page, roomId).getByTestId("room-badge-private")).toBeVisible();
 
   const invitee = newIdentity("Calon Anggota", "pending");
   const dialog = await openSettings(page, roomId, "members");
   await dialog.getByTestId("member-email-input").fill(invitee.email);
   await dialog.getByTestId("member-add").click();
-  await expect(toast(page, `${invitee.email} ditambahkan`)).toBeVisible();
+  await expect(toast(page, `${invitee.email} added`)).toBeVisible();
   await expect(memberRow(page, invitee.email)).toHaveAttribute("data-kind", "pending");
 
   // Login pertama mengklaim undangan pending (R2) → room muncul di lobby dan token terbit.
@@ -85,7 +85,7 @@ test("room public → private: link undangan lama ditolak untuk user lain", asyn
   await dialog.locator('[data-testid="visibility-option"][data-value="private"]').click();
   await dialog.getByTestId("room-settings-save").click();
   await host.getByTestId("visibility-private-confirm").click();
-  await expect(toast(host, "Pengaturan disimpan")).toBeVisible();
+  await expect(toast(host, "Settings saved")).toBeVisible();
   await expect(card(host, roomId).getByTestId("room-badge-private")).toBeVisible();
 
   const other = await newGuestPage();
@@ -102,7 +102,7 @@ test("nonaktifkan room: badge Nonaktif, Masuk disabled, anggota ditolak; aktifka
 
   const dialog = await openSettings(host, roomId, "status");
   await dialog.getByTestId("room-active-switch").click();
-  await expect(toast(host, "Room dinonaktifkan")).toBeVisible();
+  await expect(toast(host, "Room deactivated")).toBeVisible();
   await expect(dialog.getByTestId("room-active-switch")).toHaveAttribute("aria-checked", "false");
   await host.keyboard.press("Escape");
   await expect(card(host, roomId).getByTestId("room-badge-status")).toHaveAttribute("data-status", "inactive");
@@ -117,7 +117,7 @@ test("nonaktifkan room: badge Nonaktif, Masuk disabled, anggota ditolak; aktifka
 
   const again = await openSettings(host, roomId, "status");
   await again.getByTestId("room-active-switch").click();
-  await expect(toast(host, "Room diaktifkan")).toBeVisible();
+  await expect(toast(host, "Room activated")).toBeVisible();
   await host.keyboard.press("Escape");
   await expect(card(host, roomId).getByTestId("room-badge-status")).toHaveCount(0);
   await expect(card(host, roomId).getByTestId("room-enter")).toBeEnabled();
@@ -138,13 +138,13 @@ test("nonaktif: anggota yang membuka /rooms/:id mendapat pesan room dinonaktifka
 
 test("kadaluarsa: +7 hari menampilkan tanggal berakhir, Tanpa batas menghapusnya", async ({ host, roomId }) => {
   const dialog = await openSettings(host, roomId, "status");
-  await expect(dialog.getByTestId("expiry-current")).toHaveText("Tanpa batas");
+  await expect(dialog.getByTestId("expiry-current")).toHaveText("Never");
   await dialog.locator('[data-testid="expiry-extend"][data-days="7"]').click();
-  await expect(dialog.getByTestId("expiry-current")).toHaveText(/^Berakhir \S.*\d/);
+  await expect(dialog.getByTestId("expiry-current")).toHaveText(/^Expires \S.*\d/);
   await expect(card(host, roomId).getByTestId("room-expires")).toBeVisible();
 
   await dialog.getByTestId("expiry-none").click();
-  await expect(dialog.getByTestId("expiry-current")).toHaveText("Tanpa batas");
+  await expect(dialog.getByTestId("expiry-current")).toHaveText("Never");
   await expect(card(host, roomId).getByTestId("room-expires")).toHaveCount(0);
 });
 
@@ -161,16 +161,16 @@ test("anggota: ubah peran, keluarkan, batalkan pending; host terakhir tidak bisa
   await dialog.getByTestId("member-add").click();
   const row = memberRow(host, who.email);
   await expect(row).toHaveAttribute("data-kind", "member");
-  await expect(row.getByTestId("member-row-role")).toHaveText("Peserta");
+  await expect(row.getByTestId("member-row-role")).toHaveText("Participant");
 
-  await pickRole(host, row.getByTestId("member-row-role"), "Penonton");
-  await expect(toast(host, "Peran diperbarui")).toBeVisible();
-  await expect(row.getByTestId("member-row-role")).toHaveText("Penonton");
+  await pickRole(host, row.getByTestId("member-row-role"), "Viewer");
+  await expect(toast(host, "Role updated")).toBeVisible();
+  await expect(row.getByTestId("member-row-role")).toHaveText("Viewer");
   const roles = (await (await host.request.get(`/api/rooms/${roomId}/members`)).json()) as { items: { email: string; role: string }[] };
   expect(roles.items.find((m) => m.email === who.email)?.role).toBe("viewer");
 
   await row.getByTestId("member-remove").click();
-  await expect(toast(host, "Anggota Diatur dikeluarkan")).toBeVisible();
+  await expect(toast(host, "Anggota Diatur removed")).toBeVisible();
   await expect(row).toHaveCount(0);
 
   const pendingEmail = newIdentity("Pending Batal", "pending").email;
@@ -178,7 +178,7 @@ test("anggota: ubah peran, keluarkan, batalkan pending; host terakhir tidak bisa
   await dialog.getByTestId("member-add").click();
   await expect(memberRow(host, pendingEmail)).toHaveAttribute("data-kind", "pending");
   await memberRow(host, pendingEmail).getByTestId("member-remove").click();
-  await expect(toast(host, `Undangan ${pendingEmail} dibatalkan`)).toBeVisible();
+  await expect(toast(host, `Invite for ${pendingEmail} canceled`)).toBeVisible();
   await expect(memberRow(host, pendingEmail)).toHaveCount(0);
 
   // Host satu-satunya: turunkan & keluarkan → 409 last_host, baris tetap Host.
@@ -186,7 +186,7 @@ test("anggota: ubah peran, keluarkan, batalkan pending; host terakhir tidak bisa
   const rejected = (method: string) =>
     host.waitForResponse((r) => r.request().method() === method && r.url().includes(`/api/rooms/${roomId}/members/`) && r.status() === 409);
   const demote = rejected("PATCH");
-  await pickRole(host, self.getByTestId("member-row-role"), "Peserta");
+  await pickRole(host, self.getByTestId("member-row-role"), "Participant");
   await demote;
   await expect(toast(host, MSG.lastHost).first()).toBeVisible();
   await expect(self.getByTestId("member-row-role")).toHaveText("Host");
@@ -203,7 +203,7 @@ test("hapus room lewat Zona bahaya: ketik ID → kartu hilang", async ({ host, r
   await expect(confirm).toBeDisabled();
   await host.getByTestId("delete-confirm-input").fill(roomId);
   await confirm.click();
-  await expect(toast(host, `Room "Room ${roomId}" dihapus`)).toBeVisible();
+  await expect(toast(host, `Room "Room ${roomId}" deleted`)).toBeVisible();
   await expect(card(host, roomId)).toHaveCount(0);
   expect((await host.request.get(`/api/rooms/${roomId}`)).status()).toBe(404);
 });
@@ -235,6 +235,6 @@ test("/admin: kolom Tipe & Status, Pengaturan membuka dialog yang sama", async (
   const dialog = page.getByTestId("room-settings-dialog");
   await dialog.getByTestId("room-settings-tab-status").click();
   await dialog.getByTestId("room-active-switch").click();
-  await expect(toast(page, "Room dinonaktifkan")).toBeVisible();
+  await expect(toast(page, "Room deactivated")).toBeVisible();
   await expect(row.getByTestId("room-admin-status")).toHaveAttribute("data-status", "inactive");
 });

@@ -26,8 +26,8 @@ test("lobby: salin link undangan tetap berhasil di origin non-secure (http://0.0
     await expect(input).toHaveValue(/\/invite\/.+/);
     const url = await input.inputValue();
 
-    await item.getByRole("button", { name: "Salin link Peserta" }).click();
-    await expect(page.getByText("Link disalin")).toBeVisible();
+    await item.getByRole("button", { name: "Copy Participant link" }).click();
+    await expect(page.getByText("Link copied")).toBeVisible();
     expect(await page.evaluate(() => (window as unknown as { copied?: string }).copied)).toBe(url);
   } finally {
     await context.close();

@@ -33,7 +33,7 @@ test("undangan: tamu tanpa sesi wajib masuk dulu (tanpa pre-join); setelah login
   const signin = guest.getByTestId("invite-signin");
   await expect(signin).toBeVisible();
   await expect(signin.getByRole("heading", { name: `Room ${roomId}` })).toBeVisible();
-  await expect(signin.getByTestId("invite-role")).toHaveText("Peserta");
+  await expect(signin.getByTestId("invite-role")).toHaveText("Participant");
   await expect(guest.getByTestId("invite-google")).toBeVisible();
   await expect(guest.getByTestId("prejoin")).toHaveCount(0);
 
@@ -43,7 +43,7 @@ test("undangan: tamu tanpa sesi wajib masuk dulu (tanpa pre-join); setelah login
   await expect(guest.getByTestId("prejoin")).toBeVisible();
   // Nama diambil dari akun, bukan diketik di pre-join.
   await expect(guest.getByTestId("prejoin-name")).toHaveCount(0);
-  await expect(guest.getByTestId("invite-signed-in-as")).toHaveText(`Masuk sebagai ${who.name} (${who.email})`);
+  await expect(guest.getByTestId("invite-signed-in-as")).toHaveText(`Signed in as ${who.name} (${who.email})`);
   await passPreJoin(guest);
   await expectConnected(guest);
 });
@@ -53,7 +53,7 @@ test("prejoin: penonton tanpa toggle mic/kamera", async ({ host, roomId, newGues
   await loginAs(viewer, newIdentity("Penonton Prejoin"));
   await viewer.goto(await createInvite(host.request, roomId, "viewer"));
   await expect(viewer.getByTestId("prejoin")).toBeVisible();
-  await expect(viewer.getByText("Anda masuk sebagai penonton. Kamera dan mikrofon tidak digunakan.")).toBeVisible();
+  await expect(viewer.getByText("You're joining as a viewer. Camera and microphone aren't used.")).toBeVisible();
   await expect(viewer.getByTestId("prejoin-toggle-mic")).toHaveCount(0);
   await expect(viewer.getByTestId("prejoin-toggle-camera")).toHaveCount(0);
   await passPreJoin(viewer);
@@ -67,7 +67,7 @@ test("undangan rusak → invite-error, tanpa pre-join", async ({ page, allowCons
   await page.goto("/invite/ini-bukan-undangan-valid");
   const error = page.getByTestId("invite-error");
   await expect(error).toBeVisible();
-  await expect(error.getByRole("heading", { name: "Undangan tidak dapat dipakai" })).toBeVisible();
-  await expect(error).toContainText("Link undangan tidak valid atau sudah kedaluwarsa");
+  await expect(error.getByRole("heading", { name: "This invite can't be used" })).toBeVisible();
+  await expect(error).toContainText("This invite link is invalid or has expired");
   await expect(page.getByTestId("prejoin")).toHaveCount(0);
 });

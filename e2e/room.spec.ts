@@ -4,8 +4,8 @@ test("join: tamu membuka link undangan, pre-join, masuk room dan terhubung", asy
   await openRoom(host, roomId);
   const guest = await joinAs("participant", "Tamu Satu");
   await expect(guest.locator("header").getByRole("heading", { name: `Room ${roomId}` })).toBeVisible();
-  await expect(guest.locator("header").getByText("Peserta", { exact: true })).toBeVisible();
-  await expect(connectionStatus(guest)).toHaveText("Terhubung");
+  await expect(guest.locator("header").getByText("Participant", { exact: true })).toBeVisible();
+  await expect(connectionStatus(guest)).toHaveText("Connected");
 });
 
 test("media: host & peserta nyalakan kamera+mic di room, saling melihat video", async ({ host, hostId, roomId, joinAs }) => {
@@ -33,7 +33,7 @@ test("multi share: peserta tambah 2 layar, penonton melihat 2 tile; stop satu ti
   const add = sharer.getByTestId("add-screen");
   for (const n of [1, 2]) {
     await add.click();
-    await expect(add).toHaveAccessibleName(`Bagikan layar (${n} aktif)`);
+    await expect(add).toHaveAccessibleName(`Share screen (${n} active)`);
   }
   await sharer.getByTestId("screen-list").click();
   await expect(sharer.getByTestId("stop-screen")).toHaveCount(2);
@@ -48,7 +48,7 @@ test("multi share: peserta tambah 2 layar, penonton melihat 2 tile; stop satu ti
 
   await sharer.getByTestId("screen-list").click();
   await sharer.locator('[data-testid="stop-screen"][data-track-name="screen-2"]').click();
-  await expect(add).toHaveAccessibleName("Bagikan layar (1 aktif)");
+  await expect(add).toHaveAccessibleName("Share screen (1 active)");
   await expect(screen2).toHaveCount(0);
   await expect(screen1).toHaveCount(1);
   await expectVideoFlowing(screen1);
@@ -57,7 +57,7 @@ test("multi share: peserta tambah 2 layar, penonton melihat 2 tile; stop satu ti
 test("viewer: tidak ada tombol kamera, mikrofon, layar, atau toolbar layout", async ({ host, roomId, joinAs }) => {
   await openRoom(host, roomId);
   const viewer = await joinAs("viewer", "Penonton Pasif");
-  await expect(viewer.locator("header").getByText("Penonton", { exact: true })).toBeVisible();
+  await expect(viewer.locator("header").getByText("Viewer", { exact: true })).toBeVisible();
   // Kontrol host terlihat → room sudah selesai render, jadi ketiadaan di viewer bermakna.
   await expect(host.getByTestId("add-screen")).toBeVisible();
   await expect(host.getByTestId("layout-toolbar")).toBeVisible();
@@ -70,6 +70,6 @@ test("viewer: tidak ada tombol kamera, mikrofon, layar, atau toolbar layout", as
 test("toast: peserta lain bergabung → host melihat notifikasi nama", async ({ host, roomId, joinAs }) => {
   await openRoom(host, roomId);
   await joinAs("participant", "Tamu Toast");
-  // room.toasts.ts: agregasi 1,5 dtk lalu "<nama> bergabung".
-  await expect(toast(host, "Tamu Toast")).toContainText("bergabung");
+  // room.toasts.ts: agregasi 1,5 dtk lalu "<name> joined".
+  await expect(toast(host, "Tamu Toast")).toContainText("joined");
 });

@@ -26,15 +26,15 @@ test.describe("landing", () => {
 test.describe("login", () => {
   test("halaman login: satu tombol Google", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByRole("heading", { name: "Masuk ke zoomin" })).toBeVisible();
-    await expect(page.getByTestId("login-google")).toHaveText("Lanjutkan dengan Google");
+    await expect(page.getByRole("heading", { name: "Sign in to zoomin" })).toBeVisible();
+    await expect(page.getByTestId("login-google")).toHaveText("Continue with Google");
     await expect(page.getByTestId("login-error")).toHaveCount(0);
   });
 
-  test("?error=email_domain_not_allowed → pesan Indonesia", async ({ page }) => {
+  test("?error=email_domain_not_allowed → pesan English", async ({ page }) => {
     await page.goto("/login?error=email_domain_not_allowed");
     await expect(page.getByTestId("login-error")).toHaveText(
-      "Domain email akun Google ini tidak diizinkan. Masuk dengan akun Google kantor/organisasi Anda.",
+      "This Google account's email domain is not allowed. Sign in with your work or organization Google account.",
     );
   });
 
@@ -57,7 +57,7 @@ test.describe("login", () => {
       await expect(page.getByTestId("login-card")).toBeVisible();
     }
     // Ada `next` → petunjuk "Masuk dulu…".
-    await expect(page.getByRole("status")).toHaveText("Masuk dulu untuk melanjutkan ke halaman yang Anda buka.");
+    await expect(page.getByRole("status")).toHaveText("Sign in to continue to the page you opened.");
   });
 });
 
@@ -67,21 +67,21 @@ test("user biasa buka /admin & /dev → halaman tidak punya akses, jalan pulang 
     await page.goto(path);
     const forbidden = page.getByTestId("forbidden");
     await expect(forbidden).toBeVisible();
-    await expect(forbidden.getByRole("heading", { name: "Tidak punya akses" })).toBeVisible();
+    await expect(forbidden.getByRole("heading", { name: "No access" })).toBeVisible();
   }
   // API juga menolak.
   expect((await page.request.get("/api/admin/users")).status()).toBe(403);
   expect((await page.request.get("/api/dev/settings")).status()).toBe(403);
-  await page.getByTestId("forbidden").getByRole("link", { name: "Kembali ke Room" }).click();
+  await page.getByTestId("forbidden").getByRole("link", { name: "Back to rooms" }).click();
   await expect(page).toHaveURL(/\/app$/);
   // Menu Admin/Developer tidak muncul untuk user biasa.
-  await expect(page.getByRole("navigation", { name: "Navigasi aplikasi" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "App navigation" })).toHaveCount(0);
 });
 
 test("404: route tak dikenal menampilkan halaman tidak ditemukan dengan jalan pulang", async ({ page }) => {
   await page.goto("/tidak/ada/halaman-ini");
-  await expect(page.getByRole("heading", { name: "Halaman tidak ditemukan" })).toBeVisible();
-  await page.getByRole("link", { name: "Ke lobby" }).click();
-  // "Ke lobby" = /app; tanpa sesi → /login.
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+  await page.getByRole("link", { name: "Go to lobby" }).click();
+  // "Go to lobby" = /app; tanpa sesi → /login.
   await expect(page).toHaveURL(/\/login$/);
 });

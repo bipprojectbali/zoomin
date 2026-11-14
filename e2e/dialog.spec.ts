@@ -42,7 +42,7 @@ test("dialog konfirmasi Keluar dibuka ulang cepat tetap bisa diklik", async ({ h
   const stuck = await reopenQuickly(
     host,
     host.getByTestId("leave-room"),
-    () => host.getByRole("alertdialog").getByRole("button", { name: "Batal" }).click(),
+    () => host.getByRole("alertdialog").getByRole("button", { name: "Cancel" }).click(),
     "alert-dialog-content",
   );
   expect(stuck, "jeda (ms) yang membuat konten tertutup overlay").toEqual([]);

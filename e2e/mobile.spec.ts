@@ -6,7 +6,7 @@ test("mobile 390px: control bar tidak overflow, menu Lainnya membuka panel peser
   await openRoom(host, roomId);
   const phone = await joinAs("participant", "Peserta HP", { viewport: PHONE });
 
-  const bar = phone.getByRole("toolbar", { name: "Kontrol room" });
+  const bar = phone.getByRole("toolbar", { name: "Room controls" });
   await expect(bar).toBeVisible();
   await expect(phone.getByTestId("open-more")).toBeVisible();
   // Tombol Peserta desktop disembunyikan, pindah ke menu Lainnya.

@@ -17,17 +17,17 @@ test("dev: super admin promote user → admin; user itu melihat menu Admin; audi
   await expect(userPage.getByRole("link", { name: "Admin", exact: true })).toHaveCount(0);
 
   await openDev(page, "roles");
-  await page.getByRole("searchbox", { name: "Cari pengguna" }).fill(target.email);
+  await page.getByRole("searchbox", { name: "Search users" }).fill(target.email);
   const row = page.locator(`[data-testid="role-row"][data-user-id="${target.id}"]`);
   await expect(row).toHaveAttribute("data-role", "user");
   await row.getByTestId("promote-admin").click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "Jadikan admin" }).click();
-  await expect(toast(page, `${target.name} sekarang admin`)).toBeVisible();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Make admin" }).click();
+  await expect(toast(page, `${target.name} is now an admin`)).toBeVisible();
   await expect(row).toHaveAttribute("data-role", "admin");
 
   // Peran dibaca dari DB tiap request (tanpa cookieCache): reload cukup.
   await userPage.reload();
-  const adminLink = userPage.getByRole("navigation", { name: "Navigasi aplikasi" }).getByRole("link", { name: "Admin", exact: true });
+  const adminLink = userPage.getByRole("navigation", { name: "App navigation" }).getByRole("link", { name: "Admin", exact: true });
   await expect(adminLink).toBeVisible();
   await adminLink.click();
   await expect(userPage.getByTestId("admin-page")).toBeVisible();
@@ -47,7 +47,7 @@ test("dev: domain email diizinkan → domain lain ditolak, super admin tetap bis
     await page.getByTestId("settings-domain-input").press("Enter");
     await expect(page.getByTestId("settings-domain-chip")).toHaveText(["contoh.test"]);
     await page.getByTestId("settings-save").click();
-    await expect(toast(page, "Pengaturan disimpan")).toBeVisible();
+    await expect(toast(page, "Settings saved")).toBeVisible();
 
     const outsider = `luar-${Date.now().toString(36)}@lain.test`;
     const denied = await testLogin(fresh, { email: outsider });
@@ -56,11 +56,11 @@ test("dev: domain email diizinkan → domain lain ditolak, super admin tetap bis
     expect((await testLogin(fresh, { email: SUPER_ADMIN_EMAIL })).status()).toBe(200);
     expect((await testLogin(fresh, newIdentity("Orang Dalam"))).status()).toBe(200);
 
-    await page.getByRole("button", { name: "Hapus domain contoh.test" }).click();
+    await page.getByRole("button", { name: "Remove domain contoh.test" }).click();
     await expect(page.getByTestId("settings-domain-chip")).toHaveCount(0);
     await page.getByTestId("settings-save").click();
     // Toast simpan pertama bisa masih tampil → dua toast cocok; ambil yang terbaru.
-    await expect(toast(page, "Pengaturan disimpan").last()).toBeVisible();
+    await expect(toast(page, "Settings saved").last()).toBeVisible();
     expect((await testLogin(fresh, { email: outsider })).status()).toBe(200);
   } finally {
     // Jaring pengaman: jangan tinggalkan pembatasan domain untuk test lain.

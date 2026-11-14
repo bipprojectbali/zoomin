@@ -18,18 +18,18 @@ test("participants: viewer & peserta tanpa kamera terdaftar, Anda dulu, badge pe
     [guestId, "participant"],
   ]);
   const badge = (i: number) => rows.nth(i).locator('[data-slot="badge"]');
-  await expect(rows.nth(0)).toContainText("Penonton Daftar (Anda)");
-  await expect(badge(0)).toHaveText("Penonton");
+  await expect(rows.nth(0)).toContainText("Penonton Daftar (you)");
+  await expect(badge(0)).toHaveText("Viewer");
   await expect(badge(1)).toHaveText("Host");
   await expect(rows.nth(2)).toContainText("Peserta Tanpa Kamera");
-  await expect(badge(2)).toHaveText("Peserta");
-  await expect(rows.nth(2)).toContainText("Mikrofon mati");
-  await expect(panel.getByRole("heading", { name: "Peserta (3)" })).toBeVisible();
+  await expect(badge(2)).toHaveText("Participant");
+  await expect(rows.nth(2)).toContainText("Microphone off");
+  await expect(panel.getByRole("heading", { name: "Participants (3)" })).toBeVisible();
 
   // Sudut pandang host: Anda dulu.
   await host.getByTestId("open-participants").click();
   const hostRows = host.getByTestId("participants-panel").getByTestId("participant-row");
   await expect(hostRows).toHaveCount(3);
   await expect(hostRows.nth(0)).toHaveAttribute("data-identity", hostId);
-  await expect(hostRows.nth(0)).toContainText("(Anda)");
+  await expect(hostRows.nth(0)).toContainText("(you)");
 });

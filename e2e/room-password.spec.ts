@@ -8,11 +8,11 @@ import { createInvite, expect, expectConnected, loginAdmin, loginAs, newIdentity
 const PASSWORD = "rahasia-e2e"; // test-only
 const WRONG = "salah-total"; // test-only
 
-/** Pesan Indonesia (= CODE_TEXT di src/web/error.message.ts / TEXT room.connection.ts). */
+/** Pesan UI (= CODE_TEXT di src/web/error.message.ts / TEXT room.connection.ts). */
 const MSG = {
-  invalid: "Password room salah",
-  rateLimited: /^Terlalu banyak percobaan\. Coba lagi dalam \d+ (detik|menit)\.$/,
-  notMember: "Anda bukan anggota room ini",
+  invalid: "Wrong room password",
+  rateLimited: /^Too many attempts\. Try again in \d+ (seconds?|minutes?)\.$/,
+  notMember: "You're not a member of this room",
 };
 
 const card = (page: Page, roomId: string) => page.locator(`[data-testid="room-item"][data-room-id="${roomId}"]`);
@@ -31,7 +31,7 @@ async function newUser(newGuestPage: () => Promise<Page>, name: string): Promise
   return page;
 }
 
-/** Lobby → kolom "Gabung dengan ID room". */
+/** Lobby → kolom "Join with room ID". */
 async function joinById(page: Page, roomId: string): Promise<void> {
   await page.goto("/app");
   await page.getByTestId("join-by-id-input").fill(roomId);
@@ -60,18 +60,18 @@ test("buat room Password lewat form: password tampil sekali, kartu berbadge Pass
   await loginAdmin(page, root);
   await page.goto("/app");
   const form = page.getByTestId("create-room-form");
-  await form.getByLabel("Judul room").fill(`Password ${roomId}`);
+  await form.getByLabel("Room title").fill(`Password ${roomId}`);
   await form.locator('[data-testid="visibility-option"][data-value="password"]').click();
   await form.getByTestId("password-field-generate").click();
   const generated = await form.getByTestId("password-field-input").inputValue();
   expect(generated).toHaveLength(10);
-  await form.getByText("Opsi lanjutan").click();
-  await form.getByLabel("ID room").fill(roomId);
-  await form.getByRole("button", { name: "Buat room" }).click();
+  await form.getByText("Advanced options").click();
+  await form.getByLabel("Room ID").fill(roomId);
+  await form.getByRole("button", { name: "Create room" }).click();
 
   const once = page.getByTestId("password-once-dialog");
   await expect(once.getByTestId("password-once-value")).toHaveText(generated);
-  await once.getByRole("button", { name: "Sudah disimpan" }).click();
+  await once.getByRole("button", { name: "I've saved it" }).click();
   await expect(once).toHaveCount(0);
   await expect(card(page, roomId).getByTestId("room-badge-password")).toBeVisible();
   // Hash/password tidak pernah keluar lewat API (W7).

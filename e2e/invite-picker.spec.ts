@@ -36,10 +36,10 @@ async function openMembers(page: Page, roomId: string): Promise<Locator> {
 async function privateForm(page: Page, roomId: string): Promise<Locator> {
   await page.goto("/app");
   const form = page.getByTestId("create-room-form");
-  await form.getByLabel("Judul room").fill(`Picker ${roomId}`);
+  await form.getByLabel("Room title").fill(`Picker ${roomId}`);
   await form.locator('[data-testid="visibility-option"][data-value="private"]').click();
-  await form.getByText("Opsi lanjutan").click();
-  await form.getByLabel("ID room").fill(roomId);
+  await form.getByText("Advanced options").click();
+  await form.getByLabel("Room ID").fill(roomId);
   return form;
 }
 
@@ -80,9 +80,9 @@ test("buat room Private: centang beberapa akun, Tambah email manual, tempel (inv
   await option(form, second.email).click();
   await expect(chip(form, second.email)).toBeVisible();
 
-  // M3: email belum terdaftar → "Tambah <email>" → tercentang + masuk daftar tersimpan, input dikosongkan.
+  // M3: email belum terdaftar → "Add <email>" → tercentang + masuk daftar tersimpan, input dikosongkan.
   await input.fill(later.email);
-  await expect(form.getByTestId("invite-picker-manual")).toHaveText(`Tambah ${later.email}`);
+  await expect(form.getByTestId("invite-picker-manual")).toHaveText(`Add ${later.email}`);
   await form.getByTestId("invite-picker-manual").click();
   await expect(input).toHaveValue("");
   await expect(chip(form, later.email)).toHaveAttribute("data-invalid", "false");
@@ -94,12 +94,12 @@ test("buat room Private: centang beberapa akun, Tambah email manual, tempel (inv
   await expect(chip(form, pastedB.email)).toHaveAttribute("data-invalid", "false");
   await expect(chip(form, "bukan-email")).toHaveAttribute("data-invalid", "true");
   await expect(form.getByTestId("invite-chip")).toHaveCount(6);
-  await expect(form.getByText("1 email tidak valid tidak akan dikirim.")).toBeVisible();
+  await expect(form.getByText("1 invalid email won't be sent.")).toBeVisible();
 
   // Sisa kata cari (tanpa "@") saat submit dibuang, bukan jadi chip tidak valid.
   await input.fill(query);
   const sent = page.waitForRequest((r) => r.method() === "POST" && r.url().endsWith("/api/rooms"));
-  await form.getByRole("button", { name: "Buat room" }).click();
+  await form.getByRole("button", { name: "Create room" }).click();
   const body = (await sent).postDataJSON() as CreateRoomBody;
   const expected = [registered.email, second.email, later.email, pastedA.email, pastedB.email];
   expect(body.members?.map((m) => m.email).sort()).toEqual(expected.sort());
@@ -159,7 +159,7 @@ test("tab Anggota: tambah dua orang sekaligus → toast ringkasan", async ({ hos
   await paste(dialog.getByTestId("invite-picker-input"), `${a.email} ${b.email}`);
   await expect(dialog.getByTestId("invite-chip")).toHaveCount(2);
   await dialog.getByTestId("member-add").click();
-  await expect(toast(host, "2 ditambahkan")).toBeVisible();
+  await expect(toast(host, "2 added")).toBeVisible();
   await expect(dialog.getByTestId("invite-chip")).toHaveCount(0);
   for (const who of [a, b]) {
     await expect(dialog.locator(`[data-testid="member-row"][data-email="${who.email}"]`)).toHaveAttribute("data-kind", "pending");

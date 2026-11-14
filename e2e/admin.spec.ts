@@ -30,13 +30,13 @@ test("admin: cari user, ban dengan alasan → user di room terputus & tak bisa l
   await dialog.getByTestId("ban-reason").fill("Spam di room e2e");
   await dialog.getByTestId("ban-submit").click();
   await expect(dialog).toHaveCount(0);
-  await expect(toast(host, `${target.name} diblokir`)).toBeVisible();
+  await expect(toast(host, `${target.name} banned`)).toBeVisible();
   await expect(row).toHaveAttribute("data-banned", "true");
 
   // Dikeluarkan dari room LiveKit aktif (A6).
   const screen = guest.getByTestId("room-status-screen");
   await expect(screen).toBeVisible();
-  await expect(screen).toContainText("Anda dikeluarkan dari room");
+  await expect(screen).toContainText("You were removed from the room");
 
   // Login ulang ditolak dengan kode `banned`.
   const fresh = await playwright.request.newContext({ baseURL });
@@ -54,7 +54,7 @@ test("admin: cari user, ban dengan alasan → user di room terputus & tak bisa l
 
   await row.getByTestId("user-actions").click();
   await host.getByTestId("unban").click();
-  await expect(toast(host, `Blokir ${target.name} dibuka`)).toBeVisible();
+  await expect(toast(host, `${target.name} unbanned`)).toBeVisible();
   await expect(row).toHaveAttribute("data-banned", "false");
   const again = await playwright.request.newContext({ baseURL });
   try {

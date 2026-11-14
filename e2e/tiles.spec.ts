@@ -28,7 +28,7 @@ test("layar sendiri: pemilik melihat own-screen-notice, penonton melihat video (
   const id = await identityOf(sharer);
   const viewer = await joinAs("viewer", "Penonton Cermin");
   await sharer.getByTestId("add-screen").click();
-  await expect(sharer.getByTestId("add-screen")).toHaveAccessibleName("Bagikan layar (1 aktif)");
+  await expect(sharer.getByTestId("add-screen")).toHaveAccessibleName("Share screen (1 active)");
 
   await expectVideoFlowing(tile(viewer, id, "screen-1"));
   await expect(tile(viewer, id, "screen-1").getByTestId("own-screen-notice")).toHaveCount(0);
