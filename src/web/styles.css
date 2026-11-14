@@ -24,7 +24,10 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Ring fokus biru kontras ≥3:1 terhadap background (UX-17); --brand = warna identitas app. */
+  --ring: oklch(0.55 0.2 260);
+  --brand: oklch(0.55 0.2 260);
+  --brand-foreground: oklch(0.985 0 0);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,7 +49,9 @@
     --destructive: oklch(0.704 0.191 22.216);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --ring: oklch(0.74 0.15 255);
+    --brand: oklch(0.65 0.18 258);
+    --brand-foreground: oklch(0.145 0 0);
   }
 }
 
@@ -73,11 +78,13 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   html {
     color-scheme: light dark;
@@ -85,4 +92,16 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+}
+
+/*
+ * Fokus keyboard global (UX-17): sengaja di luar @layer supaya menang atas utilitas `outline-none`
+ * milik komponen mana pun (unlayered > layered), jadi tiap elemen fokus punya ring 2px kontras.
+ */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+:is(input, textarea, [contenteditable="true"]):focus-visible {
+  outline-offset: 0;
 }

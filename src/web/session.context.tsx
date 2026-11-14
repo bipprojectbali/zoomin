@@ -1,5 +1,7 @@
+import { Loader2, RotateCw } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Navigate } from "react-router";
+import { Navigate, useLocation } from "react-router";
+import { Button } from "@/components/ui/button";
 import type { SessionUser } from "../shared/api.types";
 import { ApiRequestError, getMe, logout as apiLogout } from "./api.client";
 import { errorMessage } from "./error.message";
@@ -9,10 +11,11 @@ const HTTP_UNAUTHORIZED = 401;
 const TEXT = {
   loading: "Memuat sesi…",
   errorTitle: "Gagal memuat sesi",
+  retry: "Coba lagi",
   outsideProvider: "useSession dipakai di luar <SessionProvider>",
 };
 
-/** Nilai konteks sesi: user null = belum login (401). */
+/** Nilai konteks sesi: user null = belum login (401) atau belum dicek. */
 export type SessionValue = {
   user: SessionUser | null;
   loading: boolean;
@@ -21,12 +24,18 @@ export type SessionValue = {
   logout: () => Promise<void>;
 };
 
+/** `location.state` yang dikirim RequireSession ke /login. */
+export type LoginRedirectState = { from: string; reason: "session" | "logout" };
+
 const SessionContext = createContext<SessionValue | null>(null);
 
-/** Provider sesi: memanggil GET /api/me saat mount. */
+/**
+ * Provider sesi global (dipasang sekali di main.tsx). Tidak fetch saat mount: RequireSession yang memanggil
+ * GET /api/me bila user belum diketahui, jadi berpindah halaman saat sudah login tidak memicu fetch ulang.
+ */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -55,10 +64,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
   const value = useMemo(() => ({ user, loading, error, refresh, logout }), [user, loading, error, refresh, logout]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
@@ -70,33 +75,52 @@ export function useSession(): SessionValue {
   return ctx;
 }
 
-/** Render children hanya bila login; 401 → redirect ke /login. */
+/**
+ * Render children hanya bila login. User belum diketahui (load pertama, habis login/terima undangan) → cek /api/me
+ * sekali; 401 → /login dengan alasan, supaya tamu tahu harus lewat link undangan.
+ */
 export function RequireSession({ children }: { children: ReactNode }) {
-  const { user, loading, error } = useSession();
-  if (loading && !user) {
+  const { user, error, refresh } = useSession();
+  const location = useLocation();
+  const [checked, setChecked] = useState(user !== null);
+
+  useEffect(() => {
+    if (checked) return;
+    let alive = true;
+    void refresh().then(() => {
+      if (alive) setChecked(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [checked, refresh]);
+
+  if (user) return <>{children}</>;
+  if (!checked) {
     return (
-      <p className="p-6 text-muted-foreground" role="status">
+      <div className="flex min-h-svh items-center justify-center gap-2 text-muted-foreground" role="status">
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
         {TEXT.loading}
-      </p>
+      </div>
     );
   }
   if (error) {
     return (
-      <div className="p-6" role="alert">
+      <div className="flex min-h-svh flex-col items-center justify-center gap-3 p-6 text-center" role="alert">
         <p className="font-semibold">{TEXT.errorTitle}</p>
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="max-w-sm text-sm text-muted-foreground">{error}</p>
+        <Button type="button" variant="outline" onClick={() => setChecked(false)}>
+          <RotateCw />
+          {TEXT.retry}
+        </Button>
       </div>
     );
   }
-  if (!user) return <Navigate to="/login" replace />;
-  return <>{children}</>;
+  const state: LoginRedirectState = { from: location.pathname + location.search, reason: "session" };
+  return <Navigate to="/login" replace state={state} />;
 }
 
-/** Halaman terlindung: provider + guard sekaligus (main.tsx tidak membungkus provider global). */
+/** Halaman terlindung (provider sudah global di main.tsx); alias RequireSession agar halaman lama tetap jalan. */
 export function ProtectedPage({ children }: { children: ReactNode }) {
-  return (
-    <SessionProvider>
-      <RequireSession>{children}</RequireSession>
-    </SessionProvider>
-  );
+  return <RequireSession>{children}</RequireSession>;
 }
