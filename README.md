@@ -11,15 +11,27 @@ semua penonton. Backend Bun + Elysia + SQLite, frontend React (SPA) yang di-bund
   `devkey`/`secret`, URL `ws://127.0.0.1:7880`). Tidak ada binary macOS resmi; cara build dan menjalankannya ada di
   [`RND/spike/01-livekit-server.md`](RND/spike/01-livekit-server.md).
 
-## Setup
+## Quick start lokal
 
 ```bash
 bun install
-cp .env.example .env   # isi bila perlu; di development semua punya default
+
+# LiveKit dev (pilih salah satu), kredensial devkey/secret di ws://127.0.0.1:7880
+RND/spike/.bin/livekit-server --dev                                  # binary build-source (lihat RND/spike/01)
+docker run --rm -p 7880:7880 -p 7881:7881 -p 7882:7882/udp livekit/livekit-server:v1.13.11 --dev --bind 0.0.0.0 --node-ip 127.0.0.1
+
+cp .env.example .env          # atau: bun src/server/main.ts env > .env  (binary: zoomin env > .env)
+bun run dev                   # http://localhost:3000
 ```
 
-Di `NODE_ENV=production`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `SESSION_SECRET` (minimal 32 karakter), dan
-`ADMIN_PASSWORD` wajib diset. Server gagal start bila ada yang kosong. Daftar variabel lengkap: `.env.example`.
+Buka **`http://localhost:3000`** (bukan `http://0.0.0.0:3000`: itu bukan secure context, kamera/layar/salin link
+gagal) dan login admin dengan `ADMIN_PASSWORD` (default dev: `admin`).
+
+## Setup
+
+Di development semua variabel punya default (cocok dengan LiveKit `--dev`). Di `NODE_ENV=production`,
+`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `SESSION_SECRET` (minimal 32 karakter), dan `ADMIN_PASSWORD` wajib diset;
+server gagal start bila ada yang kosong. Penjelasan tiap variabel: `.env.example` (sama dengan output `zoomin env`).
 
 Variabel jaringan:
 
@@ -57,7 +69,8 @@ bun scripts/build.binary.ts --target bun-linux-x64-musl --target bun-linux-arm64
 Pakai:
 
 ```bash
-zoomin --help              # perintah dan opsi (--port, --host, --db, --env-file)
+zoomin --help              # perintah dan opsi (-p/--port, -H/--host, --db, --env-file); zoomin -v = versi
+zoomin --docs              # dokumentasi lengkap; topik: usage, env, deploy, api, readme, list
 zoomin env > .env          # contoh .env, lalu isi secret
 zoomin check               # validasi konfigurasi tanpa start; secret hanya ditampilkan "diset"/"kosong"
 zoomin migrate             # terapkan migrasi lalu keluar
@@ -84,21 +97,48 @@ mkcert -install && mkcert <host> <ip>
 Lalu buka `https://<host>:3000` dan set `PUBLIC_APP_URL` ke alamat itu agar link undangan benar. Hanya satu
 variabel diset, atau file tidak ada, membuat server gagal start.
 
-### Akses lewat satu hostname (Cloudflare Tunnel / reverse proxy)
+## Arsitektur deploy yang terbukti
 
-App mem-proxy signaling LiveKit di path `/livekit` (WebSocket + HTTP `GET`/`HEAD`, prefix dibuang, diteruskan ke
-`LIVEKIT_URL`; aktif di dev, `bun run start`, dan binary). Jadi perangkat lain cukup menjangkau origin app, tanpa
-subdomain atau port LiveKit terpisah:
+Diuji 2026-11-14 dari perangkat lain: app berjalan di satu mesin (Mac/server, tanpa IP publik) di belakang
+Cloudflare Tunnel; LiveKit 1.13.11 berjalan di VPS sebagai stack Portainer di belakang Traefik. App di belakang
+Tunnel dijalankan dalam mode produksi (`bun run build && bun run start`, atau binary), bukan `bun run dev`.
+
+```
+app (HTTPS)       browser ──▶ Cloudflare ──▶ Cloudflare Tunnel ──▶ zoomin :3000 (Mac/server)
+signaling (wss)   browser ──▶ Cloudflare ──▶ Traefik (lk.example.com) ──▶ LiveKit :7880 (VPS, tidak di-publish)
+media (WebRTC)    browser ──────────────────▶ IP publik VPS 7882/udp (utama), 7881/tcp (cadangan)
+token/API         zoomin ──▶ LIVEKIT_URL (wss://lk.example.com)
+```
+
+Cloudflare tidak meneruskan UDP/TCP mentah, jadi media selalu langsung ke IP VPS. Port media di-publish Docker dan
+melewati ufw; TURN mati, sehingga klien di jaringan yang hanya membuka 443 gagal media. Langkah, uji, dan catatan
+firewall: [`deploy/README.md`](deploy/README.md) §LiveKit via Portainer, stack
+[`deploy/livekit-compose.yml`](deploy/livekit-compose.yml).
+
+### Koneksi browser ke LiveKit: dua opsi
+
+**A. Subdomain LiveKit (direkomendasikan, terbukti).** Browser bicara langsung ke LiveKit lewat Traefik:
+
+```bash
+PUBLIC_APP_URL=https://app.example.com
+PUBLIC_LIVEKIT_URL=wss://lk.example.com   # dipakai browser
+LIVEKIT_URL=wss://lk.example.com          # dipakai server (token, sync layout)
+LIVEKIT_API_KEY / LIVEKIT_API_SECRET      # sama dengan env stack LiveKit
+```
+
+**B. Proxy same-origin `/livekit`.** App mem-proxy signaling LiveKit di path `/livekit` (WebSocket + HTTP
+`GET`/`HEAD`, prefix dibuang, diteruskan ke `LIVEKIT_URL`; aktif di dev, `bun run start`, dan binary). Berguna bila
+tidak ada subdomain untuk LiveKit, cukup satu hostname app:
 
 ```bash
 PUBLIC_APP_URL=https://app.example.com
 PUBLIC_LIVEKIT_URL=wss://app.example.com/livekit   # signaling lewat app
-LIVEKIT_URL=ws://127.0.0.1:7880                     # atau LiveKit remote, mis. ws://<IP-VPS>:7880
+LIVEKIT_URL=ws://127.0.0.1:7880                     # atau LiveKit remote, mis. wss://lk.example.com
 ```
 
 Proxy hanya membawa signaling. Media WebRTC tetap langsung dari browser ke LiveKit, jadi port media LiveKit
-(`rtc.tcp_port` / `rtc.port_range_*` / UDP) dan IP yang diumumkannya harus terjangkau dari perangkat klien. Cookie sesi app tidak diteruskan ke LiveKit, dan
-token (`access_token`) tidak ikut di log.
+(`rtc.tcp_port` / `rtc.udp_port` / `rtc.port_range_*`) dan IP yang diumumkannya harus terjangkau dari perangkat
+klien. Cookie sesi app tidak diteruskan ke LiveKit, dan token (`access_token`) tidak ikut di log.
 
 ## Alur pakai
 
@@ -121,16 +161,30 @@ bun run typecheck
 bun run test:e2e    # browser (Playwright, Chromium dengan kamera/mic/layar palsu)
 ```
 
-Test integrasi (`test/*.integration.test.ts`) dan e2e butuh LiveKit dev server aktif di `ws://127.0.0.1:7880`.
+Test integrasi (`test/*.integration.test.ts`) dan e2e butuh LiveKit dev server aktif di `ws://127.0.0.1:7880`
+dengan kredensial `devkey`/`secret` (lihat Quick start); `.env` yang menunjuk LiveKit lain membuat test integrasi gagal.
 E2e menyalakan app sendiri di port 3101 dengan DB sementara; pasang browser-nya sekali dengan
 `bunx --bun playwright install chromium`. Laporan dan trace ada di `e2e/.artifacts/`, bug yang ditemukan e2e
 dicatat di `e2e/BUGS.md`.
 
 Smoke test setelah deploy: `SMOKE_URL=https://<domain> bun test test/smoke.prod.test.ts`.
 
+## Troubleshooting
+
+| Gejala | Penyebab | Solusi |
+|---|---|---|
+| `Blocked: Host header does not match the dev server` saat dibuka lewat domain/tunnel | Dev server Bun (`bun run dev`) menolak Host selain localhost | Pakai mode produksi: `bun run build && bun run start` (atau binary) |
+| Salin link undangan gagal, kamera/layar tidak bisa dipakai | Dibuka di `http://0.0.0.0:3000` atau IP LAN, bukan secure context | Buka `http://localhost:3000`, atau HTTPS (§HTTPS lokal / tunnel) |
+| Link undangan 404 di produksi | Bug token bertitik di rute SPA (sudah diperbaiki) | Build ulang dan restart app dengan versi terbaru |
+| Toast/banner "Gagal terhubung ke server media" | Browser tidak bisa menjangkau LiveKit | Cek `PUBLIC_LIVEKIT_URL` bisa dibuka dari perangkat klien (`wss://`, bukan `ws://127.0.0.1`), dan port media VPS terbuka |
+| `POST /api/rooms/:id/token` 500, log `syncRoomLayout` gagal | `LIVEKIT_URL` atau key/secret tidak cocok dengan server LiveKit | Samakan `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` dengan server LiveKit, lalu restart app |
+| Error `M_ID` dari `chrome-extension://...` di konsol | Ekstensi browser, bukan app | Abaikan, atau uji di profil/incognito tanpa ekstensi |
+| Log LiveKit memperingatkan UDP receive buffer kecil | Batas `net.core.rmem_max` kernel host | Opsional: naikkan `net.core.rmem_max` lewat sysctl di host VPS |
+
 ## Deploy
 
-Artefak dan langkah untuk satu server Linux (Caddy + LiveKit + systemd + backup SQLite + rollback) ada di
+Dua jalur: LiveKit sebagai stack Portainer di VPS (yang terbukti, lihat §Arsitektur deploy yang terbukti), atau satu
+server Linux penuh (Caddy + LiveKit + systemd + backup SQLite + rollback). Keduanya di
 [`deploy/README.md`](deploy/README.md). Versi rilis mengikuti `version` di `package.json` dan `CHANGELOG.md`.
 
 ## API
@@ -159,10 +213,11 @@ IP; bila lewat batas → `429` + header `Retry-After`.
 ## Struktur folder
 
 ```
+src/cli/      CLI binary (serve, migrate, check, env, docs)
 src/server/   API Elysia, auth (sesi + undangan), room, token LiveKit, layout (CAS SQLite + room metadata)
 src/shared/   kontrak API, model layout, konvensi nama track (screen-<n>)
 src/web/      SPA React: pages/, lobby/, prejoin/, room/ (media + multi layar), stage/ (layout + edit admin)
-scripts/      build SPA produksi
+scripts/      build SPA produksi + single binary
 migrations/   migrasi SQLite
 test/         test integrasi dengan LiveKit dev + smoke test produksi
 e2e/          test browser Playwright
@@ -177,7 +232,8 @@ RND/          rencana (plan/), spike, dan QA (qa/)
 - Uji browser otomatis (Playwright + QA mode produksi) memakai media palsu. Uji perangkat nyata dengan picker layar
   dan izin OS, serta jaringan seluler/UDP diblokir, belum dilakukan; checklist manual ada di
   `RND/spike/06-browser-manual.md`. Status rilis: [`RND/qa/00-status-rilis.md`](RND/qa/00-status-rilis.md).
-- Artefak deploy produksi sudah ada di `deploy/`, tetapi belum pernah dijalankan di server.
+- Dari artefak `deploy/`, baru stack LiveKit Portainer yang sudah dijalankan di VPS; jalur Caddy + systemd belum.
+  TURN mati di stack itu, jadi jaringan yang hanya membuka 443 gagal media.
 - Belum ada chat, angkat tangan, reaksi, pilihan speaker, atau toggle tema (tema mengikuti OS).
 - HTTPS lokal: sertifikat self-signed (atau CA mkcert yang belum dipercaya) membuat browser memblokir atau
   menampilkan peringatan. LiveKit juga harus diakses lewat `wss://` dari perangkat lain, sedangkan
