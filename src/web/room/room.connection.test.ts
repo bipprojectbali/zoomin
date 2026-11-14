@@ -2,7 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { ConnectionError, ConnectionState, DisconnectReason } from "livekit-client";
 import { ApiRequestError } from "../api.client";
 import { errorMessage } from "../error.message";
-import { canPublishFor, connectionErrorMessage, disconnectMessage, statusFromConnectionState } from "./room.connection";
+import {
+  canPublishFor,
+  canRetry,
+  controlsEnabled,
+  disconnectErrorFor,
+  joinErrorFor,
+  statusFromConnectionState,
+  type ConnectionStatus,
+} from "./room.connection";
 
 const apiError = (status: number, error = "pesan server") => new ApiRequestError(status, { error }, "POST /x");
 
@@ -15,53 +23,77 @@ describe("canPublishFor", () => {
   });
 });
 
-describe("connectionErrorMessage", () => {
-  test("status API dikenal → teks khusus", () => {
-    expect(connectionErrorMessage(apiError(401))).toBe("Sesi berakhir, silakan masuk lagi");
-    expect(connectionErrorMessage(apiError(403))).toBe("Anda bukan anggota room ini");
-    expect(connectionErrorMessage(apiError(404))).toBe("Room tidak ditemukan");
+describe("controlsEnabled", () => {
+  test("hanya connected yang mengaktifkan kontrol (BUG-03)", () => {
+    const all: ConnectionStatus[] = ["idle", "connecting", "connected", "reconnecting", "disconnected", "left", "error"];
+    expect(all.filter(controlsEnabled)).toEqual(["connected"]);
+  });
+});
+
+describe("joinErrorFor", () => {
+  test("401/403/404 → kind khusus", () => {
+    expect(joinErrorFor(apiError(401)).kind).toBe("unauthorized");
+    expect(joinErrorFor(apiError(403)).kind).toBe("forbidden");
+    expect(joinErrorFor(apiError(404))).toEqual({ kind: "room_not_found", message: "Room tidak ditemukan atau sudah dihapus" });
   });
 
-  test("status API lain → body.error dari server", () => {
-    expect(connectionErrorMessage(apiError(500, "db mati"))).toBe("db mati");
+  test("5xx → server; 4xx lain → unknown dengan errorMessage()", () => {
+    expect(joinErrorFor(apiError(503)).kind).toBe("server");
+    const bad = apiError(400, "id tidak valid");
+    expect(joinErrorFor(bad)).toEqual({ kind: "unknown", message: errorMessage(bad) });
   });
 
-  test("ConnectionError LiveKit → teks server media", () => {
-    expect(connectionErrorMessage(ConnectionError.timeout("ws timeout"))).toBe("Gagal terhubung ke server media");
+  test("fetch gagal & ConnectionError LiveKit → network", () => {
+    expect(joinErrorFor(new TypeError("Failed to fetch")).kind).toBe("network");
+    expect(joinErrorFor(ConnectionError.timeout("ws timeout"))).toEqual({
+      kind: "network",
+      message: "Gagal terhubung ke server media",
+    });
+  });
+});
+
+describe("canRetry", () => {
+  test("room_not_found/forbidden/unauthorized tidak bisa retry (UX-24)", () => {
+    expect(canRetry(joinErrorFor(apiError(404)))).toBe(false);
+    expect(canRetry(joinErrorFor(apiError(403)))).toBe(false);
+    expect(canRetry(joinErrorFor(apiError(401)))).toBe(false);
   });
 
-  test("Error biasa → message", () => {
-    expect(connectionErrorMessage(new Error("boom"))).toBe("boom");
+  test("network/server/duplicate/null bisa retry", () => {
+    expect(canRetry(joinErrorFor(new TypeError("x")))).toBe(true);
+    expect(canRetry(joinErrorFor(apiError(500)))).toBe(true);
+    expect(canRetry(disconnectErrorFor(DisconnectReason.DUPLICATE_IDENTITY))).toBe(true);
+    expect(canRetry(null)).toBe(true);
   });
 });
 
 describe("statusFromConnectionState", () => {
-  test("reconnecting dipetakan ke connecting", () => {
+  test("reconnecting dibedakan dari connecting", () => {
     expect(statusFromConnectionState(ConnectionState.Connected)).toBe("connected");
     expect(statusFromConnectionState(ConnectionState.Disconnected)).toBe("disconnected");
     expect(statusFromConnectionState(ConnectionState.Connecting)).toBe("connecting");
-    expect(statusFromConnectionState(ConnectionState.Reconnecting)).toBe("connecting");
-    expect(statusFromConnectionState(ConnectionState.SignalReconnecting)).toBe("connecting");
+    expect(statusFromConnectionState(ConnectionState.Reconnecting)).toBe("reconnecting");
+    expect(statusFromConnectionState(ConnectionState.SignalReconnecting)).toBe("reconnecting");
   });
 });
 
-describe("disconnectMessage", () => {
-  test("keluar sendiri → null (tanpa error)", () => {
-    expect(disconnectMessage(DisconnectReason.CLIENT_INITIATED)).toBeNull();
+describe("disconnectErrorFor", () => {
+  test("keluar sendiri → null", () => {
+    expect(disconnectErrorFor(DisconnectReason.CLIENT_INITIATED)).toBeNull();
   });
 
-  test("alasan dikenal → teks khusus, lainnya → terputus umum", () => {
-    expect(disconnectMessage(DisconnectReason.DUPLICATE_IDENTITY)).toBe("Akun ini masuk dari tab atau perangkat lain");
-    expect(disconnectMessage(DisconnectReason.PARTICIPANT_REMOVED)).toBe("Anda dikeluarkan dari room");
-    expect(disconnectMessage(DisconnectReason.ROOM_DELETED)).toBe("Room sudah dihapus");
-    expect(disconnectMessage(undefined)).toBe("Koneksi ke room terputus");
+  test("alasan dikenal → kind + teks khusus", () => {
+    expect(disconnectErrorFor(DisconnectReason.DUPLICATE_IDENTITY)).toEqual({
+      kind: "duplicate_session",
+      message: "Anda membuka room ini di tab/perangkat lain",
+    });
+    expect(disconnectErrorFor(DisconnectReason.PARTICIPANT_REMOVED)?.kind).toBe("forbidden");
+    expect(disconnectErrorFor(DisconnectReason.ROOM_DELETED)?.kind).toBe("room_not_found");
+    expect(disconnectErrorFor(DisconnectReason.SERVER_SHUTDOWN)?.kind).toBe("server");
   });
-});
 
-describe("errorMessage", () => {
-  test("ApiRequestError → body.error; TypeError fetch → teks jaringan; non-Error → teks umum", () => {
-    expect(errorMessage(apiError(400, "id tidak valid"))).toBe("id tidak valid");
-    expect(errorMessage(new TypeError("Failed to fetch"))).toBe("Tidak dapat menghubungi server, periksa koneksi");
-    expect(errorMessage("x")).toBe("Terjadi kesalahan tak terduga");
+  test("lainnya → network (terputus umum)", () => {
+    expect(disconnectErrorFor(undefined)).toEqual({ kind: "network", message: "Koneksi ke room terputus" });
+    expect(disconnectErrorFor(DisconnectReason.SIGNAL_CLOSE)?.kind).toBe("network");
   });
 });
