@@ -1,8 +1,8 @@
-import { expect, loginAdmin, test } from "./fixtures";
+import { expect, loginAdmin, loginAs, newIdentity, test } from "./fixtures";
 
-test("lobby: buat room cukup judul, muncul di daftar, buat link undangan peserta & penonton", async ({ page, roomId }) => {
-  await loginAdmin(page.request);
-  await page.goto("/");
+test("lobby: admin buat room cukup judul, muncul di daftar, buat link undangan peserta & penonton", async ({ page, root, roomId }) => {
+  await loginAdmin(page, root);
+  await page.goto("/app");
   const form = page.getByTestId("create-room-form");
   const title = `Judul ${roomId}`;
   await form.getByLabel("Judul room").fill(title);
@@ -38,20 +38,25 @@ test("lobby: buat room cukup judul, muncul di daftar, buat link undangan peserta
   await expect(page.locator(`[data-testid="room-item"][data-room-id="${roomId}"]`)).toBeVisible();
 });
 
-test("lobby: tamu Keluar akun wajib konfirmasi", async ({ roomId, joinAs }) => {
+test("lobby: user biasa tanpa undangan → rooms-empty, tanpa form buat room", async ({ page }) => {
+  await loginAs(page, newIdentity("User Biasa"));
+  await page.goto("/app");
+  await expect(page.getByTestId("rooms-empty")).toBeVisible();
+  await expect(page.getByTestId("create-room-form")).toHaveCount(0);
+  // Server juga menolak (bukan hanya UI menyembunyikan form).
+  const res = await page.request.post("/api/rooms", { data: { id: `x-${Date.now()}`, title: "Tidak boleh" } });
+  expect(res.status()).toBe(403);
+  expect((await res.json()).code).toBe("insufficient_role");
+});
+
+test("lobby: tamu yang menerima undangan melihat room-nya, lalu Keluar akun → /login", async ({ roomId, joinAs }) => {
   const guest = await joinAs("participant", "Tamu Logout");
-  await guest.goto("/");
+  await guest.goto("/app");
   await expect(guest.locator(`[data-testid="room-item"][data-room-id="${roomId}"]`)).toBeVisible();
-  // Tamu bukan admin global: tidak ada form buat room.
   await expect(guest.getByTestId("create-room-form")).toHaveCount(0);
+  await guest.getByTestId("user-menu").click();
   await guest.getByTestId("logout").click();
-  const dialog = guest.getByRole("alertdialog");
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Batal" }).click();
-  // Tunggu animasi tutup selesai (lihat E2E-01 di e2e/BUGS.md / dialog.spec.ts).
-  await expect(dialog).toHaveCount(0);
-  await expect(guest).toHaveURL(/\/$/);
-  await guest.getByTestId("logout").click();
-  await guest.getByRole("alertdialog").getByRole("button", { name: "Keluar akun" }).click();
+  await expect(guest).toHaveURL(/\/login$/);
+  await guest.goto("/app");
   await expect(guest).toHaveURL(/\/login$/);
 });

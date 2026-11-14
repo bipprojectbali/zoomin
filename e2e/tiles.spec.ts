@@ -1,13 +1,13 @@
-import { ADMIN_ID, expect, expectVideoFlowing, identityOf, openRoom, test, tile } from "./fixtures";
+import { expect, expectVideoFlowing, identityOf, openRoom, test, tile } from "./fixtures";
 
-test("avatar: admin & peserta tanpa kamera punya tile avatar, penonton tidak (QA-01)", async ({ admin, roomId, joinAs }) => {
-  await openRoom(admin, roomId);
+test("avatar: host & peserta tanpa kamera punya tile avatar, penonton tidak (QA-01)", async ({ host, hostId, roomId, joinAs }) => {
+  await openRoom(host, roomId);
   const guest = await joinAs("participant", "Budi Santoso", { camera: false });
   const viewer = await joinAs("viewer", "Penonton Avatar");
   const [guestId, viewerId] = await Promise.all([identityOf(guest), identityOf(viewer)]);
 
-  for (const page of [admin, guest, viewer]) {
-    for (const id of [ADMIN_ID, guestId]) {
+  for (const page of [host, guest, viewer]) {
+    for (const id of [hostId, guestId]) {
       const t = tile(page, id, "camera");
       await expect(t).toBeVisible();
       await expect(t).toHaveAttribute("data-state", "inactive");
@@ -15,12 +15,12 @@ test("avatar: admin & peserta tanpa kamera punya tile avatar, penonton tidak (QA
     }
     await expect(page.locator(`[data-testid="stage-tile"][data-identity="${viewerId}"]`)).toHaveCount(0);
   }
-  await expect(tile(admin, guestId, "camera")).toContainText("BS");
+  await expect(tile(host, guestId, "camera")).toContainText("BS");
 
   // Kamera dinyalakan → tile yang sama berganti video.
   await guest.getByTestId("toggle-camera").click();
-  await expectVideoFlowing(tile(admin, guestId, "camera"));
-  await expect(tile(admin, guestId, "camera")).toHaveAttribute("data-state", "active");
+  await expectVideoFlowing(tile(host, guestId, "camera"));
+  await expect(tile(host, guestId, "camera")).toHaveAttribute("data-state", "active");
 });
 
 test("layar sendiri: pemilik melihat own-screen-notice, penonton melihat video (QA-02)", async ({ joinAs }) => {

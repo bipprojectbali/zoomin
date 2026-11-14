@@ -32,6 +32,18 @@ begitu bug diperbaiki test itu jadi "unexpectedly passed" → hapus `test.fail()
 - **Bukti:** jalankan test tanpa `test.fail()` → pesan berisi daftar jeda yang macet (mis. `[160, 165, …, 195]`),
   trace & screenshot di `e2e/.artifacts/results/dialog-dialog-konfirmasi-*/` (folder artefak di-reset tiap run).
 
+## E2E-02 — Tombol "Ke lobby" di halaman 404 membuka landing `/`, bukan lobby `/app`
+
+- **Test:** `e2e/auth.spec.ts` › "404: route tak dikenal menampilkan halaman tidak ditemukan dengan jalan pulang"
+  (`test.fail()`).
+- **Dampak:** rendah. Sejak lobby pindah ke `/app` (A10), label "Ke lobby" (dan teks "kembali ke lobby") tidak
+  sesuai tujuan: user login dibawa ke landing promosi dan harus klik CTA lagi.
+- **Langkah reproduksi:** buka `/tidak/ada` → klik "Ke lobby".
+- **Ekspektasi:** ke `/app` (tanpa sesi → `/login`).
+- **Aktual:** ke `/` (landing).
+- **Dugaan akar:** `src/web/pages/NotFoundPage.tsx` masih `<Link to="/">` dari sebelum rute A10. Arah perbaikan:
+  `to="/app"` (atau ganti label jadi "Ke beranda" bila landing memang tujuannya).
+
 ## Catatan (bukan bug app, tidak di-`test.fail`)
 
 - **Bentrok `data-testid="stage"`** (sudah beres): panel Fokus kini ber-id `focus-main`/`focus-strip`, jadi
@@ -39,5 +51,8 @@ begitu bug diperbaiki test itu jadi "unexpectedly passed" → hapus `test.fail()
 - **Peserta yang keluar sangat cepat tidak memicu toast:** bila tamu keluar sebelum LiveKit menyiarkannya ke peserta
   lain (~<1 dtk setelah connect), admin tidak pernah menerima `ParticipantConnected`/`Disconnected`, jadi tak ada
   toast "bergabung"/"keluar". Perilaku LiveKit, wajar.
+- **Server e2e mewarisi `.env` developer** (sudah beres di `playwright.config.ts`): `bunx --bun playwright` memuat
+  `.env` ke proses Playwright, webServer mewarisinya → `PUBLIC_LIVEKIT_URL` produksi bocor ke server e2e dan semua
+  join gagal "Server sedang bermasalah". Kini semua env config diset eksplisit + `bun --no-env-file`.
 - **Menu Radix dibuka ulang saat masih animasi tutup diabaikan** (`screen-list`): klik pemicu ~200 ms setelah
   Escape tidak membuka menu. Kosmetik; test menunggu menu benar-benar tertutup.

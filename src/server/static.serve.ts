@@ -9,7 +9,15 @@ export const WEB_DIST_DIR = "dist/web";
  * folder "web" di bawah `import.meta.dir` (/$bunfs/root), terbaca via node:fs/Bun.file; dari source tetap relatif
  * ke WorkingDirectory. Folder khusus (bukan root bunfs) agar file entry binary sendiri tidak ikut dirutekan.
  */
-export const DEFAULT_WEB_DIR = Bun.isStandaloneExecutable ? join(import.meta.dir, "web") : WEB_DIST_DIR;
+export const DEFAULT_WEB_DIR = resolveWebDir();
+
+/**
+ * Direktori SPA produksi. Env `WEB_DIST_DIR` (opsional) menimpa default — mis. e2e menyajikan build di folder
+ * sementara agar tidak menimpa `dist/web` milik server produksi lain yang sedang jalan (file dist dibaca sekali saat start).
+ */
+export function resolveWebDir(env: Record<string, string | undefined> = process.env, standalone = Bun.isStandaloneExecutable): string {
+  return env.WEB_DIST_DIR?.trim() || (standalone ? join(import.meta.dir, "web") : WEB_DIST_DIR);
+}
 
 const IMMUTABLE = "public, max-age=31536000, immutable";
 

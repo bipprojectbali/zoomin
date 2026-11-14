@@ -4,7 +4,7 @@
  */
 import type { Page } from "@playwright/test";
 import type { TokenResponse } from "../src/shared/api.types";
-import { ADMIN_ID, createInvite, expect, expectConnected, expectVideoFlowing, identityOf, openRoom, passPreJoin, test, tile } from "./fixtures";
+import { createInvite, expect, expectConnected, expectVideoFlowing, identityOf, loginAs, newIdentity, openRoom, passPreJoin, test, tile } from "./fixtures";
 
 /** Arahkan LiveKit page ke proxy app; kembalikan daftar URL WebSocket yang dibuka page. */
 async function viaProxy(page: Page, baseURL: string): Promise<string[]> {
@@ -22,22 +22,23 @@ async function viaProxy(page: Page, baseURL: string): Promise<string[]> {
 const signalingViaProxy = (sockets: string[], baseURL: string) =>
   sockets.some((u) => u.startsWith(`${baseURL.replace(/^http/, "ws")}/livekit/rtc`));
 
-test("proxy /livekit: admin & peserta join lewat proxy dan saling melihat video", async ({ admin, roomId, newGuestPage, baseURL }) => {
+test("proxy /livekit: host & peserta join lewat proxy dan saling melihat video", async ({ host, hostId, roomId, newGuestPage, baseURL }) => {
   const base = baseURL!;
-  const adminSockets = await viaProxy(admin, base);
-  await openRoom(admin, roomId, { camera: true });
+  const hostSockets = await viaProxy(host, base);
+  await openRoom(host, roomId, { camera: true });
 
   const guest = await newGuestPage();
   const guestSockets = await viaProxy(guest, base);
-  await guest.goto(await createInvite(admin.request, roomId, "participant"));
-  await passPreJoin(guest, { camera: true }, "Tamu Proxy");
+  await loginAs(guest, newIdentity("Tamu Proxy"));
+  await guest.goto(await createInvite(host.request, roomId, "participant"));
+  await passPreJoin(guest, { camera: true });
   await expectConnected(guest);
 
-  expect(signalingViaProxy(adminSockets, base)).toBe(true);
+  expect(signalingViaProxy(hostSockets, base)).toBe(true);
   expect(signalingViaProxy(guestSockets, base)).toBe(true);
   // Tak ada signaling yang langsung ke LiveKit (port 7880).
-  expect([...adminSockets, ...guestSockets].filter((u) => u.includes(":7880"))).toEqual([]);
+  expect([...hostSockets, ...guestSockets].filter((u) => u.includes(":7880"))).toEqual([]);
 
-  await expectVideoFlowing(tile(admin, await identityOf(guest), "camera"));
-  await expectVideoFlowing(tile(guest, ADMIN_ID, "camera"));
+  await expectVideoFlowing(tile(host, await identityOf(guest), "camera"));
+  await expectVideoFlowing(tile(guest, hostId, "camera"));
 });

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { createTestDeps } from "../../test/auth.helpers";
 import type { ApiDeps } from "./api.deps";
 import { createServer } from "./main";
-import { DEFAULT_WEB_DIR, staticRoutes, WEB_DIST_DIR } from "./static.serve";
+import { DEFAULT_WEB_DIR, resolveWebDir, staticRoutes, WEB_DIST_DIR } from "./static.serve";
 
 // Dist palsu (test-only): meniru output scripts/build.web.ts.
 const dist = mkdtempSync(join(tmpdir(), "zoomin-dist-"));
@@ -105,7 +105,15 @@ describe("produksi: SPA statis dari dist", () => {
 });
 
 test("dari source (bukan binary) SPA dibaca dari dist/web relatif cwd", () => {
-  expect(DEFAULT_WEB_DIR).toBe(WEB_DIST_DIR);
+  expect(DEFAULT_WEB_DIR).toBe(process.env.WEB_DIST_DIR?.trim() || WEB_DIST_DIR);
+  expect(resolveWebDir({}, false)).toBe(WEB_DIST_DIR);
+});
+
+test("WEB_DIST_DIR menimpa direktori SPA (source & binary); kosong → default", () => {
+  expect(resolveWebDir({ WEB_DIST_DIR: " /tmp/e2e/web " }, false)).toBe("/tmp/e2e/web");
+  expect(resolveWebDir({ WEB_DIST_DIR: "/tmp/e2e/web" }, true)).toBe("/tmp/e2e/web");
+  expect(resolveWebDir({ WEB_DIST_DIR: "  " }, false)).toBe(WEB_DIST_DIR);
+  expect(resolveWebDir({}, true)).toEndWith("/web");
 });
 
 test("produksi tanpa dist → throw dengan petunjuk build", () => {

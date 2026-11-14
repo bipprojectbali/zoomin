@@ -1,60 +1,87 @@
-import { ADMIN_PASSWORD, expect, test } from "./fixtures";
+import { expect, loginAs, newIdentity, test } from "./fixtures";
 
-const RATE_LIMITED_TEXT = "Terlalu banyak percobaan. Coba lagi dalam 15 menit.";
-/** = ADMIN_LOGIN_MAX_FAILURES (src/server/auth.route.ts). */
-const LOGIN_MAX_FAILURES = 5;
-
-test.describe("auth admin", () => {
-  test("password salah: pesan Indonesia, tetap di /login", async ({ page, allowConsole }) => {
-    // LoginPage mencatat kegagalan login via console.error (dengan konteks) sebelum menampilkan pesan.
-    allowConsole(/^login: admin-login gagal/);
+test.describe("landing", () => {
+  test("anonim di / → landing dengan CTA login ke /login", async ({ page }) => {
     await page.goto("/");
+    await expect(page.getByTestId("landing")).toBeVisible();
+    await expect(page.getByTestId("landing-cta-app")).toHaveCount(0);
+    await page.getByTestId("landing-cta-login").click();
     await expect(page).toHaveURL(/\/login$/);
-    await page.getByLabel("Password admin").fill("salah-total");
-    await page.getByRole("button", { name: "Masuk" }).click();
-    await expect(page.getByRole("alert")).toHaveText("Password salah. Periksa lalu coba lagi.");
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByTestId("login-card")).toBeVisible();
   });
 
-  test("password benar masuk lobby, lalu logout kembali ke /login", async ({ page }) => {
-    await page.goto("/login");
-    await page.getByLabel("Password admin").fill(ADMIN_PASSWORD);
-    await page.getByRole("button", { name: "Masuk" }).click();
-    await expect(page.getByTestId("create-room-form")).toBeVisible();
-
-    // Admin tidak butuh konfirmasi logout (bisa login ulang sendiri).
-    await page.getByTestId("logout").click();
-    await expect(page).toHaveURL(/\/login$/);
+  test("sudah login di / → landing tetap tampil, CTA ke /app", async ({ page }) => {
+    await loginAs(page, newIdentity("Pengunjung Login"));
     await page.goto("/");
-    await expect(page).toHaveURL(/\/login$/);
-  });
-
-  test("rate limit: gagal login berulang → 429 dengan pesan Indonesia", async ({ page, allowConsole }) => {
-    // Tiap kegagalan dicatat console.error oleh LoginPage; 429 juga dicatat Chromium sebagai resource gagal.
-    allowConsole(/^login: admin-login gagal/, /status of 429/);
-    await page.goto("/login");
-    const password = page.getByLabel("Password admin");
-    const submit = page.getByRole("button", { name: "Masuk" });
-    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) {
-      const res = page.waitForResponse("**/api/auth/admin-login");
-      await password.fill(`salah-${i}`);
-      await submit.click();
-      expect((await res).status()).toBe(401);
-    }
-    const res = page.waitForResponse("**/api/auth/admin-login");
-    // Password benar pun ditolak selama jendela rate limit.
-    await password.fill(ADMIN_PASSWORD);
-    await submit.click();
-    expect((await res).status()).toBe(429);
-    await expect(page.getByRole("alert")).toHaveText(RATE_LIMITED_TEXT);
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByTestId("landing")).toBeVisible();
+    await expect(page.getByTestId("landing-cta-login")).toHaveCount(0);
+    await page.getByTestId("landing-cta-app").click();
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(page.getByTestId("user-menu")).toBeVisible();
   });
 });
 
+test.describe("login", () => {
+  test("halaman login: satu tombol Google", async ({ page }) => {
+    await page.goto("/login");
+    await expect(page.getByRole("heading", { name: "Masuk ke zoomin" })).toBeVisible();
+    await expect(page.getByTestId("login-google")).toHaveText("Lanjutkan dengan Google");
+    await expect(page.getByTestId("login-error")).toHaveCount(0);
+  });
+
+  test("?error=email_domain_not_allowed → pesan Indonesia", async ({ page }) => {
+    await page.goto("/login?error=email_domain_not_allowed");
+    await expect(page.getByTestId("login-error")).toHaveText(
+      "Domain email akun Google ini tidak diizinkan. Masuk dengan akun Google kantor/organisasi Anda.",
+    );
+  });
+
+  test("?next= eksternal ditolak: setelah login tetap di /app", async ({ page }) => {
+    await loginAs(page, newIdentity("Korban Redirect"));
+    for (const next of ["https://evil.example/curi", "//evil.example/curi", "/\\evil.example"]) {
+      await page.goto(`/login?next=${encodeURIComponent(next)}`);
+      await expect(page).toHaveURL(/^http:\/\/localhost:\d+\/app$/);
+    }
+    // Path internal tetap dihormati.
+    await page.goto(`/login?next=${encodeURIComponent("/settings")}`);
+    await expect(page).toHaveURL(/\/settings$/);
+  });
+
+  test("RequireSession: anonim buka /app & /settings → /login?next=<path>", async ({ page }) => {
+    for (const path of ["/app", "/settings", "/rooms/apa-saja"]) {
+      await page.goto(path);
+      if (path === "/app") await expect(page).toHaveURL(/\/login$/);
+      else await expect(page).toHaveURL(`/login?next=${encodeURIComponent(path)}`);
+      await expect(page.getByTestId("login-card")).toBeVisible();
+    }
+    // Ada `next` → petunjuk "Masuk dulu…".
+    await expect(page.getByRole("status")).toHaveText("Masuk dulu untuk melanjutkan ke halaman yang Anda buka.");
+  });
+});
+
+test("user biasa buka /admin & /dev → halaman tidak punya akses, jalan pulang ke /app", async ({ page }) => {
+  await loginAs(page, newIdentity("User Penasaran"));
+  for (const path of ["/admin", "/dev"]) {
+    await page.goto(path);
+    const forbidden = page.getByTestId("forbidden");
+    await expect(forbidden).toBeVisible();
+    await expect(forbidden.getByRole("heading", { name: "Tidak punya akses" })).toBeVisible();
+  }
+  // API juga menolak.
+  expect((await page.request.get("/api/admin/users")).status()).toBe(403);
+  expect((await page.request.get("/api/dev/settings")).status()).toBe(403);
+  await page.getByTestId("forbidden").getByRole("link", { name: "Kembali ke Room" }).click();
+  await expect(page).toHaveURL(/\/app$/);
+  // Menu Admin/Developer tidak muncul untuk user biasa.
+  await expect(page.getByRole("navigation", { name: "Navigasi aplikasi" })).toHaveCount(0);
+});
+
 test("404: route tak dikenal menampilkan halaman tidak ditemukan dengan jalan pulang", async ({ page }) => {
+  // BUG(e2e): E2E-02 — lihat e2e/BUGS.md; hapus test.fail() setelah NotFoundPage diperbaiki.
+  test.fail();
   await page.goto("/tidak/ada/halaman-ini");
   await expect(page.getByRole("heading", { name: "Halaman tidak ditemukan" })).toBeVisible();
   await page.getByRole("link", { name: "Ke lobby" }).click();
-  // Tanpa sesi lobby mengarah ke login.
+  // "Ke lobby" = /app; tanpa sesi → /login. Aktual: link ke "/" (landing).
   await expect(page).toHaveURL(/\/login$/);
 });

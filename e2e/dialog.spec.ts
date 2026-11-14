@@ -36,13 +36,13 @@ async function reopenQuickly(page: Page, trigger: Locator, close: () => Promise<
   return stuck;
 }
 
-test("dialog konfirmasi Keluar dibuka ulang cepat tetap bisa diklik", async ({ admin, roomId }) => {
+test("dialog konfirmasi Keluar dibuka ulang cepat tetap bisa diklik", async ({ host, roomId }) => {
   // Regresi E2E-01: overlay z-40 di bawah konten z-50, durasi animasi overlay = konten (200 ms).
-  await openRoom(admin, roomId);
+  await openRoom(host, roomId);
   const stuck = await reopenQuickly(
-    admin,
-    admin.getByTestId("leave-room"),
-    () => admin.getByRole("alertdialog").getByRole("button", { name: "Batal" }).click(),
+    host,
+    host.getByTestId("leave-room"),
+    () => host.getByRole("alertdialog").getByRole("button", { name: "Batal" }).click(),
     "alert-dialog-content",
   );
   expect(stuck, "jeda (ms) yang membuat konten tertutup overlay").toEqual([]);

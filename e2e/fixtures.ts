@@ -1,45 +1,83 @@
-/** Fixture & helper e2e: admin login via API, room unik per test, tamu di context terpisah, penjaga konsol. */
+/**
+ * Fixture & helper e2e: login test-only (`POST /api/test/login`, A12 di RND/plan/05-auth-roles.md), host room unik
+ * per test, tamu di context terpisah (login dulu sebelum undangan), penjaga konsol.
+ */
 import { test as base, expect, type APIRequestContext, type Browser, type BrowserContextOptions, type Locator, type Page } from "@playwright/test";
-import type { CreateInviteResponse, Role, UserResponse } from "../src/shared/api.types";
+import type { CreateInviteResponse, GlobalRole, RoomRole, SessionUser, UserResponse } from "../src/shared/api.types";
 
 export { expect };
 
-export const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "e2e-admin-password"; // test-only
-/** Identity & nama admin global (ADMIN_USER_ID / ADMIN_NAME di src/server/auth.route.ts). */
-export const ADMIN_ID = "admin";
-export const ADMIN_NAME = "Admin";
+/** = SUPER_ADMIN_EMAILS server e2e (playwright.config.ts). */
+export const SUPER_ADMIN_EMAIL = "root@e2e.test"; // test-only
+/**
+ * Domain semua user e2e lain. Sengaja beda dari domain super admin: test pembatasan domain (`dev.spec.ts`)
+ * mengizinkan domain ini saja, sehingga test paralel lain tetap bisa login selama pembatasan aktif.
+ */
+export const USER_DOMAIN = "contoh.test"; // test-only
 
 /** Pilihan pre-join; default semua mati (DEFAULT_MEDIA_PREFERENCES). */
 export type MediaChoice = { mic?: boolean; camera?: boolean };
+type Identity = { email: string; name: string };
 
 type Fixtures = {
   /** Id room unik per test (aman untuk SAFE_ID_PATTERN). */
   roomId: string;
-  /** Page admin global yang sudah login dan room `roomId` sudah dibuat (via API). */
-  admin: Page;
-  /** Buka link undangan `role` di context baru, lewati pre-join, tunggu terhubung. */
-  joinAs: (role: Role, name: string, media?: MediaChoice & { viewport?: BrowserContextOptions["viewport"] }) => Promise<Page>;
-  /** Context tamu baru (IP palsu unik, penjaga konsol terpasang) untuk alur manual. */
+  /** Request context super_admin (root@e2e.test), cookie terpisah dari page mana pun. */
+  root: APIRequestContext;
+  /** Page user baru yang diangkat admin global oleh root, sudah membuat room `roomId` (dia `host`). */
+  host: Page;
+  /** Identity LiveKit host (= user.id). */
+  hostId: string;
+  /** Context baru: login user baru bernama `name`, buka undangan `role`, lewati pre-join, tunggu terhubung. */
+  joinAs: (role: RoomRole, name: string, media?: MediaChoice & { viewport?: BrowserContextOptions["viewport"] }) => Promise<Page>;
+  /** Context tamu baru tanpa sesi (IP palsu unik, penjaga konsol terpasang) untuk alur manual. */
   newGuestPage: (options?: BrowserContextOptions) => Promise<Page>;
   /** Izinkan pesan konsol error yang cocok untuk test ini (wajib beri alasan di pemanggil). */
   allowConsole: (...patterns: RegExp[]) => void;
 };
 
-async function apiOk<T>(res: Awaited<ReturnType<APIRequestContext["post"]>>, operation: string): Promise<T> {
+type ApiResponse = Awaited<ReturnType<APIRequestContext["post"]>>;
+
+async function apiOk<T>(res: ApiResponse, operation: string): Promise<T> {
   if (!res.ok()) throw new Error(`${operation}: HTTP ${res.status()} ${await res.text()}`);
   return (await res.json()) as T;
 }
 
-/** Login admin lewat API; cookie masuk ke context pemilik `request`. */
-export async function loginAdmin(request: APIRequestContext): Promise<void> {
-  await apiOk(await request.post("/api/auth/admin-login", { data: { password: ADMIN_PASSWORD } }), "admin-login");
+const rand = () => Math.random().toString(36).slice(2, 8);
+
+/** Identitas user e2e unik (email di USER_DOMAIN). */
+export function newIdentity(name: string, prefix = "user"): Identity {
+  return { name, email: `${prefix}-${Date.now().toString(36)}-${rand()}@${USER_DOMAIN}` };
+}
+
+/** POST /api/test/login mentah (untuk test yang memeriksa penolakan). */
+export function testLogin(request: APIRequestContext, who: Partial<Identity> & { email: string }): Promise<ApiResponse> {
+  return request.post("/api/test/login", { data: who });
+}
+
+/** Login test-only; cookie Better Auth masuk ke context pemilik `request` (page.request = cookie page). */
+export async function loginAs(target: Page | APIRequestContext, who: Partial<Identity> & { email: string }): Promise<SessionUser> {
+  const request = "request" in target ? target.request : target;
+  return (await apiOk<UserResponse>(await testLogin(request, who), `test login ${who.email}`)).user;
+}
+
+/** Ubah peran global user (super_admin only: PUT /api/dev/users/:id/role). */
+export async function setRole(root: APIRequestContext, userId: string, role: Exclude<GlobalRole, "super_admin">): Promise<void> {
+  await apiOk(await root.put(`/api/dev/users/${userId}/role`, { data: { role } }), `set role ${role} user ${userId}`);
+}
+
+/** Login user baru lalu angkat jadi admin global lewat root; kembalikan user (role terbaru dari /api/me). */
+export async function loginAdmin(page: Page, root: APIRequestContext, name = "Admin E2E"): Promise<SessionUser> {
+  const user = await loginAs(page, newIdentity(name, "admin"));
+  await setRole(root, user.id, "admin");
+  return { ...user, role: "admin" };
 }
 
 export async function createRoom(request: APIRequestContext, id: string, title = `Room ${id}`): Promise<void> {
   await apiOk(await request.post("/api/rooms", { data: { id, title } }), `create room ${id}`);
 }
 
-export async function createInvite(request: APIRequestContext, roomId: string, role: Role): Promise<string> {
+export async function createInvite(request: APIRequestContext, roomId: string, role: RoomRole): Promise<string> {
   const res = await apiOk<CreateInviteResponse>(
     await request.post(`/api/rooms/${roomId}/invites`, { data: { role } }),
     `create invite ${role} room ${roomId}`,
@@ -74,7 +112,7 @@ export async function passPreJoin(page: Page, media: MediaChoice = {}, name?: st
   await page.getByTestId("prejoin-join").click();
 }
 
-/** Buka /rooms/:id langsung (admin) → pre-join → terhubung. */
+/** Buka /rooms/:id langsung (host/anggota) → pre-join → terhubung. */
 export async function openRoom(page: Page, roomId: string, media: MediaChoice = {}): Promise<void> {
   await page.goto(`/rooms/${roomId}`);
   await passPreJoin(page, media);
@@ -170,26 +208,33 @@ export const test = base.extend<Fixtures & { _consoleGuard: ConsoleGuard }>({
     await use(context);
   },
   roomId: async ({}, use, testInfo) => {
-    const rand = Math.random().toString(36).slice(2, 8);
-    await use(`e2e-w${testInfo.workerIndex}-${Date.now().toString(36)}-${rand}`);
+    await use(`e2e-w${testInfo.workerIndex}-${Date.now().toString(36)}-${rand()}`);
   },
-  admin: async ({ page, roomId }, use) => {
-    await loginAdmin(page.request);
+  root: async ({ playwright, baseURL }, use) => {
+    const root = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { "x-forwarded-for": fakeClientIp() } });
+    await loginAs(root, { email: SUPER_ADMIN_EMAIL, name: "Root E2E" });
+    await use(root);
+    await root.dispose();
+  },
+  host: async ({ page, root, roomId }, use) => {
+    await loginAdmin(page, root, "Host E2E");
     await createRoom(page.request, roomId);
     await use(page);
   },
+  hostId: async ({ host }, use) => use(await identityOf(host)),
   newGuestPage: async ({ browser, permissions, _consoleGuard }, use) => {
     const contexts: { close(): Promise<void> }[] = [];
     await use((options = {}) => newWatchedPage(browser, _consoleGuard.sink, contexts, { permissions, ...options }));
     await Promise.all(contexts.map((c) => c.close()));
   },
-  joinAs: async ({ admin, roomId, newGuestPage }, use) => {
+  joinAs: async ({ host, roomId, newGuestPage }, use) => {
     await use(async (role, name, media = {}) => {
-      const url = await createInvite(admin.request, roomId, role);
+      const url = await createInvite(host.request, roomId, role);
       const { viewport, ...choice } = media;
       const page = await newGuestPage(viewport ? { viewport } : {});
+      await loginAs(page, newIdentity(name, "guest"));
       await page.goto(url);
-      await passPreJoin(page, choice, name);
+      await passPreJoin(page, choice);
       await expect(page).toHaveURL(new RegExp(`/rooms/${roomId}$`));
       await expectConnected(page);
       return page;

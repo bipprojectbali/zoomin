@@ -1,18 +1,18 @@
-import { ADMIN_ID, connectionStatus, expect, expectVideoFlowing, identityOf, openRoom, test, tile, toast } from "./fixtures";
+import { connectionStatus, expect, expectVideoFlowing, identityOf, openRoom, test, tile, toast } from "./fixtures";
 
-test("join: tamu membuka link undangan, pre-join, masuk room dan terhubung", async ({ admin, roomId, joinAs }) => {
-  await openRoom(admin, roomId);
+test("join: tamu membuka link undangan, pre-join, masuk room dan terhubung", async ({ host, roomId, joinAs }) => {
+  await openRoom(host, roomId);
   const guest = await joinAs("participant", "Tamu Satu");
   await expect(guest.locator("header").getByRole("heading", { name: `Room ${roomId}` })).toBeVisible();
   await expect(guest.locator("header").getByText("Peserta", { exact: true })).toBeVisible();
   await expect(connectionStatus(guest)).toHaveText("Terhubung");
 });
 
-test("media: admin & peserta nyalakan kamera+mic di room, saling melihat video", async ({ admin, roomId, joinAs }) => {
-  await openRoom(admin, roomId);
+test("media: host & peserta nyalakan kamera+mic di room, saling melihat video", async ({ host, hostId, roomId, joinAs }) => {
+  await openRoom(host, roomId);
   const guest = await joinAs("participant", "Peserta Media");
 
-  for (const page of [admin, guest]) {
+  for (const page of [host, guest]) {
     for (const id of ["toggle-camera", "toggle-mic"]) {
       const button = page.getByTestId(id);
       await expect(button).toHaveAttribute("aria-pressed", "false");
@@ -21,8 +21,8 @@ test("media: admin & peserta nyalakan kamera+mic di room, saling melihat video",
     }
   }
 
-  await expectVideoFlowing(tile(admin, await identityOf(guest), "camera"));
-  await expectVideoFlowing(tile(guest, ADMIN_ID, "camera"));
+  await expectVideoFlowing(tile(host, await identityOf(guest), "camera"));
+  await expectVideoFlowing(tile(guest, hostId, "camera"));
 });
 
 test("multi share: peserta tambah 2 layar, penonton melihat 2 tile; stop satu tinggal 1", async ({ joinAs }) => {
@@ -54,22 +54,22 @@ test("multi share: peserta tambah 2 layar, penonton melihat 2 tile; stop satu ti
   await expectVideoFlowing(screen1);
 });
 
-test("viewer: tidak ada tombol kamera, mikrofon, layar, atau toolbar layout", async ({ admin, roomId, joinAs }) => {
-  await openRoom(admin, roomId);
+test("viewer: tidak ada tombol kamera, mikrofon, layar, atau toolbar layout", async ({ host, roomId, joinAs }) => {
+  await openRoom(host, roomId);
   const viewer = await joinAs("viewer", "Penonton Pasif");
   await expect(viewer.locator("header").getByText("Penonton", { exact: true })).toBeVisible();
-  // Kontrol admin terlihat → room sudah selesai render, jadi ketiadaan di viewer bermakna.
-  await expect(admin.getByTestId("add-screen")).toBeVisible();
-  await expect(admin.getByTestId("layout-toolbar")).toBeVisible();
+  // Kontrol host terlihat → room sudah selesai render, jadi ketiadaan di viewer bermakna.
+  await expect(host.getByTestId("add-screen")).toBeVisible();
+  await expect(host.getByTestId("layout-toolbar")).toBeVisible();
   await expect(viewer.getByTestId("leave-room")).toBeVisible();
   for (const id of ["toggle-mic", "toggle-camera", "add-screen", "layout-toolbar", "open-invite"]) {
     await expect(viewer.getByTestId(id)).toHaveCount(0);
   }
 });
 
-test("toast: peserta lain bergabung → admin melihat notifikasi nama", async ({ admin, roomId, joinAs }) => {
-  await openRoom(admin, roomId);
+test("toast: peserta lain bergabung → host melihat notifikasi nama", async ({ host, roomId, joinAs }) => {
+  await openRoom(host, roomId);
   await joinAs("participant", "Tamu Toast");
   // room.toasts.ts: agregasi 1,5 dtk lalu "<nama> bergabung".
-  await expect(toast(admin, "Tamu Toast")).toContainText("bergabung");
+  await expect(toast(host, "Tamu Toast")).toContainText("bergabung");
 });

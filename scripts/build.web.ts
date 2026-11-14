@@ -1,12 +1,16 @@
 import { renameSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
+import { parseArgs } from "node:util";
 import tailwind from "bun-plugin-tailwind";
 
 /**
  * Build produksi SPA → dist/web (statis, disajikan src/server/static.serve.ts saat NODE_ENV=production).
  * Plugin Tailwind dipasang di sini karena CLI `bun build` tidak membaca `[serve.static]` bunfig.toml.
+ * Out dir bisa diganti `--outdir <dir>` atau env `WEB_OUT_DIR` (e2e: folder sementara, pasangan WEB_DIST_DIR server)
+ * agar build tidak menimpa dist/web milik server produksi yang sedang jalan. Hanya out dir itu yang dibersihkan.
  */
-const OUT_DIR = "dist/web";
+const { values } = parseArgs({ args: Bun.argv.slice(2), options: { outdir: { type: "string" } } });
+const OUT_DIR = values.outdir?.trim() || process.env.WEB_OUT_DIR?.trim() || "dist/web";
 
 rmSync(OUT_DIR, { recursive: true, force: true });
 const result = await Bun.build({

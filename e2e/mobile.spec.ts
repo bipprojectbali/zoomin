@@ -2,8 +2,8 @@ import { expect, openRoom, test } from "./fixtures";
 
 const PHONE = { width: 390, height: 844 };
 
-test("mobile 390px: control bar tidak overflow, menu Lainnya membuka panel peserta", async ({ admin, roomId, joinAs }) => {
-  await openRoom(admin, roomId);
+test("mobile 390px: control bar tidak overflow, menu Lainnya membuka panel peserta", async ({ host, roomId, joinAs }) => {
+  await openRoom(host, roomId);
   const phone = await joinAs("participant", "Peserta HP", { viewport: PHONE });
 
   const bar = phone.getByRole("toolbar", { name: "Kontrol room" });
