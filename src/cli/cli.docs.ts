@@ -3,23 +3,12 @@
 import readme from "../../README.md" with { type: "text" };
 import deployReadme from "../../deploy/README.md" with { type: "text" };
 import envExample from "../../.env.example" with { type: "text" };
+import { REQUIRED_IN_PRODUCTION } from "../server/config";
 
 /** Isi .env.example apa adanya (perintah `zoomin env`). */
 export const ENV_EXAMPLE: string = envExample;
 
-/** Wajib diset di NODE_ENV=production (sinkron dengan `pick()` di src/server/config.ts). */
-const REQUIRED_IN_PROD = new Set(["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "SESSION_SECRET", "ADMIN_PASSWORD"]);
-
-/** Keterangan untuk var yang tidak punya komentar sendiri di .env.example. */
-const FALLBACK_NOTES: Record<string, string> = {
-  NODE_ENV: "`production` mewajibkan secret dan menyajikan SPA hasil build.",
-  PORT: "Port listen HTTP(S).",
-  DB_PATH: "Path file SQLite (direktori dibuat bila belum ada).",
-  LIVEKIT_API_KEY: "API key LiveKit (dev: `devkey`).",
-  LIVEKIT_API_SECRET: "API secret LiveKit (dev: `secret`).",
-  ADMIN_PASSWORD: "Password login admin global (dev: `admin`).",
-  TLS_KEY_PATH: "Pasangan TLS_CERT_PATH (kunci PEM).",
-};
+const REQUIRED_IN_PROD = new Set<string>(REQUIRED_IN_PRODUCTION);
 
 /** Bagian `## <judul>` dari markdown sampai heading level-2 berikutnya. */
 function section(markdown: string, title: string): string {
@@ -29,7 +18,7 @@ function section(markdown: string, title: string): string {
   return markdown.slice(start + 1, end < 0 ? undefined : end).trim();
 }
 
-/** Tabel markdown variabel env dari .env.example: komentar tepat di atas baris VAR= jadi keterangan. */
+/** Tabel markdown variabel env dari .env.example: blok komentar tepat di atas baris VAR= (tanpa baris kosong) jadi keterangan. */
 export function envTable(example: string = envExample): string {
   const rows = ["| Var | Default | Wajib di produksi | Keterangan |", "|---|---|---|---|"];
   let notes: string[] = [];
@@ -45,8 +34,7 @@ export function envTable(example: string = envExample): string {
       continue;
     }
     const [, name = "", value = ""] = match;
-    // Komentar pembuka file (sebelum var pertama) adalah catatan umum, bukan milik NODE_ENV.
-    const note = (rows.length === 2 ? "" : notes.join(" ")) || FALLBACK_NOTES[name] || "";
+    const note = notes.join(" ");
     rows.push(`| \`${name}\` | ${value ? `\`${value}\`` : "(kosong)"} | ${REQUIRED_IN_PROD.has(name) ? "ya" : "-"} | ${note.replaceAll("|", "\\|")} |`);
     notes = [];
   }
