@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { slugifyRoomId } from "../../shared/room.id";
 import { effectiveRoomId, formatDateTime, withStableSuffix } from "./lobby.format";
 
-test("formatDateTime memakai locale id-ID", () => {
+test("formatDateTime memakai locale en-US", () => {
   const out = formatDateTime(Date.UTC(2026, 10, 17, 5, 50));
   expect(out).toContain("2026");
   expect(out).toMatch(/Nov/);
-  expect(out).not.toMatch(/AM|PM/);
+  expect(out).toMatch(/AM|PM/);
 });
 
 test("withStableSuffix: sufiks tetap walau slugifyRoomId acak", () => {

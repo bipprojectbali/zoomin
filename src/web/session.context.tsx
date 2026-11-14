@@ -13,13 +13,13 @@ import { hasRole } from "./role.global.label";
 const HTTP_UNAUTHORIZED = 401;
 
 const TEXT = {
-  loading: "Memuat sesi…",
-  errorTitle: "Gagal memuat sesi",
-  retry: "Coba lagi",
-  forbiddenTitle: "Tidak punya akses",
-  forbiddenBody: "Halaman ini hanya untuk peran tertentu. Minta admin memberi akses bila Anda membutuhkannya.",
-  backToApp: "Kembali ke Room",
-  outsideProvider: "useSession dipakai di luar <SessionProvider>",
+  loading: "Loading session…",
+  errorTitle: "Couldn't load session",
+  retry: "Try again",
+  forbiddenTitle: "No access",
+  forbiddenBody: "This page is only for certain roles. Ask an admin for access if you need it.",
+  backToApp: "Back to rooms",
+  outsideProvider: "useSession used outside <SessionProvider>",
 };
 
 /** Nilai konteks sesi: user null = belum login (401). `loading` true sampai GET /api/me pertama selesai. */
@@ -114,7 +114,7 @@ export function RequireSession({ children }: { children: ReactNode }) {
   return <Navigate to={loginPath(location.pathname + location.search)} replace />;
 }
 
-/** Seperti RequireSession, plus peran global minimal `min`; kurang → halaman "Tidak punya akses". */
+/** Seperti RequireSession, plus peran global minimal `min`; kurang → halaman "No access". */
 export function RequireRole({ min, children }: { min: GlobalRole; children: ReactNode }) {
   return (
     <RequireSession>

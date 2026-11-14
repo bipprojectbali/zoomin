@@ -1,22 +1,23 @@
 import { describe, expect, test } from "bun:test";
+import { ROLE_LABEL } from "@/role.label";
 import { inviteSubtitle, joinButtonState, PREJOIN_TEXT, roleKeptNote, roleSubtitle, toggleState } from "./prejoin.labels";
 
 describe("label peran", () => {
   test("roleSubtitle", () => {
-    expect(roleSubtitle("participant")).toBe("Anda akan masuk sebagai Peserta");
-    expect(roleSubtitle("viewer")).toBe("Anda akan masuk sebagai Penonton");
+    expect(roleSubtitle("participant")).toBe(`You'll join as ${ROLE_LABEL.participant}`);
+    expect(roleSubtitle("viewer")).toBe(`You'll join as ${ROLE_LABEL.viewer}`);
   });
 
   test("inviteSubtitle tamu vs bersesi", () => {
-    expect(inviteSubtitle({ effectiveRole: "viewer", currentUser: null })).toBe("Anda akan masuk sebagai Penonton");
+    expect(inviteSubtitle({ effectiveRole: "viewer", currentUser: null })).toBe(`You'll join as ${ROLE_LABEL.viewer}`);
     expect(inviteSubtitle({ effectiveRole: "participant", currentUser: { name: "Budi" } })).toBe(
-      "Anda akan masuk sebagai Budi (Peserta)",
+      `You'll join as Budi (${ROLE_LABEL.participant})`,
     );
   });
 
   test("roleKeptNote hanya bila peran tidak diturunkan", () => {
     expect(roleKeptNote({ role: "participant", effectiveRole: "participant" })).toBeNull();
-    expect(roleKeptNote({ role: "viewer", effectiveRole: "participant" })).toContain("tetap Peserta");
+    expect(roleKeptNote({ role: "viewer", effectiveRole: "participant" })).toContain(`stays ${ROLE_LABEL.participant}`);
   });
 });
 

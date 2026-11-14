@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { ConnectionStatus } from "./room.connection";
 import { elapsedLabel, useNetworkBanner } from "./room.network";
 
-const TEXT = { reconnecting: "Koneksi terputus, menyambung ulang…", weak: "Koneksi lemah, video bisa tersendat" };
+const TEXT = { reconnecting: "Connection lost, reconnecting…", weak: "Weak connection, video may stutter" };
 const TICK_MS = 1000;
 
 /** Detik berjalan sejak `since` (null = tidak menghitung). */

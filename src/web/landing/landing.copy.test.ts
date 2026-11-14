@@ -28,27 +28,27 @@ describe("landing copy", () => {
     expect(COPY.FAQ.items.length).toBeGreaterThanOrEqual(3);
   });
 
-  test("tidak mengklaim fitur yang tidak ada (rekaman, chat, AI)", () => {
+  test("does not claim missing features (recording, chat, AI)", () => {
     const sources = [ALL_TEXT.join("\n"), ...COMPONENT_FILES.map((f) => readFileSync(join(DIR, f), "utf8"))];
     for (const text of sources) {
-      expect(text).not.toMatch(/rekam/i);
+      expect(text).not.toMatch(/\b[Rr]ecord(ing|ed|s)?\b(?!<)/); // TS `Record<>` is not a claim
       expect(text).not.toMatch(/chat/i);
-      // Case-sensitive + word boundary: "pakai"/"sampai" bukan pelanggaran.
+      // Case-sensitive + word boundary: "maintain"/"detail" are not violations.
       expect(text).not.toMatch(/\bAI\b/);
     }
   });
 
   test("CTA utama mengarah ke /login dengan label Google", () => {
     expect(LOGIN_HREF).toBe("/login");
-    expect(COPY.HERO.ctaLogin).toBe("Masuk dengan Google");
-    expect(COPY.HERO.ctaHow).toBe("Lihat cara kerja");
+    expect(COPY.HERO.ctaLogin).toBe("Sign in with Google");
+    expect(COPY.HERO.ctaHow).toBe("See how it works");
   });
 
-  test("user yang sudah login diarahkan ke /app dengan label Buka aplikasi", () => {
+  test("user yang sudah login diarahkan ke /app dengan label Open app", () => {
     expect(APP_HREF).toBe("/app");
-    expect(COPY.NAV.app).toBe("Buka aplikasi");
-    expect(COPY.HERO.ctaApp).toBe("Buka aplikasi");
-    expect(COPY.FINAL_CTA.ctaApp).toBe("Buka aplikasi");
+    expect(COPY.NAV.app).toBe("Open app");
+    expect(COPY.HERO.ctaApp).toBe("Open app");
+    expect(COPY.FINAL_CTA.ctaApp).toBe("Open app");
   });
 
   test("semua href ke /login, /app, atau anchor section yang ada", () => {

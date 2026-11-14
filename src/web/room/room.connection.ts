@@ -26,19 +26,19 @@ export type ConnectionErrorKind =
 export type ConnectionError = { kind: ConnectionErrorKind; message: string };
 
 const TEXT = {
-  unauthorized: "Sesi berakhir, silakan masuk lagi",
-  forbidden: "Anda bukan anggota room ini",
-  notFound: "Room tidak ditemukan atau sudah dihapus",
-  server: "Server sedang bermasalah, coba beberapa saat lagi",
-  mediaServer: "Gagal terhubung ke server media",
-  duplicate: "Anda bergabung dari tab atau perangkat lain dengan akun yang sama. Hanya satu sesi yang bisa aktif.",
-  removed: "Anda dikeluarkan dari room",
-  roomDeleted: "Room sudah dihapus",
-  roomClosed: "Room sudah ditutup",
-  serverShutdown: "Server media dimatikan",
-  lost: "Koneksi ke room terputus",
-  micFailed: "Mikrofon gagal diaktifkan",
-  cameraFailed: "Kamera gagal diaktifkan",
+  unauthorized: "Your session has expired, please sign in again",
+  forbidden: "You're not a member of this room",
+  notFound: "Room not found or already deleted",
+  server: "The server is having problems, try again in a moment",
+  mediaServer: "Couldn't connect to the media server",
+  duplicate: "You joined from another tab or device with the same account. Only one session can be active.",
+  removed: "You were removed from the room",
+  roomDeleted: "The room was deleted",
+  roomClosed: "The room was closed",
+  serverShutdown: "The media server shut down",
+  lost: "Connection to the room was lost",
+  micFailed: "Couldn't turn on the microphone",
+  cameraFailed: "Couldn't turn on the camera",
 };
 
 const HTTP_SERVER_ERROR = 500;

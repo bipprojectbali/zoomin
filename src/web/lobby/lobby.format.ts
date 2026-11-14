@@ -1,6 +1,6 @@
-const DATE_TIME = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" });
+const DATE_TIME = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
 
-/** Epoch ms → "14 Nov 2026, 12.50" (locale id-ID, bukan locale browser). */
+/** Epoch ms → "Nov 14, 2026, 12:50 PM" (locale en-US, bukan locale browser). */
 export function formatDateTime(epochMs: number): string {
   return DATE_TIME.format(epochMs);
 }

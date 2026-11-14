@@ -18,21 +18,9 @@ import { INVITE_PICKER_TEXT } from "@/invite-picker/invite-picker.labels";
 import { SAFE_ID_PATTERN, type RoomSummary, type RoomVisibility } from "../../shared/api.types";
 import { slugifyRoomId } from "../../shared/room.id";
 import { effectiveRoomId, withStableSuffix } from "./lobby.format";
+import { LOBBY_TEXT } from "./lobby.labels";
 
-const TEXT = {
-  heading: "Buat room baru",
-  title: "Judul room",
-  titlePlaceholder: "mis. Rapat desain mingguan",
-  advanced: "Opsi lanjutan",
-  id: "ID room",
-  idHint: "Dipakai di alamat room. Huruf, angka, - atau _, maks 64 karakter. Otomatis dari judul bila dikosongkan.",
-  idInvalid: "ID room hanya boleh huruf, angka, - atau _ (tanpa spasi), maks 64 karakter.",
-  expiry: "Kadaluarsa",
-  expiryDate: "Tanggal kadaluarsa",
-  submit: "Buat room",
-  submitting: "Membuat…",
-  created: (title: string) => `Room "${title}" dibuat`,
-};
+const TEXT = LOBBY_TEXT.createRoom;
 
 /** Samakan dengan TITLE_MAX_LENGTH di server (rooms.route.ts); validasi final di server. */
 const TITLE_MAX_LENGTH = 100;

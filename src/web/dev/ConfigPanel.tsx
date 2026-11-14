@@ -5,12 +5,12 @@ import { cn } from "@/lib/utils";
 import { getDevConfig } from "../api.client";
 import { errorMessage } from "../error.message";
 import { DevNotice, DevSectionHeader } from "./DevParts";
+import { secretState } from "./dev.format";
 import { DEV_TEXT } from "./dev.labels";
 
 const T = DEV_TEXT.config;
-const SECRET_STATES = new Set(["diset", "kosong"]);
 
-/** Tab Konfigurasi: ringkasan config server read-only (secret sudah disamarkan server jadi "diset"/"kosong"). */
+/** Tab Konfigurasi: ringkasan config server read-only (server already masks secrets as "set"/"empty"). */
 export function ConfigPanel() {
   const [config, setConfig] = useState<[string, string][] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,8 +49,8 @@ export function ConfigPanel() {
                 <TableRow key={key}>
                   <TableCell className="px-3 font-mono text-xs">{key}</TableCell>
                   <TableCell className="px-3 font-mono text-xs break-all whitespace-normal">
-                    {SECRET_STATES.has(value) ? (
-                      <span className={cn("rounded px-1.5 py-0.5", value === "diset" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
+                    {secretState(value) ? (
+                      <span className={cn("rounded px-1.5 py-0.5", secretState(value) === "set" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
                         {value}
                       </span>
                     ) : (

@@ -34,7 +34,7 @@ export function elapsedLabel(ms: number): string {
   const total = Math.max(0, Math.floor(ms / MS_PER_SECOND));
   const min = Math.floor(total / SECONDS_PER_MINUTE);
   const sec = total % SECONDS_PER_MINUTE;
-  return min > 0 ? `${min} mnt ${sec} dtk` : `${sec} dtk`;
+  return min > 0 ? `${min} min ${sec} s` : `${sec} s`;
 }
 
 /**

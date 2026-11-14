@@ -1,6 +1,6 @@
-/** Ringkas user agent → "Chrome di macOS" (tanpa library: cukup untuk daftar sesi). null/tak dikenal → "Perangkat tak dikenal". */
+/** Ringkas user agent → "Chrome on macOS" (tanpa library: cukup untuk daftar sesi). null/tak dikenal → "Unknown device". */
 export function describeUserAgent(ua: string | null): string {
-  if (!ua) return "Perangkat tak dikenal";
+  if (!ua) return "Unknown device";
   const browser =
     /Edg(e|A|iOS)?\//.test(ua) ? "Edge"
     : /OPR\/|Opera/.test(ua) ? "Opera"
@@ -16,13 +16,13 @@ export function describeUserAgent(ua: string | null): string {
     : /CrOS/.test(ua) ? "ChromeOS"
     : /Linux/.test(ua) ? "Linux"
     : null;
-  if (browser && os) return `${browser} di ${os}`;
-  return browser ?? os ?? "Perangkat tak dikenal";
+  if (browser && os) return `${browser} on ${os}`;
+  return browser ?? os ?? "Unknown device";
 }
 
-/** Waktu relatif Indonesia ("5 menit yang lalu") dari epoch ms. */
+/** Waktu relatif English ("5 minutes ago") dari epoch ms. */
 export function relativeTime(at: number, now = Date.now()): string {
-  const rtf = new Intl.RelativeTimeFormat("id-ID", { numeric: "auto" });
+  const rtf = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" });
   const sec = Math.round((at - now) / 1000);
   const units: [Intl.RelativeTimeFormatUnit, number][] = [
     ["day", 86400],

@@ -4,13 +4,9 @@ import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SAFE_ID_PATTERN } from "../../shared/api.types";
+import { LOBBY_TEXT } from "./lobby.labels";
 
-const TEXT = {
-  label: "Gabung dengan ID room",
-  placeholder: "mis. rapat-desain",
-  submit: "Gabung",
-  invalid: "ID room hanya boleh huruf, angka, - atau _ (tanpa spasi), maks 64 karakter.",
-};
+const TEXT = LOBBY_TEXT.joinById;
 
 const SAFE_ID = new RegExp(SAFE_ID_PATTERN);
 

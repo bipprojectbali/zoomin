@@ -1,171 +1,171 @@
 /**
- * Semua teks landing page (Bahasa Indonesia) di satu tempat. Hanya klaim yang benar-benar ada di produk:
- * landing.copy.test.ts menolak kata yang menyiratkan fitur yang tidak ada.
+ * All landing page copy in one place. Only claims the product actually delivers:
+ * landing.copy.test.ts rejects words that imply features that don't exist.
  */
 
-/** Tujuan CTA login: rute `/login` ditangani alur auth Google. */
+/** Login CTA target: the `/login` route is handled by the Google auth flow. */
 export const LOGIN_HREF = "/login";
 
-/** Tujuan CTA bagi user yang sudah login: area aplikasi. */
+/** CTA target for signed-in users: the app area. */
 export const APP_HREF = "/app";
 
-/** Id section yang menjadi target anchor nav/CTA. */
+/** Section ids used as nav/CTA anchor targets. */
 export const SECTION_IDS = {
   top: "top",
-  main: "konten",
-  features: "fitur",
-  how: "cara-kerja",
-  useCases: "kegunaan",
+  main: "content",
+  features: "features",
+  how: "how-it-works",
+  useCases: "use-cases",
   faq: "faq",
 } as const;
 
-/** Meta SEO halaman `/`, dipasang oleh router. */
+/** SEO meta for `/`, set by the router. */
 export const LANDING_META = {
-  title: "zoomin — bandingkan banyak layar dalam satu meeting",
+  title: "zoomin — compare multiple screens in one meeting",
   description:
-    "Ruang meeting video self-hosted: tiap peserta bisa membagikan beberapa layar sekaligus, host menata layout " +
-    "panggung yang sama untuk semua.",
+    "Self-hosted video meetings: every participant can share several screens at once, and the host arranges one " +
+    "stage layout for everyone.",
 } as const;
 
 export const NAV = {
-  label: "Navigasi utama",
+  label: "Main navigation",
   links: [
-    { href: `#${SECTION_IDS.features}`, label: "Fitur" },
-    { href: `#${SECTION_IDS.how}`, label: "Cara kerja" },
-    { href: `#${SECTION_IDS.useCases}`, label: "Kegunaan" },
+    { href: `#${SECTION_IDS.features}`, label: "Features" },
+    { href: `#${SECTION_IDS.how}`, label: "How it works" },
+    { href: `#${SECTION_IDS.useCases}`, label: "Use cases" },
     { href: `#${SECTION_IDS.faq}`, label: "FAQ" },
   ],
-  login: "Masuk",
-  app: "Buka aplikasi",
-  skip: "Lewati ke konten",
+  login: "Sign in",
+  app: "Open app",
+  skip: "Skip to content",
 } as const;
 
 export const HERO = {
-  eyebrow: "Meeting self-hosted untuk review berdampingan",
-  titleLead: "Layar A, B, dan C.",
-  titleRest: "Berdampingan, untuk semua peserta.",
+  eyebrow: "Self-hosted meetings for side-by-side review",
+  titleLead: "Screens A, B, and C.",
+  titleRest: "Side by side, for everyone.",
   sub:
-    "Setiap peserta bisa membagikan lebih dari satu layar. Host menata panggungnya — berdampingan, grid, atau " +
-    "fokus — dan semua orang melihat susunan yang sama. Berjalan di server Anda sendiri.",
-  ctaLogin: "Masuk dengan Google",
-  ctaApp: "Buka aplikasi",
-  ctaHow: "Lihat cara kerja",
-  points: ["Banyak layar per peserta", "Layout diatur host", "Data di server sendiri"],
+    "Every participant can share more than one screen. The host arranges the stage — side by side, grid, or " +
+    "focus — and everyone sees the same layout. Runs on your own server.",
+  ctaLogin: "Sign in with Google",
+  ctaApp: "Open app",
+  ctaHow: "See how it works",
+  points: ["Multiple screens per participant", "Host-controlled layout", "Your data on your server"],
 } as const;
 
-/** Teks mockup panggung di hero (dekoratif, tetapi tombol template-nya bisa dicoba). */
+/** Hero stage mockup copy (decorative, but its template buttons work). */
 export const MOCKUP = {
-  label: "Contoh panggung zoomin dengan tiga layar dibagikan",
-  room: "Review Desain Checkout",
-  templatesLabel: "Coba template layout",
+  label: "Sample zoomin stage with three shared screens",
+  room: "Checkout design review",
+  templatesLabel: "Try a layout template",
   templates: [
-    { id: "side", label: "Berdampingan" },
+    { id: "side", label: "Side by side" },
     { id: "grid", label: "Grid" },
-    { id: "focus", label: "Fokus" },
+    { id: "focus", label: "Focus" },
   ],
-  hostNote: "Diatur host · sama untuk semua",
+  hostNote: "Set by the host · same for everyone",
   screens: [
-    { tag: "A", owner: "Rina · Layar 1", title: "Checkout v1" },
-    { tag: "B", owner: "Rina · Layar 2", title: "Checkout v2" },
-    { tag: "C", owner: "Dimas · Layar 1", title: "Checkout mobile" },
+    { tag: "A", owner: "Rina · Screen 1", title: "Checkout v1" },
+    { tag: "B", owner: "Rina · Screen 2", title: "Checkout v2" },
+    { tag: "C", owner: "Dimas · Screen 1", title: "Checkout mobile" },
   ],
   cams: ["Rina", "Dimas", "Sari"],
 } as const;
 
 export const FEATURES = {
-  title: "Dibuat untuk membandingkan, bukan sekadar presentasi",
-  sub: "Fitur inti zoomin berpusat pada satu hal: melihat beberapa layar sekaligus tanpa bergantian.",
+  title: "Built for comparing, not just presenting",
+  sub: "zoomin's core features center on one thing: seeing several screens at once without taking turns.",
   items: [
     {
       icon: "screens",
-      title: "Beberapa layar per peserta",
-      body: "Bagikan dua jendela atau lebih sekaligus — versi lama dan baru, desktop dan mobile — tanpa berhenti dan mulai ulang.",
+      title: "Multiple screens per participant",
+      body: "Share two or more windows at once — old and new versions, desktop and mobile — without stopping and starting over.",
     },
     {
       icon: "layout",
-      title: "Layout diatur host",
-      body: "Host memilih template berdampingan, grid, atau fokus. Susunan yang sama tampil di layar semua peserta.",
+      title: "Host-controlled layout",
+      body: "The host picks a side-by-side, grid, or focus template. Every participant sees the same arrangement.",
     },
     {
       icon: "move",
-      title: "Seret, ubah ukuran, perbesar",
-      body: "Atur urutan tile dengan drag-drop dan ubah ukurannya. Peserta tetap bisa memperbesar tile di layarnya sendiri.",
+      title: "Drag, resize, enlarge",
+      body: "Reorder tiles with drag and drop and resize them. Participants can still enlarge a tile on their own screen.",
     },
     {
       icon: "camera",
-      title: "Kamera dan suara",
-      body: "Wajah dan suara tetap hadir di strip kamera, terpisah dari panggung layar supaya fokus tidak terganggu.",
+      title: "Camera and audio",
+      body: "Faces and voices stay in the camera strip, separate from the screen stage so focus isn't broken.",
     },
     {
       icon: "invite",
-      title: "Undangan per peran",
-      body: "Kirim link undangan sebagai host, peserta, atau penonton. Penonton menyimak tanpa membagikan apa pun.",
+      title: "Role-based invites",
+      body: "Send invite links as host, participant, or viewer. Viewers watch without sharing anything.",
     },
     {
       icon: "server",
       title: "Self-hosted",
-      body: "Berjalan di server Anda sendiri di atas LiveKit. Room, akun, dan media meeting tetap di infrastruktur Anda.",
+      body: "Runs on your own server on top of LiveKit. Rooms, accounts, and meeting media stay on your infrastructure.",
     },
   ],
 } as const;
 
 export const STEPS = {
-  title: "Cara kerja",
-  sub: "Dari login sampai komparasi layar dalam tiga langkah.",
+  title: "How it works",
+  sub: "From sign-in to screen comparison in three steps.",
   items: [
-    { title: "Masuk dengan Google", body: "Login memakai akun Google. Admin membuat room dan menjadi host-nya." },
-    { title: "Undang sesuai peran", body: "Bagikan link undangan untuk peserta yang presentasi atau penonton yang menyimak." },
-    { title: "Bagikan dan tata", body: "Peserta membagikan beberapa layar; host menyusunnya untuk dibandingkan bersama." },
+    { title: "Sign in with Google", body: "Sign in with a Google account. An admin creates a room and becomes its host." },
+    { title: "Invite by role", body: "Share invite links for participants who present or viewers who watch." },
+    { title: "Share and arrange", body: "Participants share multiple screens; the host arranges them to compare together." },
   ],
 } as const;
 
 export const USE_CASES = {
-  title: "Dipakai untuk",
+  title: "Use it for",
   items: [
-    { tag: "A / B", title: "Review desain", body: "Tampilkan dua atau tiga varian berdampingan lalu putuskan bersama, tanpa bolak-balik berbagi layar." },
-    { tag: "QA", title: "QA lintas perangkat", body: "Bandingkan tampilan desktop, tablet, dan mobile dari build yang sama dalam satu panggung." },
-    { tag: "Kelas", title: "Training", body: "Instruktur menampilkan materi dan contoh praktik sekaligus; peserta mengikuti sebagai penonton." },
-    { tag: "Demo", title: "Demo produk", body: "Perlihatkan dasbor admin dan tampilan pengguna bersebelahan agar alurnya mudah diikuti." },
+    { tag: "A / B", title: "Design review", body: "Show two or three variants side by side and decide together, without switching screen shares back and forth." },
+    { tag: "QA", title: "Cross-device QA", body: "Compare desktop, tablet, and mobile views of the same build on one stage." },
+    { tag: "Class", title: "Training", body: "Instructors show the material and a hands-on example at once; trainees follow along as viewers." },
+    { tag: "Demo", title: "Product demos", body: "Show the admin dashboard and the user view side by side so the flow is easy to follow." },
   ],
 } as const;
 
 export const FAQ = {
-  title: "Pertanyaan umum",
+  title: "Frequently asked questions",
   items: [
     {
-      q: "Berapa layar yang bisa dibagikan satu peserta?",
-      a: "Lebih dari satu. Setiap layar tampil sebagai tile sendiri di panggung dan bisa diatur posisinya oleh host.",
+      q: "How many screens can one participant share?",
+      a: "More than one. Each screen appears as its own tile on the stage, and the host can arrange its position.",
     },
     {
-      q: "Siapa yang mengatur layout?",
-      a: "Host room. Pilihan template, urutan, dan ukuran tile berlaku untuk semua peserta. Memperbesar tile hanya mengubah tampilan di layar Anda sendiri.",
+      q: "Who controls the layout?",
+      a: "The room host. Template, tile order, and tile size apply to all participants. Enlarging a tile only changes the view on your own screen.",
     },
     {
-      q: "Apakah peserta perlu akun?",
-      a: "Ya, semua orang masuk dengan akun Google, lalu bergabung ke room lewat link undangan sesuai perannya.",
+      q: "Do participants need an account?",
+      a: "Yes. Everyone signs in with a Google account, then joins the room through an invite link for their role.",
     },
     {
-      q: "Di mana data disimpan?",
-      a: "Di server tempat zoomin dipasang. Media disalurkan lewat server LiveKit milik Anda sendiri.",
+      q: "Where is data stored?",
+      a: "On the server where zoomin is installed. Media is routed through your own LiveKit server.",
     },
   ],
 } as const;
 
 export const FINAL_CTA = {
-  title: "Siap membandingkan layar bersama tim?",
-  sub: "Masuk dengan akun Google untuk membuka lobby dan bergabung ke room Anda.",
-  cta: "Masuk dengan Google",
-  subApp: "Anda sudah masuk. Lanjutkan ke lobby dan bergabung ke room Anda.",
-  ctaApp: "Buka aplikasi",
+  title: "Ready to compare screens with your team?",
+  sub: "Sign in with your Google account to open the lobby and join your rooms.",
+  cta: "Sign in with Google",
+  subApp: "You're signed in. Continue to the lobby and join your rooms.",
+  ctaApp: "Open app",
 } as const;
 
 export const FOOTER = {
-  label: "Tautan footer",
-  rights: "zoomin. Meeting self-hosted di atas LiveKit.",
-  top: "Kembali ke atas",
+  label: "Footer links",
+  rights: "zoomin. Self-hosted meetings on LiveKit.",
+  top: "Back to top",
 } as const;
 
-/** Semua tautan yang dirender landing (dipakai test untuk memastikan tujuan valid). */
+/** Every link the landing page renders (used by tests to check targets are valid). */
 export const ALL_HREFS: readonly string[] = [
   ...NAV.links.map((l) => l.href),
   LOGIN_HREF,

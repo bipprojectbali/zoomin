@@ -82,16 +82,16 @@ describe("countScreens", () => {
 describe("presenceToastText", () => {
   test("agregasi nama", () => {
     expect(presenceToastText([], "join")).toBeNull();
-    expect(presenceToastText(["Budi"], "join")).toBe("Budi bergabung");
-    expect(presenceToastText(["Budi", "Ani"], "leave")).toBe("Budi dan Ani keluar");
-    expect(presenceToastText(["Budi", "Ani", "Citra"], "join")).toBe("3 peserta bergabung");
+    expect(presenceToastText(["Budi"], "join")).toBe("Budi joined");
+    expect(presenceToastText(["Budi", "Ani"], "leave")).toBe("Budi and Ani left");
+    expect(presenceToastText(["Budi", "Ani", "Citra"], "join")).toBe("3 participants joined");
   });
 });
 
 describe("screenToastText", () => {
   test("screen-N → teks bernomor; track lain → null", () => {
-    expect(screenToastText("Budi", "screen-2", true)).toBe("Budi mulai membagikan Layar 2");
-    expect(screenToastText("Budi", "screen-2", false)).toBe("Budi berhenti membagikan Layar 2");
+    expect(screenToastText("Budi", "screen-2", true)).toBe("Budi started sharing Screen 2");
+    expect(screenToastText("Budi", "screen-2", false)).toBe("Budi stopped sharing Screen 2");
     expect(screenToastText("Budi", "screen-2-audio", true)).toBeNull();
     expect(screenToastText("Budi", "camera", true)).toBeNull();
   });

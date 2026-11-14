@@ -9,7 +9,7 @@ import { applyContentHint, screenAudioPublishOptions, screenPublishOptions } fro
 /** User menutup/membatalkan picker; UI menampilkan pesan lembut, bukan error. */
 export class ScreenShareCancelled extends Error {
   constructor(options?: ErrorOptions) {
-    super("Berbagi layar dibatalkan", options);
+    super("Screen sharing canceled", options);
     this.name = "ScreenShareCancelled";
   }
 }
@@ -63,14 +63,14 @@ export class ScreenPublisher {
       stream = await this.deps.getDisplayMedia({ video: true, audio: true });
     } catch (err) {
       if (isPickerCancel(err)) throw new ScreenShareCancelled({ cause: err });
-      throw new Error(`addScreen: getDisplayMedia gagal (${describe(err)})`, { cause: err });
+      throw new Error(`addScreen: getDisplayMedia failed (${describe(err)})`, { cause: err });
     }
 
     const [videoTrack] = stream.getVideoTracks();
     const [audioTrack] = stream.getAudioTracks();
     if (!videoTrack) {
       audioTrack?.stop();
-      throw new Error("addScreen: getDisplayMedia tidak mengembalikan track video");
+      throw new Error("addScreen: getDisplayMedia returned no video track");
     }
 
     const names = this.namer.next();
@@ -87,7 +87,7 @@ export class ScreenPublisher {
       if (videoPublished) await this.deps.unpublish(videoTrack);
       videoTrack.stop();
       audioTrack?.stop();
-      throw new Error(`addScreen: publish ${names.video} gagal (${describe(err)})`, { cause: err });
+      throw new Error(`addScreen: publish ${names.video} failed (${describe(err)})`, { cause: err });
     }
 
     const entry: Entry = {
@@ -120,7 +120,7 @@ export class ScreenPublisher {
       await this.deps.unpublish(entry.videoTrack);
       if (entry.audioTrack) await this.deps.unpublish(entry.audioTrack);
     } catch (err) {
-      throw new Error(`stopScreen: unpublish ${name} gagal (${describe(err)})`, { cause: err });
+      throw new Error(`stopScreen: unpublish ${name} failed (${describe(err)})`, { cause: err });
     }
   }
 

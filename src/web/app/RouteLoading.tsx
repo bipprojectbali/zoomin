@@ -5,7 +5,7 @@ export function RouteLoading() {
   return (
     <p className="flex min-h-svh items-center justify-center gap-2 text-muted-foreground" role="status">
       <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-      Memuat…
+      Loading…
     </p>
   );
 }

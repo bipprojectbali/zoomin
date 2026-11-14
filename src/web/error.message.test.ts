@@ -9,7 +9,7 @@ const apiErr = (status: number, code?: ApiErrorCode, path?: string) =>
 const mediaErr = (name: string) => new DOMException("raw", name);
 
 describe("errorMessage — API", () => {
-  test("setiap kode dipetakan ke pesan Indonesia, tidak pernah teks mentah server", () => {
+  test("setiap kode dipetakan ke pesan English, tidak pernah teks mentah server", () => {
     const codes: ApiErrorCode[] = [
       "unauthorized",
       "forbidden",
@@ -32,25 +32,25 @@ describe("errorMessage — API", () => {
   });
 
   test("pesan spesifik dengan saran tindakan", () => {
-    expect(errorMessage(apiErr(403, "banned"))).toContain("diblokir");
-    expect(errorMessage(apiErr(403, "insufficient_role"))).toContain("Peran akun");
-    expect(errorMessage(apiErr(409, "room_exists"))).toContain("ID room sudah dipakai");
-    expect(errorMessage(apiErr(400, "invite_invalid"))).toContain("Minta link baru ke admin room");
+    expect(errorMessage(apiErr(403, "banned"))).toContain("banned");
+    expect(errorMessage(apiErr(403, "insufficient_role"))).toContain("account role");
+    expect(errorMessage(apiErr(409, "room_exists"))).toContain("room ID is already taken");
+    expect(errorMessage(apiErr(400, "invite_invalid"))).toContain("Ask the room host for a new one");
   });
 
   test("invalid_input dengan path menyebut field", () => {
-    expect(errorMessage(apiErr(400, "invalid_input", "/id"))).toContain("ID room");
-    expect(errorMessage(apiErr(400, "invalid_input", "title"))).toContain("Judul room");
+    expect(errorMessage(apiErr(400, "invalid_input", "/id"))).toContain("Room ID");
+    expect(errorMessage(apiErr(400, "invalid_input", "title"))).toContain("Room title");
     expect(errorMessage(apiErr(400, "invalid_input", "unknownField"))).toBe(errorMessage(apiErr(400, "invalid_input")));
   });
 
   test("tanpa kode: fallback per status", () => {
-    expect(errorMessage(apiErr(401))).toContain("Sesi Anda sudah berakhir");
-    expect(errorMessage(apiErr(403))).toContain("tidak punya akses");
-    expect(errorMessage(apiErr(404))).toContain("tidak ditemukan");
-    expect(errorMessage(apiErr(429))).toContain("Terlalu banyak percobaan");
-    expect(errorMessage(apiErr(502))).toContain("Server sedang bermasalah");
-    expect(errorMessage(apiErr(418))).toContain("kesalahan tak terduga");
+    expect(errorMessage(apiErr(401))).toContain("Your session has ended");
+    expect(errorMessage(apiErr(403))).toContain("don't have access");
+    expect(errorMessage(apiErr(404))).toContain("Not found");
+    expect(errorMessage(apiErr(429))).toContain("Too many attempts");
+    expect(errorMessage(apiErr(502))).toContain("server is having trouble");
+    expect(errorMessage(apiErr(418))).toContain("Something went wrong");
   });
 });
 
@@ -59,15 +59,15 @@ describe("rate limit + Retry-After", () => {
     new ApiRequestError(429, { error: "raw english text", code }, "TEST /api/x", retryAfter);
 
   test("menit dibulatkan ke atas, <60 dtk dalam detik", () => {
-    expect(errorMessage(limited(898))).toBe("Terlalu banyak percobaan. Coba lagi dalam 15 menit.");
-    expect(errorMessage(limited(60))).toBe("Terlalu banyak percobaan. Coba lagi dalam 1 menit.");
-    expect(errorMessage(limited(61))).toBe("Terlalu banyak percobaan. Coba lagi dalam 2 menit.");
-    expect(errorMessage(limited(59))).toBe("Terlalu banyak percobaan. Coba lagi dalam 59 detik.");
-    expect(rateLimitedText(0)).toBe("Terlalu banyak percobaan. Coba lagi dalam 1 detik.");
+    expect(errorMessage(limited(898))).toBe("Too many attempts. Try again in 15 minutes.");
+    expect(errorMessage(limited(60))).toBe("Too many attempts. Try again in 1 minute.");
+    expect(errorMessage(limited(61))).toBe("Too many attempts. Try again in 2 minutes.");
+    expect(errorMessage(limited(59))).toBe("Too many attempts. Try again in 59 seconds.");
+    expect(rateLimitedText(0)).toBe("Too many attempts. Try again in 1 second.");
   });
   test("429 tanpa kode tetap memakai Retry-After; tanpa header → teks umum", () => {
-    expect(errorMessage(limited(120, undefined))).toContain("2 menit");
-    expect(errorMessage(limited(null))).toBe("Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.");
+    expect(errorMessage(limited(120, undefined))).toContain("2 minutes");
+    expect(errorMessage(limited(null))).toBe("Too many attempts. Wait a moment and try again.");
   });
   test("parseRetryAfter: detik saja", () => {
     expect(parseRetryAfter("898")).toBe(898);
@@ -80,53 +80,53 @@ describe("rate limit + Retry-After", () => {
 
 describe("errorMessage — non-API", () => {
   test("TypeError fetch = jaringan", () => {
-    expect(errorMessage(new TypeError("Failed to fetch"))).toContain("Periksa koneksi internet");
+    expect(errorMessage(new TypeError("Failed to fetch"))).toContain("Check your internet connection");
   });
   test("AbortError", () => {
-    expect(errorMessage(mediaErr("AbortError"))).toContain("dibatalkan");
+    expect(errorMessage(mediaErr("AbortError"))).toContain("canceled");
   });
   test("Error biasa memakai message; nilai lain teks umum", () => {
     expect(errorMessage(new Error("Pesan khusus"))).toBe("Pesan khusus");
-    expect(errorMessage("x")).toContain("kesalahan tak terduga");
-    expect(errorMessage(null)).toContain("kesalahan tak terduga");
+    expect(errorMessage("x")).toContain("Something went wrong");
+    expect(errorMessage(null)).toContain("Something went wrong");
   });
-  test("error media tanpa jenis memakai kata 'perangkat'", () => {
-    expect(errorMessage(mediaErr("NotAllowedError"))).toContain("Akses perangkat ditolak");
+  test("error media tanpa jenis memakai kata 'device'", () => {
+    expect(errorMessage(mediaErr("NotAllowedError"))).toContain("Device access was denied");
   });
 });
 
 describe("mediaErrorMessage", () => {
   test("izin ditolak kamera/mik menyebut ikon gembok", () => {
-    expect(mediaErrorMessage(mediaErr("NotAllowedError"), "camera")).toContain("Akses kamera ditolak");
-    expect(mediaErrorMessage(mediaErr("NotAllowedError"), "mic")).toContain("Akses mikrofon ditolak");
-    expect(mediaErrorMessage(mediaErr("NotAllowedError"), "camera")).toContain("ikon gembok");
+    expect(mediaErrorMessage(mediaErr("NotAllowedError"), "camera")).toContain("Camera access was denied");
+    expect(mediaErrorMessage(mediaErr("NotAllowedError"), "mic")).toContain("Microphone access was denied");
+    expect(mediaErrorMessage(mediaErr("NotAllowedError"), "camera")).toContain("lock icon");
   });
   test("perangkat tidak ada / sedang dipakai / constraint", () => {
-    expect(mediaErrorMessage(mediaErr("NotFoundError"), "mic")).toStartWith("Mikrofon tidak ditemukan");
-    expect(mediaErrorMessage(mediaErr("NotReadableError"), "camera")).toContain("dipakai aplikasi lain");
+    expect(mediaErrorMessage(mediaErr("NotFoundError"), "mic")).toStartWith("No microphone found");
+    expect(mediaErrorMessage(mediaErr("NotReadableError"), "camera")).toContain("in use by another app");
     // OverconstrainedError di Chrome bukan DOMException, cukup cocok di `name`.
-    expect(mediaErrorMessage({ name: "OverconstrainedError", constraint: "deviceId" }, "camera")).toContain("Pilih kamera lain");
+    expect(mediaErrorMessage({ name: "OverconstrainedError", constraint: "deviceId" }, "camera")).toContain("Choose another camera");
   });
   test("layar: batal picker dan izin rekam layar OS", () => {
-    expect(mediaErrorMessage(mediaErr("NotAllowedError"), "screen")).toContain("Berbagi layar dibatalkan");
-    expect(mediaErrorMessage(mediaErr("NotReadableError"), "screen")).toContain("izin rekam layar");
-    expect(mediaErrorMessage(mediaErr("NotSupportedError"), "screen")).toContain("tidak mendukung berbagi layar");
+    expect(mediaErrorMessage(mediaErr("NotAllowedError"), "screen")).toContain("Screen sharing was canceled");
+    expect(mediaErrorMessage(mediaErr("NotReadableError"), "screen")).toContain("screen recording permission");
+    expect(mediaErrorMessage(mediaErr("NotSupportedError"), "screen")).toContain("doesn't support screen sharing");
   });
   test("nama tak dikenal: fallback umum", () => {
-    expect(mediaErrorMessage(new Error("boom"), "camera")).toBe("Kamera tidak bisa dipakai. Muat ulang halaman lalu coba lagi.");
+    expect(mediaErrorMessage(new Error("boom"), "camera")).toBe("The camera can't be used. Reload the page and try again.");
   });
 });
 
 describe("authErrorMessage — ?error= login Better Auth", () => {
   test("domain & ban (case-insensitive)", () => {
-    expect(authErrorMessage("email_domain_not_allowed")).toContain("Domain email");
-    expect(authErrorMessage("BANNED_USER")).toContain("diblokir");
+    expect(authErrorMessage("email_domain_not_allowed")).toContain("email domain");
+    expect(authErrorMessage("BANNED_USER")).toContain("banned");
     expect(authErrorMessage("banned")).toBe(authErrorMessage("BANNED_USER"));
   });
   test("provider Google belum dikonfigurasi", () => {
-    expect(authErrorMessage("PROVIDER_NOT_FOUND")).toBe("Login Google belum dikonfigurasi admin server.");
+    expect(authErrorMessage("PROVIDER_NOT_FOUND")).toBe("Google sign-in hasn't been configured by the server admin.");
   });
-  test("kode tak dikenal tetap pesan Indonesia + kodenya", () => {
-    expect(authErrorMessage("weird_code")).toBe("Login gagal (weird_code). Coba lagi, atau hubungi admin zoomin.");
+  test("kode tak dikenal tetap pesan English + kodenya", () => {
+    expect(authErrorMessage("weird_code")).toBe("Sign-in failed (weird_code). Try again, or contact your zoomin admin.");
   });
 });

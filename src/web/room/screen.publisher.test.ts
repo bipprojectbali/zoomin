@@ -93,7 +93,7 @@ describe("ScreenPublisher", () => {
     const { pub } = setup({ fail: domError("NotReadableError") });
     const err = await pub.addScreen().catch((e: unknown) => e);
     expect(err).not.toBeInstanceOf(ScreenShareCancelled);
-    expect((err as Error).message).toContain("getDisplayMedia gagal (NotReadableError");
+    expect((err as Error).message).toContain("getDisplayMedia failed (NotReadableError");
   });
 
   test("audio ada → screen-N-audio dipublish dengan source ScreenShareAudio; stop unpublish keduanya", async () => {

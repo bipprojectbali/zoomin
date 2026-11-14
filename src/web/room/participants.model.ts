@@ -67,16 +67,16 @@ export function countScreens(trackNames: Iterable<string>): number {
 
 /** Teks toast agregat masuk/keluar: 1-2 nama disebut, lebih dari itu dihitung. */
 export function presenceToastText(names: readonly string[], kind: "join" | "leave"): string | null {
-  const verb = kind === "join" ? "bergabung" : "keluar";
+  const verb = kind === "join" ? "joined" : "left";
   if (names.length === 0) return null;
   if (names.length === 1) return `${names[0]} ${verb}`;
-  if (names.length === 2) return `${names[0]} dan ${names[1]} ${verb}`;
-  return `${names.length} peserta ${verb}`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} ${verb}`;
+  return `${names.length} participants ${verb}`;
 }
 
 /** Teks toast share layar; `trackName` di luar konvensi `screen-N` → null. */
 export function screenToastText(name: string, trackName: string, started: boolean): string | null {
   const parsed = parseTrackName(trackName);
   if (parsed?.kind !== "screen") return null;
-  return `${name} ${started ? "mulai" : "berhenti"} membagikan Layar ${parsed.index}`;
+  return `${name} ${started ? "started" : "stopped"} sharing Screen ${parsed.index}`;
 }

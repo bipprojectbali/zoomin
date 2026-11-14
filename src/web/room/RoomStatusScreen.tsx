@@ -1,25 +1,11 @@
 import { ArrowLeft, LogOut, RotateCw, Unplug, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { canRetry, type ConnectionError } from "./room.connection";
+import { ROOM_STATUS_TEXT } from "./room.labels";
 
 export type RoomStatusKind = "left" | "disconnected" | "error";
 
-const TEXT = {
-  title: {
-    left: "Anda telah keluar dari room",
-    disconnected: "Anda terputus dari room",
-    error: "Tidak dapat bergabung ke room",
-  } satisfies Record<RoomStatusKind, string>,
-  duplicateTitle: "Room dibuka di tab lain",
-  leftHint: "Tidak sengaja keluar? Anda bisa bergabung lagi.",
-  duplicateHint: "Menggunakan room di tab ini akan menutupnya di tab atau perangkat lain.",
-  noRetryHint: "Kembali ke lobby untuk memilih room lain.",
-  rejoin: "Gabung lagi",
-  reconnect: "Sambung ulang",
-  useHere: "Gunakan di tab ini",
-  retry: "Coba lagi",
-  lobby: "Ke lobby",
-};
+const TEXT = ROOM_STATUS_TEXT;
 
 const ICON = { left: LogOut, disconnected: Unplug, error: TriangleAlert } satisfies Record<RoomStatusKind, unknown>;
 

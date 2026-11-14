@@ -3,11 +3,11 @@ import { ADMIN_TEXT } from "./admin.labels";
 
 /** Pilihan durasi blokir di dialog; `hours` undefined = permanen. */
 export const BAN_DURATIONS = [
-  { id: "1h", label: "1 jam", hours: 1 },
-  { id: "1d", label: "1 hari", hours: 24 },
-  { id: "7d", label: "7 hari", hours: 24 * 7 },
-  { id: "30d", label: "30 hari", hours: 24 * 30 },
-  { id: "permanent", label: "Permanen", hours: undefined },
+  { id: "1h", label: "1 hour", hours: 1 },
+  { id: "1d", label: "1 day", hours: 24 },
+  { id: "7d", label: "7 days", hours: 24 * 7 },
+  { id: "30d", label: "30 days", hours: 24 * 30 },
+  { id: "permanent", label: "Permanent", hours: undefined },
 ] as const;
 
 export type BanDurationId = (typeof BAN_DURATIONS)[number]["id"];
@@ -24,17 +24,17 @@ export const BAN_REASON_MAX = 200;
 /** Pesan error alasan blokir, atau null bila valid (dihitung setelah trim). */
 export function banReasonError(reason: string): string | null {
   const len = reason.trim().length;
-  if (len < BAN_REASON_MIN) return `Alasan minimal ${BAN_REASON_MIN} karakter.`;
-  if (len > BAN_REASON_MAX) return `Alasan maksimal ${BAN_REASON_MAX} karakter.`;
+  if (len < BAN_REASON_MIN) return `Reason must be at least ${BAN_REASON_MIN} characters.`;
+  if (len > BAN_REASON_MAX) return `Reason must be at most ${BAN_REASON_MAX} characters.`;
   return null;
 }
 
-const DATE_TIME = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" });
-const DATE = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" });
+const DATE_TIME = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
+const DATE = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 
-/** "14 Nov 2026, 10.30" (id-ID). */
+/** "Nov 14, 2026, 10:30 AM" (en-US). */
 export const formatDateTime = (ms: number) => DATE_TIME.format(ms);
-/** "14 Nov 2026" (id-ID). */
+/** "Nov 14, 2026" (en-US). */
 export const formatDate = (ms: number) => DATE.format(ms);
 
 /** true bila blokir masih berlaku pada `now` (blokir yang sudah lewat masa berlaku dianggap aktif). */
@@ -42,14 +42,14 @@ export function isBanActive(user: Pick<AdminUser, "banned" | "banExpires">, now:
   return user.banned && (user.banExpires === null || user.banExpires > now);
 }
 
-/** Label status: "Aktif", atau "Diblokir" + detail "sampai …"/"permanen". */
+/** Status label: "Active", or "Banned" + detail "until …"/"permanent". */
 export function userStatusLabel(user: Pick<AdminUser, "banned" | "banExpires">, now: number): { label: string; detail: string | null } {
   if (!isBanActive(user, now)) return { label: ADMIN_TEXT.statusActive, detail: null };
   const detail = user.banExpires === null ? ADMIN_TEXT.bannedForever : ADMIN_TEXT.bannedUntil(formatDateTime(user.banExpires));
   return { label: ADMIN_TEXT.statusBanned, detail };
 }
 
-const RELATIVE = new Intl.RelativeTimeFormat("id-ID", { numeric: "auto" });
+const RELATIVE = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" });
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["year", 365 * 24 * 3600_000],
   ["month", 30 * 24 * 3600_000],
@@ -59,7 +59,7 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["minute", 60_000],
 ];
 
-/** "3 jam yang lalu" (id-ID); null → "Belum pernah"; < 1 menit → "sekarang". */
+/** "3 hours ago" (en-US); null → "Never"; < 1 minute → "now". */
 export function formatRelative(ms: number | null, now: number): string {
   if (ms === null) return ADMIN_TEXT.never;
   const diff = ms - now;

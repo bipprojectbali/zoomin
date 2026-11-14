@@ -26,10 +26,10 @@ describe("networkBannerFor", () => {
 });
 
 test("elapsedLabel: detik lalu menit", () => {
-  expect(elapsedLabel(0)).toBe("0 dtk");
-  expect(elapsedLabel(12_400)).toBe("12 dtk");
-  expect(elapsedLabel(65_000)).toBe("1 mnt 5 dtk");
-  expect(elapsedLabel(-500)).toBe("0 dtk");
+  expect(elapsedLabel(0)).toBe("0 s");
+  expect(elapsedLabel(12_400)).toBe("12 s");
+  expect(elapsedLabel(65_000)).toBe("1 min 5 s");
+  expect(elapsedLabel(-500)).toBe("0 s");
 });
 
 describe("cappedReconnectPolicy", () => {

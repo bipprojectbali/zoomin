@@ -2,7 +2,7 @@ import type { GlobalRole } from "../shared/api.types";
 
 /** Label UI peran global akun (badge user menu, profil, admin). */
 export const GLOBAL_ROLE_LABEL: Record<GlobalRole, string> = {
-  user: "Pengguna",
+  user: "User",
   admin: "Admin",
   super_admin: "Super admin",
 };

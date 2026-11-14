@@ -14,16 +14,9 @@ import { ROLE_LABEL } from "@/role.label";
 import type { RoomSummary } from "../../shared/api.types";
 import { InviteLinks } from "./InviteLinks";
 import { formatDateTime } from "./lobby.format";
+import { LOBBY_TEXT } from "./lobby.labels";
 
-const TEXT = {
-  enter: "Masuk",
-  enterLabel: (title: string) => `Masuk ke room ${title}`,
-  created: (when: string) => `Dibuat ${when}`,
-  notMember: "Admin global",
-  invites: "Undang orang",
-  invite: "Undang",
-  inviteLabel: (title: string) => `Undang orang ke room ${title}`,
-};
+const TEXT = LOBBY_TEXT.roomCard;
 
 type Props = { room: RoomSummary; onChanged: (room: RoomSummary) => void; onDeleted: (roomId: string) => void };
 

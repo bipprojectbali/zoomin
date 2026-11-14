@@ -22,12 +22,12 @@ describe("addDomains", () => {
   it("tolak duplikat (setelah normalisasi)", () => {
     const r = addDomains(["acme.com"], "ACME.com");
     expect(r.domains).toEqual(["acme.com"]);
-    expect(r.error).toContain("sudah ada");
+    expect(r.error).toContain("already in the list");
   });
   it("tolak format salah, domain valid sebelumnya tetap masuk", () => {
     const r = addDomains([], "ok.com bad");
     expect(r.domains).toEqual(["ok.com"]);
-    expect(r.error).toContain("bukan domain yang valid");
+    expect(r.error).toContain("isn't a valid domain");
   });
   it(`maksimal ${ALLOWED_EMAIL_DOMAINS_MAX}`, () => {
     const full = Array.from({ length: ALLOWED_EMAIL_DOMAINS_MAX }, (_, i) => `d${i}.com`);

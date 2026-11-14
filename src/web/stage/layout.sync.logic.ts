@@ -24,7 +24,7 @@ export function layoutFromMetadata(metadata: string | undefined): { layout: Layo
   try {
     return { layout: parseLayout(metadata), error: null };
   } catch (e) {
-    return { layout: null, error: new Error("layoutFromMetadata: room.metadata bukan layout valid", { cause: e }) };
+    return { layout: null, error: new Error("layoutFromMetadata: room.metadata is not a valid layout", { cause: e }) };
   }
 }
 

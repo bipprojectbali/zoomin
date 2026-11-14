@@ -37,7 +37,7 @@ function SheetContent({
   className,
   children,
   side = "right",
-  closeLabel = "Tutup",
+  closeLabel = "Close",
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"

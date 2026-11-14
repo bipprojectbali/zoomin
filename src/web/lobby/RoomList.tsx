@@ -3,17 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RoomSummary } from "../../shared/api.types";
 import { RoomCard } from "./RoomCard";
+import { LOBBY_TEXT } from "./lobby.labels";
 
-const TEXT = {
-  heading: "Room Anda",
-  loading: "Memuat daftar room…",
-  loadMore: "Muat lagi",
-  loadingMore: "Memuat…",
-  emptyTitle: "Belum ada room",
-  emptyAdmin: "Buat room pertama lewat form di atas, lalu bagikan link undangan.",
-  emptyUserTitle: "Belum ada undangan",
-  emptyUser: "Anda belum diundang ke room mana pun. Minta link undangan ke host/admin.",
-};
+const TEXT = LOBBY_TEXT.roomList;
 
 const SKELETON_COUNT = 3;
 

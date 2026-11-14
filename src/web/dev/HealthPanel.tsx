@@ -12,7 +12,7 @@ import { DEV_TEXT } from "./dev.labels";
 
 const T = DEV_TEXT.health;
 const AUTO_REFRESH_MS = 30_000;
-const TIME = new Intl.DateTimeFormat("id-ID", { timeStyle: "medium" });
+const TIME = new Intl.DateTimeFormat("en-US", { timeStyle: "medium" });
 
 /** Tab Ringkasan: status LiveKit, versi/uptime, DB, jumlah super admin; auto refresh 30 dtk saat tab browser terlihat. */
 export function HealthPanel() {

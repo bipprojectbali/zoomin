@@ -13,23 +13,23 @@ const UA = {
 
 describe("describeUserAgent", () => {
   test("browser + OS umum", () => {
-    expect(describeUserAgent(UA.chromeMac)).toBe("Chrome di macOS");
-    expect(describeUserAgent(UA.safariIphone)).toBe("Safari di iOS");
-    expect(describeUserAgent(UA.edgeWin)).toBe("Edge di Windows");
-    expect(describeUserAgent(UA.firefoxLinux)).toBe("Firefox di Linux");
-    expect(describeUserAgent(UA.chromeAndroid)).toBe("Chrome di Android");
+    expect(describeUserAgent(UA.chromeMac)).toBe("Chrome on macOS");
+    expect(describeUserAgent(UA.safariIphone)).toBe("Safari on iOS");
+    expect(describeUserAgent(UA.edgeWin)).toBe("Edge on Windows");
+    expect(describeUserAgent(UA.firefoxLinux)).toBe("Firefox on Linux");
+    expect(describeUserAgent(UA.chromeAndroid)).toBe("Chrome on Android");
   });
   test("kosong / tak dikenal", () => {
-    expect(describeUserAgent(null)).toBe("Perangkat tak dikenal");
-    expect(describeUserAgent("curl/8.0")).toBe("Perangkat tak dikenal");
+    expect(describeUserAgent(null)).toBe("Unknown device");
+    expect(describeUserAgent("curl/8.0")).toBe("Unknown device");
   });
 });
 
 describe("relativeTime", () => {
   const now = 1_700_000_000_000;
   test("menit & hari", () => {
-    expect(relativeTime(now - 5 * 60_000, now)).toBe("5 menit yang lalu");
-    expect(relativeTime(now - 3 * 86_400_000, now)).toBe("3 hari yang lalu");
+    expect(relativeTime(now - 5 * 60_000, now)).toBe("5 minutes ago");
+    expect(relativeTime(now - 3 * 86_400_000, now)).toBe("3 days ago");
   });
 });
 

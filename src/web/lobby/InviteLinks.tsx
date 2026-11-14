@@ -11,24 +11,9 @@ import { ROLE_LABEL, ROLES } from "@/role.label";
 import type { RoomRole } from "../../shared/api.types";
 import { loadInvites, saveInvites, type StoredInvites } from "./invite.storage";
 import { formatDateTime } from "./lobby.format";
+import { LOBBY_TEXT } from "./lobby.labels";
 
-const TEXT = {
-  roleGroup: "Peran untuk link undangan",
-  create: (role: string) => `Buat link ${role}`,
-  creating: "Membuat…",
-  copy: "Salin",
-  copyLabel: (role: string) => `Salin link ${role}`,
-  copied: "Link disalin",
-  copyFailed: "Gagal menyalin link. Pilih teks link lalu salin manual.",
-  linkLabel: (role: string) => `Link ${role}`,
-  expires: (when: string) => `berlaku sampai ${when}`,
-  hostWarning: "Siapa pun yang punya link ini menjadi host room: bisa mengatur layout dan membuat undangan. Bagikan hanya ke orang tepercaya.",
-  roleHint: {
-    participant: "Bisa bicara, menyalakan kamera, dan berbagi layar.",
-    viewer: "Hanya menonton dan mendengar.",
-    host: "Mengatur layout dan mengundang orang.",
-  } satisfies Record<RoomRole, string>,
-};
+const TEXT = LOBBY_TEXT.inviteLinks;
 
 /** Pilih peran → buat link undangan → salin. Link tersimpan di sessionStorage sampai tab ditutup. */
 export function InviteLinks({ roomId }: { roomId: string }) {

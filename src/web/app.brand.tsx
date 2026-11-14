@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 /** Nama & tagline aplikasi (satu sumber untuk login, lobby, 404). */
 export const APP_NAME = "zoomin";
-export const APP_TAGLINE = "Meeting video dengan banyak layar sekaligus";
+export const APP_TAGLINE = "Video meetings with many screens at once";
 
 /** Logo + nama app; `tagline` menampilkan tagline di bawah nama. */
 export function AppBrand({ tagline = false, className }: { tagline?: boolean; className?: string }) {

@@ -1,8 +1,8 @@
 {
   "name": "zoomin",
   "short_name": "zoomin",
-  "description": "Meeting video dengan banyak layar sekaligus",
-  "lang": "id",
+  "description": "Video meetings with many screens at once",
+  "lang": "en",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",

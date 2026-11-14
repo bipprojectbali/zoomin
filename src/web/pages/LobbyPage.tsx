@@ -7,12 +7,9 @@ import { JoinByIdForm } from "@/lobby/JoinByIdForm";
 import { RoomList } from "@/lobby/RoomList";
 import { hasRole, RequireSession, useSession } from "@/session.context";
 import type { RoomSummary } from "../../shared/api.types";
+import { LOBBY_TEXT } from "@/lobby/lobby.labels";
 
-const TEXT = {
-  title: "Room",
-  subtitleAdmin: "Buat room, bagikan link undangan, lalu masuk ke meeting.",
-  subtitleUser: "Pilih room untuk masuk ke meeting.",
-};
+const TEXT = LOBBY_TEXT.page;
 
 /** Halaman lobby /app (terlindung sesi), di dalam AppShell. */
 export function LobbyPage() {

@@ -1,0 +1,66 @@
+import type { RoomRole } from "../../shared/api.types";
+
+/** Label UI lobby (halaman, buat room, daftar & kartu room, gabung via ID, link undangan). */
+export const LOBBY_TEXT = {
+  page: {
+    title: "Rooms",
+    subtitleAdmin: "Create a room, share an invite link, then join the meeting.",
+    subtitleUser: "Pick a room to join the meeting.",
+  },
+  createRoom: {
+    heading: "Create a new room",
+    title: "Room title",
+    titlePlaceholder: "e.g. Weekly design sync",
+    advanced: "Advanced options",
+    id: "Room ID",
+    idHint: "Used in the room URL. Letters, numbers, - or _, up to 64 characters. Generated from the title if left empty.",
+    idInvalid: "Room ID may only contain letters, numbers, - or _ (no spaces), up to 64 characters.",
+    expiry: "Expires",
+    expiryDate: "Expiry date",
+    submit: "Create room",
+    submitting: "Creating…",
+    created: (title: string) => `Room "${title}" created`,
+  },
+  inviteLinks: {
+    roleGroup: "Role for the invite link",
+    create: (role: string) => `Create ${role} link`,
+    creating: "Creating…",
+    copy: "Copy",
+    copyLabel: (role: string) => `Copy ${role} link`,
+    copied: "Link copied",
+    copyFailed: "Couldn't copy the link. Select the link text and copy it manually.",
+    linkLabel: (role: string) => `${role} link`,
+    expires: (when: string) => `expires ${when}`,
+    hostWarning: "Anyone with this link becomes a room host: they can arrange the layout and create invites. Share it only with people you trust.",
+    roleHint: {
+      participant: "Can talk, turn on the camera, and share screens.",
+      viewer: "Can only watch and listen.",
+      host: "Arranges the layout and invites people.",
+    } satisfies Record<RoomRole, string>,
+  },
+  joinById: {
+    label: "Join with room ID",
+    placeholder: "e.g. design-sync",
+    submit: "Join",
+    invalid: "Room ID may only contain letters, numbers, - or _ (no spaces), up to 64 characters.",
+  },
+  roomCard: {
+    enter: "Join",
+    enterLabel: (title: string) => `Join room ${title}`,
+    created: (when: string) => `Created ${when}`,
+    notMember: "Global admin",
+    invites: "Invite people",
+    invite: "Invite",
+    inviteLabel: (title: string) => `Invite people to room ${title}`,
+  },
+  roomList: {
+    heading: "Your rooms",
+    loading: "Loading rooms…",
+    loadMore: "Load more",
+    loadingMore: "Loading…",
+    emptyTitle: "No rooms yet",
+    emptyAdmin: "Create your first room with the form above, then share an invite link.",
+    emptyUserTitle: "No invites yet",
+    emptyUser: "You haven't been invited to any room yet. Ask a host or admin for an invite link.",
+  },
+} as const;

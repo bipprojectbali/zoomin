@@ -34,14 +34,14 @@ describe("joinErrorFor", () => {
   test("401/403/404 → kind khusus", () => {
     expect(joinErrorFor(apiError(401)).kind).toBe("unauthorized");
     expect(joinErrorFor(apiError(403)).kind).toBe("forbidden");
-    expect(joinErrorFor(apiError(404))).toEqual({ kind: "room_not_found", message: "Room tidak ditemukan atau sudah dihapus" });
+    expect(joinErrorFor(apiError(404))).toEqual({ kind: "room_not_found", message: "Room not found or already deleted" });
   });
 
   test("403 room_inactive/room_expired/room_private → pesan khusus, bukan 'bukan anggota' (E2E-03)", () => {
     for (const code of ["room_inactive", "room_expired", "room_private"] as const) {
       const err = new ApiRequestError(403, { error: "x", code }, "POST /x");
       expect(joinErrorFor(err)).toEqual({ kind: "forbidden", message: errorMessage(err) });
-      expect(errorMessage(err)).not.toBe("Anda bukan anggota room ini");
+      expect(errorMessage(err)).not.toBe("You're not a member of this room");
     }
   });
 
@@ -55,7 +55,7 @@ describe("joinErrorFor", () => {
     expect(joinErrorFor(new TypeError("Failed to fetch")).kind).toBe("network");
     expect(joinErrorFor(ConnectionError.timeout("ws timeout"))).toEqual({
       kind: "network",
-      message: "Gagal terhubung ke server media",
+      message: "Couldn't connect to the media server",
     });
   });
 });
@@ -101,7 +101,7 @@ describe("disconnectErrorFor", () => {
   test("alasan dikenal → kind + teks khusus", () => {
     expect(disconnectErrorFor(DisconnectReason.DUPLICATE_IDENTITY)).toEqual({
       kind: "duplicate_session",
-      message: "Anda bergabung dari tab atau perangkat lain dengan akun yang sama. Hanya satu sesi yang bisa aktif.",
+      message: "You joined from another tab or device with the same account. Only one session can be active.",
     });
     expect(disconnectErrorFor(DisconnectReason.PARTICIPANT_REMOVED)?.kind).toBe("forbidden");
     expect(disconnectErrorFor(DisconnectReason.ROOM_DELETED)?.kind).toBe("room_not_found");
@@ -109,7 +109,7 @@ describe("disconnectErrorFor", () => {
   });
 
   test("lainnya → network (terputus umum)", () => {
-    expect(disconnectErrorFor(undefined)).toEqual({ kind: "network", message: "Koneksi ke room terputus" });
+    expect(disconnectErrorFor(undefined)).toEqual({ kind: "network", message: "Connection to the room was lost" });
     expect(disconnectErrorFor(DisconnectReason.SIGNAL_CLOSE)?.kind).toBe("network");
   });
 });

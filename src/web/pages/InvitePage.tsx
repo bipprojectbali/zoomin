@@ -11,7 +11,7 @@ import { errorMessage } from "@/error.message";
 import { saveMediaPreferences, stashFirstJoinChoices } from "@/prejoin/media.preferences";
 import { PreJoin } from "@/prejoin/PreJoin";
 import { PasswordGate } from "@/room-password/PasswordGate";
-import { inviteSubtitle, roleKeptNote } from "@/prejoin/prejoin.labels";
+import { INVITE_PAGE_TEXT, inviteSubtitle, roleKeptNote } from "@/prejoin/prejoin.labels";
 import type { PreJoinChoices } from "@/prejoin/prejoin.types";
 import { GoogleMark } from "@/landing/GoogleMark";
 import { ROLE_LABEL } from "@/role.label";
@@ -19,23 +19,7 @@ import { canPublishFor } from "@/room/room.connection";
 import { useSession } from "@/session.context";
 import type { InvitePreview } from "../../shared/api.types";
 
-const TEXT = {
-  loading: "Memeriksa undangan…",
-  invalidTitle: "Undangan tidak dapat dipakai",
-  invalidHelp: "Link mungkin salah salin, sudah kedaluwarsa, atau room-nya sudah dihapus. Minta link undangan baru ke admin room.",
-  loadFailedTitle: "Gagal memuat undangan",
-  retry: "Coba lagi",
-  home: "Ke lobby",
-  notYou: "Bukan Anda?",
-  logout: "Ganti akun",
-  invitedTo: "Anda diundang ke room",
-  asRole: "Peran",
-  expires: (at: number) => `Berlaku sampai ${new Date(at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}`,
-  signInHelp: "Masuk dengan akun Google Anda untuk bergabung. Setelah masuk, Anda kembali ke halaman ini.",
-  signIn: "Masuk dengan Google untuk bergabung",
-  redirecting: "Mengalihkan ke Google…",
-  signedInAs: (name: string, email: string) => `Masuk sebagai ${name} (${email})`,
-};
+const TEXT = INVITE_PAGE_TEXT;
 
 /** Kode error yang berarti undangan memang tidak bisa dipakai (bukan gangguan sementara). */
 const INVALID_CODES = new Set(["invite_invalid", "room_not_found", "not_found", "invalid_input"]);

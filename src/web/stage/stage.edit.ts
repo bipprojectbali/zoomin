@@ -16,13 +16,13 @@ export function placeTrack(state: LayoutState, index: number | null, trackRef: T
   let panelSizes = state.panelSizes;
   if (index === null) {
     if (existing >= 0) return state;
-    if (n >= LAYOUT_MAX_SLOTS) throw new LayoutValidationError("slots", `placeTrack: maks ${LAYOUT_MAX_SLOTS} slot`);
+    if (n >= LAYOUT_MAX_SLOTS) throw new LayoutValidationError("slots", `placeTrack: at most ${LAYOUT_MAX_SLOTS} slots`);
     slots.push({ trackRef });
     // side-by-side: jumlah panel = jumlah slot, ukuran lama tidak valid lagi → render pakai default.
     if (state.template === "side-by-side") panelSizes = undefined;
   } else {
     if (!Number.isInteger(index) || index < 0 || index >= n) {
-      throw new LayoutValidationError("slots", `placeTrack: index ${index} di luar 0..${n - 1}`);
+      throw new LayoutValidationError("slots", `placeTrack: index ${index} is outside 0..${n - 1}`);
     }
     if (existing === index) return state;
     if (existing >= 0) slots[existing]!.trackRef = slots[index]!.trackRef;
@@ -38,7 +38,7 @@ export function placeTrack(state: LayoutState, index: number | null, trackRef: T
 export function removeSlot(state: LayoutState, index: number, by: string): LayoutState {
   const n = state.slots.length;
   if (!Number.isInteger(index) || index < 0 || index >= n) {
-    throw new LayoutValidationError("slots", `removeSlot: index ${index} di luar 0..${n - 1}`);
+    throw new LayoutValidationError("slots", `removeSlot: index ${index} is outside 0..${n - 1}`);
   }
   const slots = state.slots.filter((_, i) => i !== index).map((s) => ({ ...s }));
   return withSlots(state, slots, state.template === "side-by-side" ? undefined : state.panelSizes, by);

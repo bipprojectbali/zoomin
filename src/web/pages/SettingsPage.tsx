@@ -14,16 +14,16 @@ export default function SettingsPage() {
   return (
     <AppShell title={TEXT.title}>
       <div className="flex max-w-4xl flex-col gap-8">
-        <SettingsSection id="profil" title={TEXT.profile.title} description={TEXT.profile.description} testId="settings-profile">
+        <SettingsSection id="profile" title={TEXT.profile.title} description={TEXT.profile.description} testId="settings-profile">
           {/* key: form di-reset saat profil berubah dari server (mis. setelah simpan). */}
           <ProfileSection key={`${user.name}|${user.image}`} user={user} />
         </SettingsSection>
         <Separator />
-        <SettingsSection id="sesi" title={TEXT.sessions.title} description={TEXT.sessions.description} testId="settings-sessions">
+        <SettingsSection id="sessions" title={TEXT.sessions.title} description={TEXT.sessions.description} testId="settings-sessions">
           <SessionsSection />
         </SettingsSection>
         <Separator />
-        <SettingsSection id="hapus-akun" tone="danger" title={TEXT.danger.title} description={TEXT.danger.description}>
+        <SettingsSection id="delete-account" tone="danger" title={TEXT.danger.title} description={TEXT.danger.description}>
           <DangerSection user={user} />
         </SettingsSection>
       </div>

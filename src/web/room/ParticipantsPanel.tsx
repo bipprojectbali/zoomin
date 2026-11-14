@@ -9,23 +9,9 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { cn } from "@/lib/utils";
 import { ROLE_LABEL } from "@/role.label";
 import { countScreens, displayName, imageFromMetadata, initials, roleFromMetadata, sortParticipants } from "./participants.model";
+import { PARTICIPANTS_TEXT } from "./room.labels";
 
-const TEXT = {
-  title: (n: number) => `Peserta (${n})`,
-  description: "Semua orang di room ini, termasuk penonton dan yang tanpa kamera.",
-  you: "(Anda)",
-  speaking: "Sedang bicara",
-  micOn: "Mikrofon nyala",
-  micOff: "Mikrofon mati",
-  screens: (n: number) => `Membagikan ${n} layar`,
-  quality: {
-    [ConnectionQuality.Excellent]: "Koneksi sangat baik",
-    [ConnectionQuality.Good]: "Koneksi baik",
-    [ConnectionQuality.Poor]: "Koneksi buruk",
-    [ConnectionQuality.Lost]: "Koneksi hilang",
-    [ConnectionQuality.Unknown]: "Kualitas koneksi belum diketahui",
-  } satisfies Record<ConnectionQuality, string>,
-};
+const TEXT = PARTICIPANTS_TEXT;
 
 const QUALITY_ICON = {
   [ConnectionQuality.Excellent]: SignalHigh,

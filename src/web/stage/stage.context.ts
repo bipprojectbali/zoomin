@@ -33,6 +33,6 @@ export const StageContext = createContext<StageCtx | null>(null);
 
 export function useStage(): StageCtx {
   const ctx = useContext(StageContext);
-  if (!ctx) throw new Error("useStage: harus di dalam <Stage>");
+  if (!ctx) throw new Error("useStage: must be used inside <Stage>");
   return ctx;
 }

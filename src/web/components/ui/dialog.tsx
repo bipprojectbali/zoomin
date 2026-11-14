@@ -37,7 +37,7 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
-  closeLabel = "Tutup",
+  closeLabel = "Close",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean

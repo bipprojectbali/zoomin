@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { displayName, presenceToastText, screenToastText } from "./participants.model";
 
-const TEXT = { reconnected: "Koneksi tersambung kembali" };
+const TEXT = { reconnected: "Reconnected" };
 
 /** Jendela agregasi masuk/keluar: banyak peserta dalam jendela ini = satu toast. */
 const PRESENCE_BATCH_MS = 1500;

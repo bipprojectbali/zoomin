@@ -10,14 +10,14 @@ import { DEFAULT_AFTER_LOGIN, safeNextPath } from "@/login.redirect";
 import { SessionLoading, useSession } from "@/session.context";
 
 const TEXT = {
-  title: "Masuk ke zoomin",
-  description: "Gunakan akun Google Anda untuk membuka room dan bergabung lewat undangan.",
-  google: "Lanjutkan dengan Google",
-  redirecting: "Mengalihkan ke Google…",
-  nextHint: "Masuk dulu untuk melanjutkan ke halaman yang Anda buka.",
+  title: "Sign in to zoomin",
+  description: "Use your Google account to open rooms and join by invite.",
+  google: "Continue with Google",
+  redirecting: "Redirecting to Google…",
+  nextHint: "Sign in to continue to the page you opened.",
   policy:
-    "Dengan masuk, Anda setuju nama, email, dan foto profil Google Anda dipakai untuk identitas di room. Kami tidak meminta akses lain ke akun Google Anda.",
-  backHome: "Kembali ke beranda",
+    "By signing in, you agree that your Google name, email, and profile photo are used as your identity in rooms. We don't request any other access to your Google account.",
+  backHome: "Back to home",
 };
 
 /** /login: satu tombol Google (ala Google/Linear). `?next=` hanya path internal; `?error=` → pesan Indonesia. */

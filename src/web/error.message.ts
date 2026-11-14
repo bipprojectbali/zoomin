@@ -5,37 +5,37 @@ import { ApiRequestError } from "./api.client";
 export type MediaKind = "camera" | "mic" | "screen";
 
 const TEXT = {
-  unknown: "Terjadi kesalahan tak terduga. Coba lagi.",
-  network: "Tidak dapat menghubungi server. Periksa koneksi internet lalu coba lagi.",
-  aborted: "Permintaan dibatalkan. Coba lagi.",
-  server: "Server sedang bermasalah. Coba lagi beberapa saat lagi.",
-  conflict: "Data baru saja berubah. Muat ulang halaman lalu coba lagi.",
-  invalidField: (field: string) => `${field} belum valid. Periksa kembali lalu coba lagi.`,
-  device: "perangkat",
+  unknown: "Something went wrong. Try again.",
+  network: "Can't reach the server. Check your internet connection and try again.",
+  aborted: "The request was canceled. Try again.",
+  server: "The server is having trouble. Try again in a moment.",
+  conflict: "The data just changed. Reload the page and try again.",
+  invalidField: (field: string) => `${field} is not valid. Check it and try again.`,
+  device: "device",
 } as const;
 
 const CODE_TEXT: Record<ApiErrorCode, string> = {
-  unauthorized: "Sesi Anda sudah berakhir. Masuk lagi, atau buka ulang link undangan dari admin room.",
-  forbidden: "Anda tidak punya akses untuk tindakan ini. Minta admin room memberi akses.",
-  not_found: "Data yang dicari tidak ditemukan. Mungkin sudah dihapus.",
-  room_not_found: "Room tidak ditemukan. Mungkin sudah dihapus atau link-nya salah.",
-  room_exists: "ID room sudah dipakai. Ganti ID room di Opsi lanjutan.",
-  invalid_input: "Isian belum valid. Periksa kembali lalu coba lagi.",
-  invite_invalid: "Link undangan tidak valid atau sudah kedaluwarsa. Minta link baru ke admin room.",
-  rate_limited: "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.", // tanpa Retry-After; lihat rateLimitedText
-  layout_conflict: "Layout baru saja diubah admin lain. Tampilan sudah diperbarui, silakan ulangi perubahan Anda.",
-  banned: "Akun Anda diblokir admin. Hubungi admin zoomin bila menurut Anda ini keliru.",
-  email_domain_not_allowed: "Domain email akun Google ini tidak diizinkan. Masuk dengan akun Google kantor/organisasi Anda.",
-  cannot_modify_self: "Anda tidak bisa mengubah atau menghapus akun Anda sendiri dari sini.",
-  insufficient_role: "Peran akun Anda tidak cukup untuk tindakan ini.",
-  user_not_found: "Akun tidak ditemukan. Mungkin sudah dihapus.",
-  room_inactive: "Room ini sedang dinonaktifkan. Minta host room mengaktifkannya kembali.",
-  room_expired: "Masa berlaku room ini sudah habis. Minta host room memperpanjangnya.",
-  room_private: "Room ini privat: hanya orang yang diundang lewat email yang bisa masuk. Minta host room menambahkan email Anda.",
-  last_host: "Room harus punya minimal satu host. Jadikan anggota lain host terlebih dahulu.",
-  member_not_found: "Anggota atau undangan tidak ditemukan. Mungkin sudah dihapus.",
-  password_required: "Room ini dilindungi password. Masukkan password dari host room untuk bergabung.",
-  password_invalid: "Password room salah. Periksa kembali atau minta password ke host room.",
+  unauthorized: "Your session has ended. Sign in again, or reopen the invite link from the room host.",
+  forbidden: "You don't have access to do this. Ask the room host for access.",
+  not_found: "Not found. It may have been deleted.",
+  room_not_found: "Room not found. It may have been deleted, or the link is wrong.",
+  room_exists: "This room ID is already taken. Change the room ID under Advanced options.",
+  invalid_input: "Some fields are not valid. Check them and try again.",
+  invite_invalid: "This invite link is invalid or has expired. Ask the room host for a new one.",
+  rate_limited: "Too many attempts. Wait a moment and try again.", // tanpa Retry-After; lihat rateLimitedText
+  layout_conflict: "Another host just changed the layout. The view has been updated; please redo your change.",
+  banned: "Your account has been banned by an admin. Contact your zoomin admin if you think this is a mistake.",
+  email_domain_not_allowed: "This Google account's email domain is not allowed. Sign in with your work or organization Google account.",
+  cannot_modify_self: "You can't change or delete your own account from here.",
+  insufficient_role: "Your account role doesn't allow this action.",
+  user_not_found: "Account not found. It may have been deleted.",
+  room_inactive: "This room is inactive. Ask the room host to reactivate it.",
+  room_expired: "This room has expired. Ask the room host to extend it.",
+  room_private: "This is a private room: only people invited by email can join. Ask the room host to add your email.",
+  last_host: "A room needs at least one host. Make another member a host first.",
+  member_not_found: "Member or invitation not found. It may have been removed.",
+  password_required: "This room is password-protected. Enter the password from the room host to join.",
+  password_invalid: "Wrong room password. Check it or ask the room host for the password.",
 };
 
 /**
@@ -46,20 +46,20 @@ const AUTH_ERROR_TEXT: Record<string, string> = {
   email_domain_not_allowed: CODE_TEXT.email_domain_not_allowed,
   banned: CODE_TEXT.banned,
   banned_user: CODE_TEXT.banned,
-  provider_not_found: "Login Google belum dikonfigurasi admin server.",
-  access_denied: "Login dibatalkan. Klik Lanjutkan dengan Google untuk mencoba lagi.",
-  state_mismatch: "Sesi login kedaluwarsa atau dibuka di tab lain. Coba masuk lagi.",
-  please_restart_the_process: "Sesi login kedaluwarsa. Coba masuk lagi.",
-  unable_to_get_user_info: "Gagal membaca akun Google. Coba lagi beberapa saat lagi.",
-  unable_to_create_user: "Akun tidak bisa dibuat. Hubungi admin zoomin.",
-  unable_to_create_session: "Sesi tidak bisa dibuat. Hubungi admin zoomin bila berulang.",
-  signup_disabled: "Pendaftaran akun baru sedang ditutup. Hubungi admin zoomin.",
+  provider_not_found: "Google sign-in hasn't been configured by the server admin.",
+  access_denied: "Sign-in was canceled. Click Continue with Google to try again.",
+  state_mismatch: "The sign-in session expired or was opened in another tab. Try signing in again.",
+  please_restart_the_process: "The sign-in session expired. Try signing in again.",
+  unable_to_get_user_info: "Couldn't read your Google account. Try again in a moment.",
+  unable_to_create_user: "Couldn't create the account. Contact your zoomin admin.",
+  unable_to_create_session: "Couldn't create a session. Contact your zoomin admin if this keeps happening.",
+  signup_disabled: "New sign-ups are currently closed. Contact your zoomin admin.",
   too_many_requests: CODE_TEXT.rate_limited,
 };
 
-/** Pesan Indonesia untuk kode error login Better Auth; kode tak dikenal → pesan umum yang menyebut kodenya. */
+/** Pesan English untuk kode error login Better Auth; kode tak dikenal → pesan umum yang menyebut kodenya. */
 export function authErrorMessage(code: string): string {
-  return AUTH_ERROR_TEXT[code.trim().toLowerCase()] ?? `Login gagal (${code}). Coba lagi, atau hubungi admin zoomin.`;
+  return AUTH_ERROR_TEXT[code.trim().toLowerCase()] ?? `Sign-in failed (${code}). Try again, or contact your zoomin admin.`;
 }
 
 /** Fallback per status HTTP bila server tidak mengirim `code`. */
@@ -74,12 +74,12 @@ const STATUS_TEXT: Record<number, string> = {
 
 /** Nama field (dari `ApiError.path`) yang ditampilkan ke user. */
 const FIELD_LABEL: Record<string, string> = {
-  id: "ID room (huruf, angka, - atau _, maks 64 karakter)",
-  title: "Judul room",
-  name: "Nama",
-  role: "Peran",
-  invite: "Link undangan",
-  expiresAt: "Tanggal kadaluarsa (maks 365 hari dari sekarang)",
+  id: "Room ID (letters, numbers, - or _, max 64 characters)",
+  title: "Room title",
+  name: "Name",
+  role: "Role",
+  invite: "Invite link",
+  expiresAt: "Expiry date (max 365 days from now)",
   email: "Email",
 };
 
@@ -87,16 +87,18 @@ const HTTP_SERVER_ERROR = 500;
 const HTTP_TOO_MANY_REQUESTS = 429;
 const SECONDS_PER_MINUTE = 60;
 
-/** "…Coba lagi dalam N menit." (dibulatkan ke atas; <60 dtk → detik) dari `Retry-After`. */
+const plural = (count: number, unit: string) => `${count} ${unit}${count === 1 ? "" : "s"}`;
+
+/** "…Try again in N minutes." (dibulatkan ke atas; <60 dtk → detik) dari `Retry-After`. */
 export function rateLimitedText(retryAfterSeconds: number): string {
   const wait =
     retryAfterSeconds < SECONDS_PER_MINUTE
-      ? `${Math.max(1, Math.ceil(retryAfterSeconds))} detik`
-      : `${Math.ceil(retryAfterSeconds / SECONDS_PER_MINUTE)} menit`;
-  return `Terlalu banyak percobaan. Coba lagi dalam ${wait}.`;
+      ? plural(Math.max(1, Math.ceil(retryAfterSeconds)), "second")
+      : plural(Math.ceil(retryAfterSeconds / SECONDS_PER_MINUTE), "minute");
+  return `Too many attempts. Try again in ${wait}.`;
 }
 
-const KIND_NOUN: Record<MediaKind, string> = { camera: "kamera", mic: "mikrofon", screen: "layar" };
+const KIND_NOUN: Record<MediaKind, string> = { camera: "camera", mic: "microphone", screen: "screen" };
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -151,34 +153,34 @@ export function mediaErrorMessage(err: unknown, kind: MediaKind | null): string 
     switch (name) {
       case "NotAllowedError":
       case "PermissionDeniedError":
-        return "Berbagi layar dibatalkan atau tidak diizinkan. Klik Bagikan layar lagi dan pilih layar, jendela, atau tab.";
+        return "Screen sharing was canceled or not allowed. Click Share screen again and pick a screen, window, or tab.";
       case "NotFoundError":
-        return "Tidak ada layar atau jendela yang bisa dibagikan.";
+        return "There's no screen or window available to share.";
       case "NotReadableError":
       case "AbortError":
-        return "Layar tidak bisa direkam. Periksa izin rekam layar di pengaturan sistem (macOS: Privasi & Keamanan → Rekaman Layar), lalu coba lagi.";
+        return "The screen can't be captured. Check screen recording permission in system settings (macOS: Privacy & Security → Screen Recording), then try again.";
       case "NotSupportedError":
-        return "Browser ini tidak mendukung berbagi layar. Gunakan Chrome, Edge, atau Firefox versi terbaru di komputer.";
+        return "This browser doesn't support screen sharing. Use the latest Chrome, Edge, or Firefox on a computer.";
     }
   }
   switch (name) {
     case "NotAllowedError":
     case "SecurityError":
     case "PermissionDeniedError":
-      return `Akses ${noun} ditolak. Izinkan lewat ikon gembok di bilah alamat browser, lalu coba lagi.`;
+      return `${Noun} access was denied. Allow it via the lock icon in the browser's address bar, then try again.`;
     case "NotFoundError":
     case "DevicesNotFoundError":
-      return `${Noun} tidak ditemukan. Pastikan ${noun} terpasang, lalu coba lagi.`;
+      return `No ${noun} found. Make sure a ${noun} is connected, then try again.`;
     case "NotReadableError":
     case "TrackStartError":
-      return `${Noun} sedang dipakai aplikasi lain atau bermasalah. Tutup aplikasi lain (mis. Zoom atau Meet), lalu coba lagi.`;
+      return `The ${noun} is in use by another app or isn't working. Close other apps (e.g. Zoom or Meet), then try again.`;
     case "OverconstrainedError":
     case "ConstraintNotSatisfiedError":
-      return `${Noun} yang dipilih tidak mendukung pengaturan ini. Pilih ${noun} lain.`;
+      return `The selected ${noun} doesn't support these settings. Choose another ${noun}.`;
     case "NotSupportedError":
-      return `Browser ini tidak mendukung akses ${noun}. Gunakan browser versi terbaru.`;
+      return `This browser doesn't support ${noun} access. Use the latest version of your browser.`;
     case "AbortError":
-      return `${Noun} gagal dimulai. Coba lagi.`;
+      return `The ${noun} failed to start. Try again.`;
   }
-  return `${Noun} tidak bisa dipakai. Muat ulang halaman lalu coba lagi.`;
+  return `The ${noun} can't be used. Reload the page and try again.`;
 }

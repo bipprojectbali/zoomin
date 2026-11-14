@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 import { ROOM_LABELS, deviceLabel, screenLabel, toggleState } from "./room.labels";
 
-test("screenLabel: nama track layar → 'Layar N'; lainnya apa adanya", () => {
-  expect(screenLabel("screen-1")).toBe("Layar 1");
-  expect(screenLabel("screen-12")).toBe("Layar 12");
+test("screenLabel: nama track layar → 'Screen N'; lainnya apa adanya", () => {
+  expect(screenLabel("screen-1")).toBe("Screen 1");
+  expect(screenLabel("screen-12")).toBe("Screen 12");
   expect(screenLabel("screen-1-audio")).toBe("screen-1-audio");
   expect(screenLabel("camera")).toBe("camera");
 });
@@ -15,7 +15,7 @@ test("toggleState: nyala netral, mati merah, label = aksi berikutnya", () => {
   expect(toggleState("camera", false, false)).toMatchObject({ label: ROOM_LABELS.cameraOff, variant: "destructive" });
 });
 
-test("deviceLabel: label kosong (belum ada izin) → 'Perangkat N'", () => {
+test("deviceLabel: label kosong (belum ada izin) → 'Device N'", () => {
   expect(deviceLabel({ label: "Headset USB" }, 0)).toBe("Headset USB");
-  expect(deviceLabel({ label: "" }, 1)).toBe("Perangkat 2");
+  expect(deviceLabel({ label: "" }, 1)).toBe("Device 2");
 });
