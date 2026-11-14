@@ -31,6 +31,23 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikut
 - Variabel env baru: `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
   `SUPER_ADMIN_EMAILS`, `WEB_DIST_DIR` (opsional), dan `ZOOMIN_TEST_AUTH` (khusus test otomatis). Panduan membuat
   OAuth client Google ada di `.env.example` / `zoomin env`.
+- **Room public / private.** Room public (default) bisa dimasuki siapa pun yang login dan memegang link undangan;
+  room private hanya untuk anggota yang diundang lewat email, link undangan ditolak. Tipe bisa diubah kapan saja
+  (public → private membuat link yang sudah dibagikan tidak berlaku lagi).
+- **Undang anggota lewat email** (public maupun private) dengan peran `host`/`participant`/`viewer`. Email yang belum
+  punya akun disimpan sebagai undangan tertunda dan otomatis jadi anggota saat orang itu login pertama kali dengan
+  Google. Host bisa mengubah peran, mengeluarkan anggota (langsung terputus bila sedang di room), dan membatalkan
+  undangan tertunda; host terakhir tidak bisa diturunkan atau dikeluarkan.
+- **Dialog "Pengaturan room"** (dari menu ⋯ kartu room di lobby dan dari `/admin`) dengan tab Umum (judul, tipe),
+  Anggota, Status, dan zona bahaya.
+- **Aktifkan / nonaktifkan room.** Menonaktifkan room langsung memutus semua peserta; room nonaktif tidak bisa
+  dimasuki sampai diaktifkan lagi. Data room (layout, anggota) tetap tersimpan.
+- **Masa berlaku room** (default tanpa batas, maks 365 hari) saat membuat room atau dari tab Status, dengan tombol
+  cepat +1 / +7 / +30 hari, "Tanpa batas", atau pilih tanggal. Room yang kadaluarsa ditutup otomatis (diperiksa tiap
+  60 detik) dan aktif lagi begitu diperpanjang.
+- **Host room bisa menghapus room** sendiri (konfirmasi dengan mengetik ID room); sebelumnya hanya admin.
+- Kartu room menampilkan badge Private, status Nonaktif/Kadaluarsa (tombol Masuk dimatikan dengan alasan), dan tanggal
+  berakhir.
 
 ### Changed
 
@@ -40,6 +57,12 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikut
   mengisi nama. Akun lama (admin password dan tamu) tidak dimigrasikan: room dan layout-nya tetap ada, tapi daftar
   anggota room lama kosong, jadi undang ulang peserta.
 - Admin dan super admin yang membuka room tanpa undangan diperlakukan sebagai host.
+- Panel `/admin` › Room: kolom Tipe dan Status baru, plus aksi "Pengaturan" yang membuka dialog pengaturan room.
+- Tombol **Undang** di dalam room private membuka pengelolaan anggota (undang lewat email), bukan link undangan.
+- `POST /api/rooms` menerima field opsional `visibility` dan `expiresAt`; `RoomSummary` bertambah `visibility`,
+  `status`, `expiresAt`, `canManage`.
+- **BREAKING (API):** field `active` (room sedang live di LiveKit) di `GET /api/admin/rooms` berganti nama menjadi
+  `live`.
 
 ### Removed
 

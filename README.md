@@ -19,6 +19,11 @@ di-bundle oleh Bun.
   - `super_admin`: semua kemampuan admin plus `/dev` (mengangkat/menurunkan admin, kesehatan sistem, audit log,
     domain email yang diizinkan, ringkasan konfigurasi). **Hanya dari env `SUPER_ADMIN_EMAILS`**, disinkronkan setiap
     login; tidak bisa diberikan lewat UI. Tidak ada yang bisa memblokir/menghapus dirinya sendiri.
+- **Room public / private.** Room public (default): siapa pun yang login dan memegang link undangan bisa masuk. Room
+  private: hanya anggota yang diundang lewat email. Host room (atau admin+) mengelola room lewat dialog **Pengaturan
+  room**: judul, tipe, anggota (undang lewat email; email tanpa akun jadi undangan tertunda yang otomatis diklaim saat
+  login pertama), aktif/nonaktif (menonaktifkan memutus semua peserta), masa berlaku (default tanpa batas, maks 365
+  hari; room kadaluarsa ditutup otomatis dalam ≤60 detik), dan hapus room.
 - **Halaman**: `/` landing publik, `/login`, `/app` lobby, `/rooms/:roomId`, `/invite/:invite`, `/settings`,
   `/admin` (admin+), `/dev` (super_admin). Aksi admin/dev tercatat di audit log.
 
@@ -193,7 +198,8 @@ klien. Cookie sesi app tidak diteruskan ke LiveKit, dan token (`access_token`) t
 
 1. Admin (peran global) membuat room di lobby `/app` (id + judul) dan menjadi host room itu.
 2. Host membuat link undangan per peran (`host` / `participant` / `viewer`), masa berlaku default 72 jam, maks 720.
-   Link juga bisa dibuat dari dalam room lewat tombol **Undang**.
+   Link juga bisa dibuat dari dalam room lewat tombol **Undang**. Alternatifnya (dan satu-satunya cara di room
+   private) host mengundang lewat email di Pengaturan room › Anggota.
 3. Tamu membuka link, melihat judul room + peran, masuk dengan Google bila belum, lalu memeriksa kamera/mic di layar
    pre-join sebelum masuk. Nama dan foto diambil dari profil.
 4. Peserta menyalakan kamera/mic dan menekan "Tambah layar" berulang kali untuk membagikan beberapa layar.
@@ -267,12 +273,18 @@ callback `/api/auth/callback/google`, `POST /api/auth/sign-out`). Endpoint plugi
 | GET | `/api/me/sessions` | sesi | `{ items }` (sesi login, tanda `current`) |
 | DELETE | `/api/me/sessions` · `/api/me/sessions/:id` | sesi | 204 (cabut semua sesi lain / satu sesi) |
 | GET | `/api/rooms?limit=&cursor=` | sesi | `{ items, nextCursor }` (user: room yang diikuti; admin+: semua; limit default 20, maks 100) |
-| POST | `/api/rooms` | admin+, `{ id, title }` | `RoomSummary`; pembuat jadi host \| 403 `insufficient_role` |
+| POST | `/api/rooms` | admin+, `{ id, title, visibility?, expiresAt? }` | `RoomSummary`; pembuat jadi host \| 403 `insufficient_role` |
 | GET | `/api/rooms/:roomId` | anggota / admin+ | `RoomSummary` \| 401 \| 403 \| 404 |
-| POST | `/api/rooms/:roomId/invites` | host room / admin+, `{ role, ttlHours? }` | `{ url, expiresAt }` |
-| GET | `/api/invites/preview?invite=` | publik (sesi opsional) | `InvitePreview` (judul room, peran, sesi saat ini) \| 400 \| 404 |
-| POST | `/api/invites/accept` | sesi, `{ invite }` | `{ user, roomId, role }` \| 401 \| 429 (200 / jam per IP) |
-| POST | `/api/rooms/:roomId/token` | anggota / admin+ | `{ token, url, role }` (role dari DB, bukan dari body) |
+| PATCH | `/api/rooms/:roomId` | host room / admin+, `{ title?, visibility?, enabled?, expiresAt? }` | `RoomSummary` (`enabled: false` memutus semua peserta) |
+| DELETE | `/api/rooms/:roomId` | host room / admin+ | 204 (hapus room di DB + LiveKit) |
+| GET | `/api/rooms/:roomId/members?limit=&cursor=` | host room / admin+ | `Page<RoomMemberItem>` (anggota lalu undangan tertunda; limit default 50, maks 200) |
+| POST | `/api/rooms/:roomId/members` | host room / admin+, `{ email, role }` | 201 `RoomMemberItem` (akun ada → anggota; belum → tertunda) |
+| PATCH · DELETE | `/api/rooms/:roomId/members/:userId` | host room / admin+, PATCH `{ role }` | `RoomMemberItem` / 204 \| 404 `member_not_found` \| 409 `last_host` |
+| DELETE | `/api/rooms/:roomId/invitations/:email` | host room / admin+ | 204 (batalkan undangan tertunda) \| 404 `member_not_found` |
+| POST | `/api/rooms/:roomId/invites` | host room / admin+, `{ role, ttlHours? }` | `{ url, expiresAt }` \| 403 `room_private` |
+| GET | `/api/invites/preview?invite=` | publik (sesi opsional) | `InvitePreview` (judul room, peran, sesi saat ini) \| 400 \| 403 `room_private`/`room_inactive`/`room_expired` \| 404 |
+| POST | `/api/invites/accept` | sesi, `{ invite }` | `{ user, roomId, role }` \| 401 \| 403 (seperti preview) \| 429 (200 / jam per IP) |
+| POST | `/api/rooms/:roomId/token` | anggota / admin+ | `{ token, url, role }` (role dari DB, bukan dari body) \| 403 `room_inactive`/`room_expired` |
 | GET | `/api/rooms/:roomId/layout` | anggota / admin+ | `{ version, layout \| null }` |
 | PUT | `/api/rooms/:roomId/layout` | host / admin+, `{ baseVersion, layout }` | `{ version }` \| 409 `{ currentVersion }` |
 | GET | `/api/admin/users?q=&role=&banned=&limit=&cursor=` | admin+ | `Page<AdminUser>` |
@@ -280,7 +292,7 @@ callback `/api/auth/callback/google`, `POST /api/auth/sign-out`). Endpoint plugi
 | POST | `/api/admin/users/:id/unban` | admin+ | `{ user }` |
 | DELETE | `/api/admin/users/:id` | admin+ | 204 |
 | POST | `/api/admin/users/:id/sessions/revoke` | admin+ | 204 |
-| GET | `/api/admin/rooms?limit=&cursor=` | admin+ | `Page<RoomSummary & { members, active, participants }>` |
+| GET | `/api/admin/rooms?limit=&cursor=` | admin+ | `Page<RoomSummary & { members, live, participants }>` |
 | DELETE | `/api/admin/rooms/:id` | admin+ | 204 (hapus room di DB + LiveKit) |
 | PUT | `/api/dev/users/:id/role` | super_admin, `{ role: "user" \| "admin" }` | `{ user }` |
 | GET | `/api/dev/health` | super_admin | `SystemHealth` (versi, LiveKit, DB) |

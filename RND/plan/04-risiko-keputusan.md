@@ -69,6 +69,25 @@ Spec lengkap dan kontrak endpoint/skema: `05-auth-roles.md`. Ringkasan untuk jej
 Dampak ke keputusan lama: K2 (a) digantikan A1 (lihat di bawah); R17 (rate limit `admin-login`) tidak berlaku lagi
 karena endpoint dihapus, limiter undangan tetap, login dibatasi rate limit Better Auth.
 
+## Keputusan akses room (2026-11-14, disetujui user)
+
+Spec lengkap, migrasi `0004_room_access`, dan kontrak endpoint: `06-room-access.md`. Nomor di bawah merujuk R1–R11
+di dokumen itu (bukan risiko R1–R18 di atas).
+
+| # | Keputusan |
+|---|---|
+| 06-R1 | `rooms.visibility` `public` (default, perilaku lama: link undangan) / `private` (link ditolak, hanya anggota). |
+| 06-R2 | Anggota ditambah lewat email; email tanpa akun → baris pending `room_invitations`, diklaim di hook `session.create` Better Auth. Allowlist domain tetap berlaku. |
+| 06-R3 | Pengelola room = host room atau admin+; satu fungsi `canManageRoom` (`room.access.ts`) untuk semua route. |
+| 06-R4 | Ganti tipe tidak menghapus anggota; validitas link dicek terhadap visibility saat preview/accept, bukan di token undangan. |
+| 06-R5 | Status turunan dari `disabled_at` + `expires_at` (default tanpa batas): `active`/`inactive`/`expired`; non-active → token & undangan 403 `room_inactive`/`room_expired`; data tidak dihapus. |
+| 06-R6 | Nonaktifkan → `deleteRoom` LiveKit langsung. Kadaluarsa ditegakkan enforcer tiap 60 s yang hanya menutup room **yang ada di DB** dan non-active. **Batas diterima:** token yang sudah terbit (TTL 2 jam) bisa bergabung ulang ≤60 s sebelum ditendang lagi. **Revisi E2E-04:** versi awal juga menutup room live yang tidak dikenal DB; itu menendang peserta instance lain yang berbagi LiveKit (dev + prod e2e, staging + prod), jadi dibatalkan — room yang dihapus sudah ditutup saat dihapus. |
+| 06-R7 | Perpanjang = set `expiresAt` baru (≤ now + 365 hari) atau `null`; memperpanjang/mengaktifkan langsung membuat room aktif lagi. |
+| 06-R8 | Hapus room oleh host room atau admin+; logika tunggal `room.service.ts#deleteRoom` (juga dipakai `/api/admin/rooms`). |
+| 06-R9 | Kelola anggota (ubah peran, keluarkan + `removeParticipant`, batalkan pending); host terakhir dilindungi → 409 `last_host`. |
+| 06-R10 | Semua aksi baru diaudit (`room.update`, `room.visibility`, `room.activate`, `room.deactivate`, `room.expiry`, `room.member.*`); email target boleh di detail audit, tidak di console log. |
+| 06-R11 | `AdminRoomSummary.active` → `live` agar tidak bentrok dengan status room (breaking kecil di API admin). |
+
 ## Keputusan terbuka untuk user
 
 Urut dari yang paling memblokir.

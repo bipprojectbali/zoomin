@@ -8,9 +8,11 @@ konvensi khusus proyek. Detail pakai/deploy: `README.md`, `deploy/README.md`.
 Ruang meeting self-hosted di atas LiveKit. Pembeda: satu peserta bisa membagikan **beberapa layar sekaligus**, dan
 host room mengatur layout panggung (template, drag-drop, resize, fokus) yang sama untuk semua penonton. Fitur lain:
 login Google (Better Auth) + profil, peran global `user`/`admin`/`super_admin`, panel `/admin` dan `/dev` (audit log,
-domain email, health), landing publik `/` (lobby di `/app`), room, undangan per peran room
+domain email, health), landing publik `/` (lobby di `/app`), room public/private (anggota diundang lewat email, undangan
+tertunda bagi email tanpa akun), aktif/nonaktif + kadaluarsa room, dialog Pengaturan room, undangan per peran room
 (`host`/`participant`/`viewer`), pre-join, daftar peserta, toast, banner koneksi, rate limit, build produksi, single
-binary + CLI (`zoomin user` darurat), proxy signaling opsional `/livekit`. Spec auth: `RND/plan/05-auth-roles.md`.
+binary + CLI (`zoomin user` darurat), proxy signaling opsional `/livekit`. Spec auth: `RND/plan/05-auth-roles.md`;
+spec akses room: `RND/plan/06-room-access.md`.
 
 Status: app terbukti jalan lewat Cloudflare Tunnel + LiveKit 1.13.11 di VPS (stack Portainer
 `deploy/livekit-compose.yml`). Versi rilis = `version` di `package.json` + `CHANGELOG.md`.
@@ -36,7 +38,8 @@ src/web/      SPA: pages/, landing/, app/ (header, guard), lobby/, prejoin/, roo
               admin/, dev/, components/ui/; auth.client.ts (klien Better Auth)
 src/cli/      CLI single binary (args, help, docs, check, run); entrypoint tetap src/server/main.ts
 scripts/      build.web.ts (SPA → dist/web), build.binary.ts (→ bin/)
-migrations/   SQL bernomor: 0001_init, 0002_auth (tabel Better Auth + peran room host), 0003_admin (audit_log, app_settings)
+migrations/   SQL bernomor: 0001_init, 0002_auth (tabel Better Auth + peran room host), 0003_admin (audit_log, app_settings),
+              0004_room_access (visibility, disabled_at, expires_at, room_invitations)
 test/         integrasi dengan LiveKit dev + smoke produksi
 e2e/          Playwright (temuan bug di e2e/BUGS.md)
 deploy/       artefak produksi (systemd/Caddy, stack Portainer LiveKit)
@@ -83,8 +86,13 @@ LiveKit dev lokal: `RND/spike/.bin/livekit-server --dev` (atau Docker `livekit/l
   `user` + `admin`; tidak ada yang menyasar diri sendiri atau super_admin (`admin.service.ts`).
 - **Jangan buka plugin admin Better Auth lewat HTTP**: `/api/auth/admin/*` diblok di `api.ts` karena tidak menegakkan
   A5. Aksi admin lewat `/api/admin/*` / `/api/dev/*` yang memanggil `auth.api.*` dari server.
+- **Pengelola room** (host room ATAU admin/super_admin global) dicek HANYA lewat `canManageRoom` di
+  `src/server/room.access.ts` (juga `roomStatus`/`getRoomAccess`); jangan tulis cek host manual di route.
+- **Enforcer room** (`room.enforcer.ts`, tiap 60 s) hanya menutup room LiveKit yang ADA di DB dan berstatus non-active;
+  room yang tak dikenal DB dibiarkan (LiveKit bisa dipakai bersama instance lain, E2E-04). Token yang sudah terbit
+  bisa bergabung ulang ≤60 s sebelum ditendang lagi (ponytail, R6 di `06-room-access.md`).
 - **Audit wajib** untuk setiap aksi admin/dev (ban, unban, hapus, ubah peran, revoke sesi, buat/hapus room, ubah
-  setting) lewat `recordAudit` (`audit.repository.ts`); aksi admin baru tanpa entri audit = bug.
+  setting, plus aksi pengelola room: tipe, aktif/nonaktif, kadaluarsa, anggota) lewat `recordAudit` (`audit.repository.ts`); aksi admin baru tanpa entri audit = bug.
 - **Login test-only** `POST /api/test/login` (A12): hanya aktif bila `ZOOMIN_TEST_AUTH=1` DAN bukan production;
   e2e/test tidak pernah memanggil Google. Test `prod` membuktikan 404 di production; jangan longgarkan guard ini.
 - **Error API wajib punya `code`** stabil: pakai `apiError(code, error, path?)` di `src/server/api.error.ts`;
@@ -95,7 +103,7 @@ LiveKit dev lokal: `RND/spike/.bin/livekit-server --dev` (atau Docker `livekit/l
   lewat kelas CSS.
 - **Batas file** (aturan global Rule 8): route 150, service 300, repository 250, types 300, test 400 baris; hard
   limit 500 baris / 20.000 karakter. Pecah, jangan menambah ke file yang sudah lewat batas.
-- **Migrasi**: file SQL bernomor baru di `migrations/` (berikutnya `0004_<nama>.sql`), lalu tambahkan import + entri di
+- **Migrasi**: file SQL bernomor baru di `migrations/` (berikutnya `0005_<nama>.sql`), lalu tambahkan import + entri di
   `MIGRATIONS` (`src/server/db.ts`); `db.test.ts` gagal bila daftar tak sinkron. Migrasi hanya maju, idempotent.
 - **Secret**: jangan membaca, mencetak, atau commit `.env` (hanya `.env.example`). `zoomin check` menampilkan
   secret sebagai "diset"/"kosong". Variabel baru → tambahkan ke `.env.example` + `src/server/config.ts`
