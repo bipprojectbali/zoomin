@@ -3,6 +3,7 @@ import { networkInterfaces } from "node:os";
 import type { ApiDeps } from "./api.deps";
 import { createApi } from "./api";
 import { CLIENT_IP_HEADER } from "./auth.ratelimit";
+import { LIVEKIT_PROXY_PREFIX, livekitProxy, livekitWebSocket } from "./livekit.proxy";
 import { DEFAULT_WEB_DIR, staticRoutes } from "./static.serve";
 
 /**
@@ -19,18 +20,23 @@ const devIndex: Bun.HTMLBundle | undefined =
  * `[serve.static]`, docs bun.com/docs/bundler/fullstack). Produksi: prebuild statis dari `bun run build`
  * (code splitting + hash, static.serve.ts); HTML import hanya manifest lazy, jadi tidak di-bundle saat runtime.
  * Elysia dipasang sebagai handler `/api/*` lewat `api.fetch`; route yang lebih spesifik menang atas wildcard `/*`.
+ * `/livekit` + `/livekit/*` = proxy signaling LiveKit same-origin (livekit.proxy.ts), aktif di semua mode.
  */
 export function createServer(deps: ApiDeps, port: number, webDir: string = DEFAULT_WEB_DIR) {
   const api = createApi(deps);
   const isProd = deps.config.nodeEnv === "production";
   // Binary dengan NODE_ENV=development eksplisit tidak punya devIndex → tetap sajikan SPA tertanam.
   const web: Record<string, Bun.HTMLBundle | ((req: Request) => Response)> = isProd || !devIndex ? staticRoutes(webDir) : { "/*": devIndex };
+  const lkProxy = livekitProxy(deps.config.livekitUrl);
   return Bun.serve({
     port,
     hostname: deps.config.host,
     tls: loadTls(deps.config.tls),
     development: !isProd,
+    websocket: livekitWebSocket,
     routes: {
+      [LIVEKIT_PROXY_PREFIX]: lkProxy,
+      [`${LIVEKIT_PROXY_PREFIX}/*`]: lkProxy,
       "/api/*": (req, server) => {
         // Selalu timpa: header internal ini sumber IP peer untuk rate limit (auth.ratelimit.ts), klien tak boleh mengisinya.
         req.headers.set(CLIENT_IP_HEADER, server.requestIP(req)?.address ?? "");
@@ -66,10 +72,7 @@ export function lanAddress(): string | undefined {
   return Object.values(networkInterfaces()).flat().find((i) => i?.family === "IPv4" && !i.internal)?.address;
 }
 
-/** LiveKit Twirp memakai HTTP(S), sedangkan config menyimpan URL ws(s). */
-export function toHttpUrl(livekitUrl: string): string {
-  return livekitUrl.replace(/^ws(s?):\/\//, "http$1://");
-}
+export { toHttpUrl } from "./livekit.proxy";
 
 type Stoppable = { stop(closeActiveConnections?: boolean): Promise<void> };
 type Closable = { close(): void };

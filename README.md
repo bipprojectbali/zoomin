@@ -84,6 +84,22 @@ mkcert -install && mkcert <host> <ip>
 Lalu buka `https://<host>:3000` dan set `PUBLIC_APP_URL` ke alamat itu agar link undangan benar. Hanya satu
 variabel diset, atau file tidak ada, membuat server gagal start.
 
+### Akses lewat satu hostname (Cloudflare Tunnel / reverse proxy)
+
+App mem-proxy signaling LiveKit di path `/livekit` (WebSocket + HTTP `GET`/`HEAD`, prefix dibuang, diteruskan ke
+`LIVEKIT_URL`; aktif di dev, `bun run start`, dan binary). Jadi perangkat lain cukup menjangkau origin app, tanpa
+subdomain atau port LiveKit terpisah:
+
+```bash
+PUBLIC_APP_URL=https://app.example.com
+PUBLIC_LIVEKIT_URL=wss://app.example.com/livekit   # signaling lewat app
+LIVEKIT_URL=ws://127.0.0.1:7880                     # atau LiveKit remote, mis. ws://<IP-VPS>:7880
+```
+
+Proxy hanya membawa signaling. Media WebRTC tetap langsung dari browser ke LiveKit, jadi port media LiveKit
+(`rtc.tcp_port` / `rtc.port_range_*` / UDP) dan IP yang diumumkannya harus terjangkau dari perangkat klien. Cookie sesi app tidak diteruskan ke LiveKit, dan
+token (`access_token`) tidak ikut di log.
+
 ## Alur pakai
 
 1. Admin membuat room di lobby (id + judul).

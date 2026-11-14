@@ -13,6 +13,8 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/). Versi mengikut
   server.
 - Saat server listen di semua interface, log start menampilkan `http://localhost:<port>/` (bukan `0.0.0.0`, yang
   membuat kamera/share layar/clipboard gagal) plus alamat LAN untuk perangkat lain.
+- Proxy signaling LiveKit di `/livekit`: set `PUBLIC_LIVEKIT_URL=wss://<domain-app>/livekit` agar browser cukup
+  menjangkau satu hostname (mis. lewat Cloudflare Tunnel), tanpa subdomain LiveKit. Media tetap langsung ke LiveKit.
 
 ## [0.1.0] - 2026-11-14
 
