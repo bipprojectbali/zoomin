@@ -72,8 +72,12 @@ describe("POST /rooms/:roomId/members (R2)", () => {
     expect(await res.json()).toEqual({ kind: "member", userId: bob.user.id, name: "Bob", email: "bob@example.test", image: null, role: "host" });
     await call("POST", `/rooms/${r}/members`, host.cookie, { email: "bob@example.test", role: "viewer" });
     expect(roleOf(r, bob.user.id)).toBe("viewer");
-    const entry = listAudit(db, { action: "room.member.add" }).items.find((e) => e.targetId === r);
-    expect(entry).toMatchObject({ actorId: host.user.id, targetType: "room", detail: { userId: bob.user.id, role: "viewer", pending: false } });
+    // Kedua entri bisa berbagi milidetik `at` yang sama → urutan tak dijamin; cocokkan per role.
+    const entries = listAudit(db, { action: "room.member.add" }).items.filter((e) => e.targetId === r);
+    expect(entries).toHaveLength(2);
+    for (const role of ["host", "viewer"]) {
+      expect(entries.find((e) => (e.detail as { role?: string })?.role === role)).toMatchObject({ actorId: host.user.id, targetType: "room", detail: { userId: bob.user.id, role, pending: false } });
+    }
   });
 
   test("email belum terdaftar → pending; ulang = update role, bukan duplikat", async () => {
