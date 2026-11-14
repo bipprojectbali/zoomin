@@ -37,8 +37,7 @@ async function reopenQuickly(page: Page, trigger: Locator, close: () => Promise<
 }
 
 test("dialog konfirmasi Keluar dibuka ulang cepat tetap bisa diklik", async ({ admin, roomId }) => {
-  // BUG(e2e): E2E-01 — overlay dialog/sheet menutupi konten saat dibuka ulang <200 ms setelah ditutup
-  test.fail();
+  // Regresi E2E-01: overlay z-40 di bawah konten z-50, durasi animasi overlay = konten (200 ms).
   await openRoom(admin, roomId);
   const stuck = await reopenQuickly(
     admin,

@@ -15,3 +15,8 @@ export function withStableSuffix(slugified: string, suffix: string): string {
   const slug = slugified.length > suffix.length ? slugified.slice(0, -SUFFIX_SEPARATOR_LENGTH) : "";
   return slug ? `${slug}-${suffix}` : suffix;
 }
+
+/** ID room yang dipakai: isian manual bila tidak kosong, selain itu slug otomatis dari judul (QA-17). */
+export function effectiveRoomId(customId: string | null, autoId: string): string {
+  return customId?.trim() ? customId.trim() : autoId;
+}

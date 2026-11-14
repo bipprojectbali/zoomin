@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ApiErrorCode } from "../shared/api.types";
-import { ApiRequestError } from "./api.client";
-import { errorMessage, mediaErrorMessage } from "./error.message";
+import { ApiRequestError, parseRetryAfter } from "./api.client";
+import { errorMessage, mediaErrorMessage, rateLimitedText } from "./error.message";
 
 const apiErr = (status: number, code?: ApiErrorCode, path?: string) =>
   new ApiRequestError(status, { error: "raw english text", code, path }, "TEST /api/x");
@@ -46,6 +46,30 @@ describe("errorMessage — API", () => {
     expect(errorMessage(apiErr(429))).toContain("Terlalu banyak percobaan");
     expect(errorMessage(apiErr(502))).toContain("Server sedang bermasalah");
     expect(errorMessage(apiErr(418))).toContain("kesalahan tak terduga");
+  });
+});
+
+describe("rate limit + Retry-After", () => {
+  const limited = (retryAfter: number | null, code: ApiErrorCode | undefined = "rate_limited") =>
+    new ApiRequestError(429, { error: "raw english text", code }, "TEST /api/x", retryAfter);
+
+  test("menit dibulatkan ke atas, <60 dtk dalam detik", () => {
+    expect(errorMessage(limited(898))).toBe("Terlalu banyak percobaan. Coba lagi dalam 15 menit.");
+    expect(errorMessage(limited(60))).toBe("Terlalu banyak percobaan. Coba lagi dalam 1 menit.");
+    expect(errorMessage(limited(61))).toBe("Terlalu banyak percobaan. Coba lagi dalam 2 menit.");
+    expect(errorMessage(limited(59))).toBe("Terlalu banyak percobaan. Coba lagi dalam 59 detik.");
+    expect(rateLimitedText(0)).toBe("Terlalu banyak percobaan. Coba lagi dalam 1 detik.");
+  });
+  test("429 tanpa kode tetap memakai Retry-After; tanpa header → teks umum", () => {
+    expect(errorMessage(limited(120, undefined))).toContain("2 menit");
+    expect(errorMessage(limited(null))).toBe("Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.");
+  });
+  test("parseRetryAfter: detik saja", () => {
+    expect(parseRetryAfter("898")).toBe(898);
+    expect(parseRetryAfter(" 5 ")).toBe(5);
+    expect(parseRetryAfter(null)).toBeNull();
+    expect(parseRetryAfter("Wed, 21 Oct 2026 07:28:00 GMT")).toBeNull();
+    expect(parseRetryAfter("-3")).toBeNull();
   });
 });
 

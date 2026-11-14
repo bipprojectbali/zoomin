@@ -12,6 +12,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       // Tanpa next-themes: ikut prefers-color-scheme, sama dengan styles.css.
       theme="system"
+      // Label region Indonesia (default sonner "Notifications alt+T"); hotkey Alt+T tetap aktif (QA-07).
+      customAriaLabel="Notifikasi (Alt+T)"
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

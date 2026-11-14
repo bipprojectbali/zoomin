@@ -18,7 +18,13 @@ import type {
   UserResponse,
 } from "../shared/api.types";
 
-/** Error dari API: status HTTP + `code`/`path` dari body, body lengkap (mis. `currentVersion` untuk 409). */
+/** Header `Retry-After` dalam detik (bentuk tanggal HTTP tidak dipakai server ini) → null bila tidak ada/tidak valid. */
+export function parseRetryAfter(value: string | null): number | null {
+  if (!value || !/^\d+$/.test(value.trim())) return null;
+  return Number(value.trim());
+}
+
+/** Error dari API: status HTTP + `code`/`path` dari body, body lengkap (mis. `currentVersion` untuk 409), `Retry-After` (429). */
 export class ApiRequestError extends Error {
   readonly code?: ApiErrorCode;
   readonly path?: string;
@@ -26,6 +32,7 @@ export class ApiRequestError extends Error {
     readonly status: number,
     readonly body: ApiError & Record<string, unknown>,
     operation: string,
+    readonly retryAfterSeconds: number | null = null,
   ) {
     super(`${operation}: HTTP ${status} ${body.error}`);
     this.name = "ApiRequestError";
@@ -56,7 +63,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
   if (!res.ok) {
     const errBody = json && typeof json === "object" && "error" in json ? (json as ApiError) : { error: text || res.statusText };
-    throw new ApiRequestError(res.status, errBody, operation);
+    throw new ApiRequestError(res.status, errBody, operation, parseRetryAfter(res.headers.get("retry-after")));
   }
   return json as T;
 }

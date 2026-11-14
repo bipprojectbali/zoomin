@@ -1,5 +1,7 @@
-import { Eye, Mic, Video } from "lucide-react";
+import { ArrowLeft, Eye, Mic, Video } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Link } from "react-router";
+import { AppBrand } from "@/app.brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,10 +29,15 @@ export type PreJoinProps = {
   onJoin: (choices: PreJoinChoices, name?: string) => void;
   /** Konten tambahan di bawah tombol gabung (mis. "Bukan Anda? Keluar"). */
   footer?: ReactNode;
+  /**
+   * Tujuan tombol "Ke lobby" (QA-09); default `/` untuk pengguna bersesi. `null` = tanpa tombol: tamu undangan
+   * tanpa sesi tidak punya lobby (/ → login admin), dan mematikan preview cukup lewat toggle kamera/mic.
+   */
+  backTo?: string | null;
 };
 
 /** Layar "Siap bergabung?": preview kamera, toggle & pilih perangkat, nama, lalu Gabung sekarang. */
-export function PreJoin({ title, subtitle, canPublish, askName = false, busy = false, error, onJoin, footer }: PreJoinProps) {
+export function PreJoin({ title, subtitle, canPublish, askName = false, busy = false, error, onJoin, footer, backTo = "/" }: PreJoinProps) {
   const [choices, setChoices] = useState<PreJoinChoices>(loadMediaPreferences);
   const [name, setName] = useState("");
   // Setelah klik gabung preview dilepas supaya kamera tidak menyala dua kali saat room mem-publish.
@@ -59,8 +66,19 @@ export function PreJoin({ title, subtitle, canPublish, askName = false, busy = f
   }
 
   return (
-    <main data-testid="prejoin" className="mx-auto flex min-h-svh w-full max-w-5xl items-center p-4 sm:p-6">
-      <div className="grid w-full gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] md:items-center">
+    <main data-testid="prejoin" className="mx-auto flex min-h-svh w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
+      <nav className="flex items-center justify-between gap-3">
+        <AppBrand />
+        {backTo !== null && (
+          <Button asChild variant="ghost" size="sm" data-testid="prejoin-back">
+            <Link to={backTo}>
+              <ArrowLeft aria-hidden="true" />
+              {PREJOIN_TEXT.back}
+            </Link>
+          </Button>
+        )}
+      </nav>
+      <div className="my-auto grid w-full gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] md:items-center">
         {canPublish ? (
           <section className="flex min-w-0 flex-col gap-3" aria-label={PREJOIN_TEXT.toggles}>
             <CameraPreview track={video.track} loading={video.loading}>

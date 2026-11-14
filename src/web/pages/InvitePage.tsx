@@ -18,9 +18,9 @@ const TEXT = {
   invalidHelp: "Link mungkin salah salin, sudah kedaluwarsa, atau room-nya sudah dihapus. Minta link undangan baru ke admin room.",
   loadFailedTitle: "Gagal memuat undangan",
   retry: "Coba lagi",
-  home: "Ke halaman utama",
+  home: "Ke lobby",
   notYou: "Bukan Anda?",
-  logout: "Keluar",
+  logout: "Keluar akun",
 };
 
 /** Kode error yang berarti undangan memang tidak bisa dipakai (bukan gangguan sementara). */
@@ -130,6 +130,7 @@ export function InvitePage() {
       subtitle={inviteSubtitle(preview)}
       canPublish={canPublishFor(preview.effectiveRole)}
       askName={!preview.currentUser}
+      backTo={preview.currentUser ? "/" : null}
       busy={busy}
       error={error}
       onJoin={(choices, name) => void onJoin(choices, name)}

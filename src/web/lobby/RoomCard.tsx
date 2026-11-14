@@ -1,4 +1,5 @@
-import { CalendarDays, LogIn } from "lucide-react";
+import { CalendarDays, LogIn, UserPlus } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,10 +14,17 @@ const TEXT = {
   created: (when: string) => `Dibuat ${when}`,
   notMember: "Admin global",
   invites: "Undang orang",
+  invite: "Undang",
+  inviteLabel: (title: string) => `Undang orang ke room ${title}`,
 };
 
-/** Satu room di lobby: judul, ID, peran, tanggal, tombol Masuk, dan undangan bila boleh. */
+/**
+ * Satu room di lobby: judul, ID, peran, tanggal, Masuk, dan Undang bila boleh. Panel undangan tertutup default
+ * supaya lobby banyak room tetap ringkas (QA-15); link yang dibuat tetap diingat InviteLinks (sessionStorage).
+ */
 export function RoomCard({ room, canInvite }: { room: RoomSummary; canInvite: boolean }) {
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const panelId = `invite-panel-${room.id}`;
   return (
     <li data-testid="room-item" data-room-id={room.id} className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-xs sm:p-5">
       <div className="flex items-start justify-between gap-3">
@@ -35,15 +43,32 @@ export function RoomCard({ room, canInvite }: { room: RoomSummary; canInvite: bo
             </span>
           </p>
         </div>
-        <Button asChild size="sm">
-          <Link to={`/rooms/${encodeURIComponent(room.id)}`} aria-label={TEXT.enterLabel(room.title)}>
-            <LogIn aria-hidden="true" />
-            {TEXT.enter}
-          </Link>
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          {canInvite && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              data-testid="invite-toggle"
+              aria-expanded={inviteOpen}
+              aria-controls={panelId}
+              aria-label={TEXT.inviteLabel(room.title)}
+              onClick={() => setInviteOpen((o) => !o)}
+            >
+              <UserPlus aria-hidden="true" />
+              <span className="hidden sm:inline">{TEXT.invite}</span>
+            </Button>
+          )}
+          <Button asChild size="sm">
+            <Link to={`/rooms/${encodeURIComponent(room.id)}`} aria-label={TEXT.enterLabel(room.title)}>
+              <LogIn aria-hidden="true" />
+              {TEXT.enter}
+            </Link>
+          </Button>
+        </div>
       </div>
       {canInvite && (
-        <section className="flex flex-col gap-2 border-t pt-4" aria-label={TEXT.invites}>
+        <section id={panelId} hidden={!inviteOpen} className="flex flex-col gap-2 border-t pt-4" aria-label={TEXT.invites}>
           <h4 className="text-sm font-medium">{TEXT.invites}</h4>
           <InviteLinks roomId={room.id} />
         </section>

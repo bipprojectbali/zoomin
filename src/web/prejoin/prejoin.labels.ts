@@ -23,6 +23,7 @@ export const PREJOIN_TEXT = {
   noDeviceHint: "Anda tetap bisa bergabung tanpa kamera atau mikrofon.",
   permissionHint: "Setelah izin diberikan, muat ulang halaman ini.",
   reload: "Muat ulang",
+  back: "Ke lobby",
 } as const;
 
 export type MediaKind = "camera" | "mic";

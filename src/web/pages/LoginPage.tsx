@@ -58,7 +58,8 @@ export function LoginPage() {
           <CardDescription>{TEXT.description}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          {state?.reason === "session" && (
+          {/* Dari root `/` bukan deep link: tidak perlu peringatan (QA-13). */}
+          {state?.reason === "session" && state.from !== "/" && (
             <p className="flex gap-2 rounded-md border bg-muted p-3 text-sm" role="status">
               <Info className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden="true" />
               {TEXT.sessionNeeded}

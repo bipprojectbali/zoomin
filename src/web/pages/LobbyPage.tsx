@@ -14,8 +14,8 @@ const TEXT = {
   greeting: (name: string) => `Halo, ${name}`,
   subtitleAdmin: "Buat room, bagikan link undangan, lalu masuk ke meeting.",
   subtitleGuest: "Pilih room untuk masuk ke meeting.",
-  loggedOut: "Anda sudah logout",
-  logoutFailed: (msg: string) => `Gagal logout. ${msg}`,
+  loggedOut: "Anda sudah keluar akun",
+  logoutFailed: (msg: string) => `Gagal keluar akun. ${msg}`,
 };
 
 /** Halaman lobby (terlindung sesi). */

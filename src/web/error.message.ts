@@ -23,7 +23,7 @@ const CODE_TEXT: Record<ApiErrorCode, string> = {
   invalid_input: "Isian belum valid. Periksa kembali lalu coba lagi.",
   invite_invalid: "Link undangan tidak valid atau sudah kedaluwarsa. Minta link baru ke admin room.",
   invalid_credentials: "Password salah. Periksa lalu coba lagi.",
-  rate_limited: "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.",
+  rate_limited: "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.", // tanpa Retry-After; lihat rateLimitedText
   layout_conflict: "Layout baru saja diubah admin lain. Tampilan sudah diperbarui, silakan ulangi perubahan Anda.",
 };
 
@@ -48,6 +48,17 @@ const FIELD_LABEL: Record<string, string> = {
 };
 
 const HTTP_SERVER_ERROR = 500;
+const HTTP_TOO_MANY_REQUESTS = 429;
+const SECONDS_PER_MINUTE = 60;
+
+/** "…Coba lagi dalam N menit." (dibulatkan ke atas; <60 dtk → detik) dari `Retry-After`. */
+export function rateLimitedText(retryAfterSeconds: number): string {
+  const wait =
+    retryAfterSeconds < SECONDS_PER_MINUTE
+      ? `${Math.max(1, Math.ceil(retryAfterSeconds))} detik`
+      : `${Math.ceil(retryAfterSeconds / SECONDS_PER_MINUTE)} menit`;
+  return `Terlalu banyak percobaan. Coba lagi dalam ${wait}.`;
+}
 
 const KIND_NOUN: Record<MediaKind, string> = { camera: "kamera", mic: "mikrofon", screen: "layar" };
 
@@ -80,6 +91,8 @@ export function errorMessage(err: unknown): string {
       const label = FIELD_LABEL[err.path.replace(/^\//, "")];
       if (label) return TEXT.invalidField(label);
     }
+    const limited = err.code === "rate_limited" || (!err.code && err.status === HTTP_TOO_MANY_REQUESTS);
+    if (limited && err.retryAfterSeconds !== null) return rateLimitedText(err.retryAfterSeconds);
     if (err.code && err.code in CODE_TEXT) return CODE_TEXT[err.code];
     if (err.status >= HTTP_SERVER_ERROR) return TEXT.server;
     return STATUS_TEXT[err.status] ?? TEXT.unknown;

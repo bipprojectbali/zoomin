@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 const TEXT = {
   code: "404",
   title: "Halaman tidak ditemukan",
-  body: "Alamat ini tidak ada atau sudah dipindahkan. Periksa kembali link-nya, atau kembali ke daftar room.",
-  back: "Ke daftar room",
+  body: "Alamat ini tidak ada atau sudah dipindahkan. Periksa kembali link-nya, atau kembali ke lobby.",
+  back: "Ke lobby",
 };
 
 /** Route `*`: halaman 404 dengan jalan pulang ke lobby. */

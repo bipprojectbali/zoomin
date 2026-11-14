@@ -16,10 +16,10 @@ import { Button } from "@/components/ui/button";
 import type { SessionUser } from "../../shared/api.types";
 
 const TEXT = {
-  logout: "Logout",
+  logout: "Keluar akun",
   adminRole: "Admin",
   guestRole: "Tamu",
-  confirmTitle: "Logout dari zoomin?",
+  confirmTitle: "Keluar akun dari zoomin?",
   confirmBody: "Sebagai tamu, Anda butuh link undangan dari admin room untuk masuk lagi.",
   cancel: "Batal",
 };
@@ -33,8 +33,9 @@ function initials(name: string): string {
     .join("");
 }
 
-/** Header lobby: brand, identitas user, Logout (tamu wajib konfirmasi karena tak bisa login ulang sendiri). */
+/** Header lobby: brand, identitas user, Keluar akun (tamu wajib konfirmasi karena tak bisa login ulang sendiri). */
 export function LobbyHeader({ user, onLogout }: { user: SessionUser; onLogout: () => void }) {
+  const roleLabel = user.isAdmin ? TEXT.adminRole : TEXT.guestRole;
   const logoutButton = (props: { onClick?: () => void }) => (
     <Button type="button" variant="ghost" size="sm" data-testid="logout" {...props}>
       <LogOut aria-hidden="true" />
@@ -51,7 +52,8 @@ export function LobbyHeader({ user, onLogout }: { user: SessionUser; onLogout: (
           </Avatar>
           <span className="hidden min-w-0 flex-col leading-tight sm:flex">
             <span className="truncate text-sm font-medium">{user.name}</span>
-            <span className="text-xs text-muted-foreground">{user.isAdmin ? TEXT.adminRole : TEXT.guestRole}</span>
+            {/* Admin bernama "Admin" tidak perlu baris peran kembar (QA-15). */}
+            {user.name !== roleLabel && <span className="text-xs text-muted-foreground">{roleLabel}</span>}
           </span>
           {user.isAdmin ? (
             logoutButton({ onClick: onLogout })

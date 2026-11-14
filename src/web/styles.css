@@ -18,10 +18,13 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* 0.54 (bukan 0.556): ≥4.5:1 di atas --muted untuk teks kecil (QA-06: 4,64:1). */
+  --muted-foreground: oklch(0.54 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  /* QA-06 (rumus WCAG): putih di atas merah 5,37:1; teks merah di atas --muted 4,92:1. */
+  --destructive: oklch(0.55 0.23 27.3);
+  --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   /* Ring fokus biru kontras ≥3:1 terhadap background (UX-17); --brand = warna identitas app. */
@@ -46,7 +49,13 @@
     --muted-foreground: oklch(0.708 0 0);
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.985 0 0);
+    /*
+     * Dark: merah terang + teks gelap. Satu merah tak bisa sekaligus ≥4,5:1 untuk teks putih di atasnya DAN untuk
+     * teks merah di atas background gelap, jadi foreground-nya yang dibalik (QA-06): 6,84:1, hover /90 5,68:1;
+     * teks merah di atas background 6,84:1, card 6,19:1, muted 5,23:1.
+     */
     --destructive: oklch(0.704 0.191 22.216);
+    --destructive-foreground: oklch(0.145 0 0);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.74 0.15 255);
@@ -75,6 +84,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

@@ -25,7 +25,7 @@ export function MediaToggle(props: { kind: MediaKind; enabled: boolean; failed: 
         "relative size-12 rounded-full border shadow-md [&_svg:not([class*='size-'])]:size-5",
         s.tone === "on"
           ? "border-white/30 bg-white/15 text-white backdrop-blur hover:bg-white/25"
-          : "border-transparent bg-destructive text-white hover:bg-destructive/90",
+          : "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/90",
       )}
     >
       {s.tone === "on" ? <On /> : <Off />}
