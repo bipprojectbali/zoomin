@@ -11,6 +11,7 @@ Artefak untuk satu server Linux: Caddy (TLS + reverse proxy + SNI ke TURN) → a
 | `livekit.service`, `zoomin.service` | `/etc/systemd/system/` |
 | `backup-sqlite.sh` | `/usr/local/bin/zoomin-backup-sqlite` |
 | `../.env.example` | dasar `/etc/zoomin/zoomin.env` (secret app) |
+| `livekit-compose.yml`, `livekit-stack.env.example` | stack Portainer LiveKit (alternatif, lihat bagian Portainer) |
 
 Versi yang diverifikasi (2026-11-14): livekit-server **1.13.11** (rilis terbaru, 25 Okt; `livekit.yaml.example`
 di-parse oleh binary 1.13.11, log `turn.externalTLS: true, turn.proxyProtocol: true`), Caddy **2.11.9** (5 Nov)
@@ -204,6 +205,36 @@ ExecStart=/opt/zoomin/current/zoomin serve
 `BUN_RUNTIME_TRANSPILER_CACHE_PATH` tidak lagi diperlukan dan `dist/web` tidak perlu ada di server. Migrasi tetap
 jalan otomatis saat start; `zoomin migrate --db /var/lib/zoomin/zoomin.sqlite` bisa dipakai untuk menjalankannya
 terpisah (sesudah backup).
+
+## LiveKit via Portainer (tanpa subdomain)
+
+Alternatif `livekit.service` + Caddy untuk VPS yang sudah memakai Portainer: `livekit-compose.yml` (image
+`livekit/livekit-server:v1.13.11`, `network_mode: host`, config lewat env `LIVEKIT_CONFIG`). Tanpa subdomain dan
+tanpa Traefik: browser memakai signaling `wss://<APP_DOMAIN>/livekit` yang diproxy app zoomin, server zoomin
+memanggil API langsung ke `ws://<IP-VPS>:7880`.
+
+1. Portainer > Stacks > Add stack > Web editor: tempel `livekit-compose.yml`. Environment variables: isi dari
+   `livekit-stack.env.example` (`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`; `LIVEKIT_BIND` opsional). Deploy.
+   Variabel kunci kosong → stack ditolak (`required variable ... is missing a value`).
+2. Firewall/security group VPS (host network = port langsung terbuka di host):
+   - TCP 7880 (API/signaling): hanya dari IP/tailnet server zoomin bila bisa. Alternatif:
+     `LIVEKIT_BIND=<IP Tailscale VPS>` agar 7880 hanya listen di tailnet. `bind_addresses` di livekit 1.13.11 hanya
+     dipakai listener HTTP (+prometheus/webtransport) di `pkg/service/server.go`; RTC dan TURN punya bind sendiri
+     (default `0.0.0.0`), jadi media tidak ikut terikat ke IP privat. Syarat: tailscaled sudah up saat container
+     start (kalau belum, start gagal dan `restart: unless-stopped` mengulang).
+   - TCP 7881 (ICE/TCP), UDP 50000–60000 (media), UDP 3478 (TURN/UDP): terbuka untuk semua klien.
+   - Range relay TURN (default UDP 30000–40000) tidak perlu dibuka: relay embedded hanya mengirim ke SFU di host
+     yang sama.
+3. Uji: `curl http://<IP-VPS>:7880` → `OK`, lalu
+   `RND/spike/.bin/lk room list --url http://<IP-VPS>:7880 --api-key "$LIVEKIT_API_KEY" --api-secret "$LIVEKIT_API_SECRET"`
+   (ambil dari env, jangan tulis secret di command line yang tersimpan di history). Log: `docker logs livekit`
+   harus memuat `found external IP via STUN` dengan IP publik VPS.
+4. `.env` zoomin: `LIVEKIT_URL=ws://<IP-VPS>:7880`, `PUBLIC_LIVEKIT_URL=wss://<APP_DOMAIN>/livekit`
+   (mis. `wss://malik.wibudev.com/livekit`), `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` sama dengan env stack.
+   Proxy `/livekit` di app sedang dikerjakan terpisah; sebelum itu selesai, URL publik ini belum berfungsi.
+
+Batasan: tanpa TURN/TLS di 443, klien di jaringan yang hanya membuka 443 (korporat/hotel ketat) bisa tersambung
+signaling tapi gagal media. Butuh itu → pakai setup Caddy + caddy-l4 di atas dengan domain TURN.
 
 ## Backup SQLite
 
