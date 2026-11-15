@@ -2,8 +2,10 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { SKIP_LIVEKIT_TESTS } from "./livekit.gate";
 import { Room, RoomEvent } from "@livekit/rtc-node";
-import type { RoomRole } from "../src/shared/api.types";
-import { type LayoutState, parseLayout } from "../src/shared/layout.model";
+import type { LayoutState } from "../src/shared/layout.model";
+import { type RoomRole, STAGE_EVENT_TOPIC, type StageEvent } from "../src/shared/api.types";
+import { parseRoomStage } from "../src/shared/stage.model";
+import { notifyStage } from "../src/server/stage.notify";
 import { createApi } from "../src/server/api";
 import { syncRoomLayout } from "../src/server/layout.service";
 import { createJoinToken } from "../src/server/token.service";
@@ -94,7 +96,7 @@ test.skipIf(SKIP_LIVEKIT_TESTS)("PUT host sampai ke semua klien dengan isi sama"
   expect(await res.json()).toEqual({ version: 1 });
   const [a, b] = await Promise.all(waits);
   expect(a).toBe(b!);
-  expect(parseLayout(a!)).toMatchObject({ version: 1, template: "grid", updatedBy: host.user.id });
+  expect(parseRoomStage(a!).layout).toMatchObject({ version: 1, template: "grid", updatedBy: host.user.id });
 });
 
 test.skipIf(SKIP_LIVEKIT_TESTS)("late joiner langsung dapat layout terkini dari room.metadata", async () => {
@@ -103,7 +105,7 @@ test.skipIf(SKIP_LIVEKIT_TESTS)("late joiner langsung dapat layout terkini dari 
   const latest = await wait;
   const carol = await join("carol", "viewer");
   expect(carol.metadata).toBe(latest);
-  expect(parseLayout(carol.metadata!).version).toBe(2);
+  expect(parseRoomStage(carol.metadata!).layout?.version).toBe(2);
 });
 
 test.skipIf(SKIP_LIVEKIT_TESTS)("room LiveKit dibuat ulang: syncRoomLayout memulihkan metadata dari SQLite", async () => {
@@ -116,7 +118,7 @@ test.skipIf(SKIP_LIVEKIT_TESTS)("room LiveKit dibuat ulang: syncRoomLayout memul
   await syncRoomLayout({ db, roomService }, other);
   const listed = (await roomService.listRooms([other]))[0];
   await roomService.deleteRoom(other);
-  expect(parseLayout(listed!.metadata).version).toBe(3);
+  expect(parseRoomStage(listed!.metadata)).toMatchObject({ stageMode: "host", layout: { version: 3 } });
 });
 
 test.skipIf(SKIP_LIVEKIT_TESTS)("token participant dan host (tanpa roomAdmin) -> Twirp UpdateRoomMetadata 401", async () => {
@@ -126,4 +128,22 @@ test.skipIf(SKIP_LIVEKIT_TESTS)("token participant dan host (tanpa roomAdmin) ->
     expect(res.status).toBe(401);
   }
   expect((await roomService.listRooms([roomId]))[0]!.metadata).toBe(before);
+});
+
+test.skipIf(SKIP_LIVEKIT_TESTS)("notifyStage: StageEvent sampai ke klien di topic zoomin.stage (sendData reliable)", async () => {
+  const event: StageEvent = {
+    type: "request.created",
+    request: { id: "q1", roomId, userId: "alice", userName: "Alice", trackName: "screen-1", action: "show", status: "pending", createdAt: 1, expiresAt: 2 },
+  };
+  const got = new Promise<{ payload: string; topic?: string }>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("bob: DataReceived tidak datang")), EVENT_TIMEOUT_MS);
+    bob.once(RoomEvent.DataReceived, (payload, _participant, _kind, topic) => {
+      clearTimeout(timer);
+      resolve({ payload: new TextDecoder().decode(payload), topic });
+    });
+  });
+  await notifyStage({ roomService }, event);
+  const { payload, topic } = await got;
+  expect(topic).toBe(STAGE_EVENT_TOPIC);
+  expect(JSON.parse(payload)).toEqual(event);
 });

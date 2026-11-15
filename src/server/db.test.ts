@@ -173,7 +173,20 @@ describe("0005_room_password", () => {
     runMigrations(db, MIGRATIONS.slice(0, 4));
     addUser(db, "u1");
     db.run("INSERT INTO rooms (id, title, created_by, created_at) VALUES ('r1', 'R1', 'u1', 1)");
-    expect(runMigrations(db)).toEqual(["0005_room_password.sql"]);
+    expect(runMigrations(db, MIGRATIONS.slice(0, 5))).toEqual(["0005_room_password.sql"]);
     expect(db.query("SELECT visibility, password_hash FROM rooms").get()).toEqual({ visibility: "public", password_hash: null });
+  });
+});
+
+describe("0006_stage_mode", () => {
+  test("room lama jadi stage_mode 'host'; nilai di luar host/request/open ditolak", () => {
+    const db = connectDb(":memory:");
+    runMigrations(db, MIGRATIONS.slice(0, 5));
+    addUser(db, "u1");
+    db.run("INSERT INTO rooms (id, title, created_by, created_at) VALUES ('r1', 'R1', 'u1', 1)");
+    expect(runMigrations(db, MIGRATIONS.slice(0, 6))).toEqual(["0006_stage_mode.sql"]);
+    expect(db.query("SELECT stage_mode FROM rooms").get()).toEqual({ stage_mode: "host" });
+    db.run("UPDATE rooms SET stage_mode = 'open'");
+    expect(() => db.run("UPDATE rooms SET stage_mode = 'chaos'")).toThrow();
   });
 });

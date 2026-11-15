@@ -36,6 +36,9 @@ const CODE_TEXT: Record<ApiErrorCode, string> = {
   member_not_found: "Member or invitation not found. It may have been removed.",
   password_required: "This room is password-protected. Enter the password from the room host to join.",
   password_invalid: "Wrong room password. Check it or ask the room host for the password.",
+  stage_locked: "Only the room host can change the stage right now.",
+  stage_mode_mismatch: "Stage requests are not enabled in this room.",
+  stage_request_not_found: "This stage request was already handled or has expired.",
 };
 
 /**

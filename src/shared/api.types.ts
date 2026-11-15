@@ -23,10 +23,14 @@
 // POST /api/rooms/:roomId/join JoinRoomBody   -> JoinRoomResponse (room password, RND/plan/08) | 403 password_invalid | 429
 // POST /api/rooms/:roomId/token                 -> TokenResponse                        | 403 room_inactive | room_expired | password_required
 // GET  /api/rooms/:roomId/layout                -> LayoutResponse
-// PUT  /api/rooms/:roomId/layout PutLayoutBody  -> PutLayoutResponse | 409 LayoutConflictError
+// PUT  /api/rooms/:roomId/layout PutLayoutBody  -> PutLayoutResponse | 403 stage_locked | 409 LayoutConflictError
+// /api/rooms/:roomId/stage-mode, /stage-requests* -> lihat src/shared/stage.types.ts
 // Admin (admin+) & dev (super_admin): lihat tabel endpoint di RND/plan/05-auth-roles.md dan fungsi di src/web/api.client.ts.
 
 import type { LayoutState } from "./layout.model";
+import type { StageMode } from "./stage.types";
+
+export * from "./stage.types";
 
 /** Pola aman untuk id room/user (= nama room & identity LiveKit). */
 export const SAFE_ID_PATTERN = "^[A-Za-z0-9_-]{1,64}$";
@@ -76,6 +80,8 @@ export type AuditAction =
   | "room.member.role"
   | "room.member.remove"
   | "room.password"
+  | "room.stage_mode"
+  | "room.stage_request"
   | "setting.update";
 
 /** Satu baris audit log. */
@@ -144,7 +150,10 @@ export type ApiErrorCode =
   | "last_host"
   | "member_not_found"
   | "password_required"
-  | "password_invalid";
+  | "password_invalid"
+  | "stage_locked"
+  | "stage_mode_mismatch"
+  | "stage_request_not_found";
 
 /** Bentuk body error semua endpoint; `path` = field yang gagal validasi. */
 export type ApiError = { error: string; code?: ApiErrorCode; path?: string };
@@ -178,13 +187,14 @@ export type RoomSummary = {
   expiresAt: number | null;
   /** true bila pemanggil pengelola room (host room atau admin+, R3). */
   canManage: boolean;
+  stageMode: StageMode;
 };
 
 /**
  * Body PATCH /api/rooms/:roomId (pengelola). expiresAt null = tanpa batas. `password` wajib saat pindah ke
  * "password"; saat sudah "password" = ganti, tanpa `password` = tidak berubah (W7).
  */
-export type UpdateRoomBody = { title?: string; visibility?: RoomVisibility; password?: string; enabled?: boolean; expiresAt?: number | null };
+export type UpdateRoomBody = { title?: string; visibility?: RoomVisibility; password?: string; enabled?: boolean; expiresAt?: number | null; stageMode?: StageMode };
 
 /** Body POST /api/rooms/:roomId/join (W5). */
 export type JoinRoomBody = { password: string };
@@ -248,6 +258,7 @@ export type CreateRoomBody = {
   password?: string;
   expiresAt?: number | null;
   members?: AddRoomMemberBody[];
+  stageMode?: StageMode;
 };
 
 /** Batas jumlah anggota di POST /api/rooms. */
@@ -266,7 +277,7 @@ export const USER_SEARCH_MAX_RESULTS = 50;
 export type TokenResponse = { token: string; url: string; role: RoomRole };
 
 /** Respons GET /api/rooms/:roomId/layout; layout null = belum pernah diset. */
-export type LayoutResponse = { version: number; layout: LayoutState | null };
+export type LayoutResponse = { version: number; layout: LayoutState | null; stageMode: StageMode };
 
 /** Body PUT /api/rooms/:roomId/layout (compare-and-set pada baseVersion). */
 export type PutLayoutBody = { baseVersion: number; layout: LayoutState };

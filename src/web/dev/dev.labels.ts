@@ -104,6 +104,8 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "room.member.role": "Change room member role",
   "room.member.remove": "Remove room member",
   "room.password": "Change room password",
+  "room.stage_mode": "Change stage control",
+  "room.stage_request": "Decide stage request",
   "setting.update": "Change settings",
 };
 

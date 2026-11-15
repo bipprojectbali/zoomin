@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { ServerError } from "livekit-server-sdk";
-import { type LayoutState, parseLayout } from "../shared/layout.model";
+import type { LayoutState } from "../shared/layout.model";
+import { parseRoomStage } from "../shared/stage.model";
+import { listAudit } from "./audit.repository";
 import { openDb } from "./db";
-import { getLayout, LayoutConflictError, type LayoutDeps, putLayout, syncRoomLayout } from "./layout.service";
+import { getLayout, LayoutConflictError, type LayoutDeps, putLayout, setStageMode, syncRoomLayout } from "./layout.service";
 
 type Call = { method: string; args: unknown[] };
 
@@ -49,7 +51,7 @@ const layout: LayoutState = {
 describe("layout.service", () => {
   test("getLayout room baru: version 0, layout null", () => {
     const { db } = setup();
-    expect(getLayout(db, "r1")).toEqual({ version: 0, layout: null });
+    expect(getLayout(db, "r1")).toEqual({ version: 0, layout: null, stageMode: "host" });
   });
 
   test("CAS: dua tulis baseVersion sama -> satu sukses, satu conflict", async () => {
@@ -80,8 +82,7 @@ describe("layout.service", () => {
     const [room, md] = svc.calls[0]!.args as [string, string];
     expect(svc.calls[0]!.method).toBe("updateRoomMetadata");
     expect(room).toBe("r1");
-    expect(parseLayout(md)).toEqual(saved.layout!);
-    expect(parseLayout(md).version).toBe(1);
+    expect(parseRoomStage(md)).toEqual({ stageMode: "host", layout: saved.layout });
   });
 
   test("room LiveKit belum ada -> tulis tetap sukses", async () => {
@@ -100,10 +101,10 @@ describe("layout.service", () => {
     await expect(putLayout(deps, { roomId: "nope", baseVersion: 0, layout, by: "u1" })).rejects.toThrow(/nope/);
   });
 
-  test("syncRoomLayout tanpa layout: createRoom tanpa metadata, tanpa update", async () => {
+  test("syncRoomLayout tanpa layout: createRoom dengan envelope tanpa layout, tanpa update", async () => {
     const { deps, svc } = setup(fakeRoomService({ roomExists: false }));
     await syncRoomLayout(deps, "r1");
-    expect(svc.calls).toEqual([{ method: "createRoom", args: [{ name: "r1", metadata: undefined }] }]);
+    expect(svc.calls).toEqual([{ method: "createRoom", args: [{ name: "r1", metadata: '{"stageMode":"host","layout":null}' }] }]);
   });
 
   test("syncRoomLayout room belum ada: createRoom membawa metadata, tanpa update", async () => {
@@ -113,7 +114,7 @@ describe("layout.service", () => {
     await syncRoomLayout(deps, "r1");
     expect(svc.calls.map((c) => c.method)).toEqual(["createRoom"]);
     const md = (svc.calls[0]!.args[0] as { metadata: string }).metadata;
-    expect(parseLayout(md).version).toBe(1);
+    expect(parseRoomStage(md).layout?.version).toBe(1);
   });
 
   test("syncRoomLayout room sudah ada dengan metadata lama: updateRoomMetadata dipanggil", async () => {
@@ -126,5 +127,27 @@ describe("layout.service", () => {
     stale.db.run("UPDATE rooms SET layout_json = ?, layout_version = 1 WHERE id = 'r1'", [JSON.stringify({ ...layout, version: 1 })]);
     await syncRoomLayout(stale.deps, "r1");
     expect(stale.svc.calls.map((c) => c.method)).toEqual(["createRoom", "updateRoomMetadata"]);
+  });
+
+  test("setStageMode: simpan, audit {from,to}, siarkan envelope; layout tidak berubah; mode sama = no-op", async () => {
+    const { db, deps, svc } = setup();
+    await putLayout(deps, { roomId: "r1", baseVersion: 0, layout, by: "u1" });
+    svc.calls.length = 0;
+    await setStageMode(deps, { id: "u1", email: "u1@example.test" }, "r1", "open");
+    expect(getLayout(db, "r1")).toMatchObject({ version: 1, stageMode: "open", layout: { template: "grid" } });
+    const md = svc.calls[0]!.args[1] as string;
+    expect(parseRoomStage(md)).toMatchObject({ stageMode: "open", layout: { version: 1 } });
+    expect(listAudit(db).items.map((e) => [e.action, e.detail])).toEqual([["room.stage_mode", { from: "host", to: "open" }]]);
+
+    await setStageMode(deps, { id: "u1", email: "u1@example.test" }, "r1", "open");
+    expect(svc.calls).toHaveLength(1);
+    expect(listAudit(db).items).toHaveLength(1);
+  });
+
+  test("setStageMode room LiveKit belum ada -> tetap sukses; room SQLite tidak ada -> error", async () => {
+    const { db, deps } = setup(fakeRoomService({ roomExists: false }));
+    await setStageMode(deps, { id: "u1", email: "u1@example.test" }, "r1", "request");
+    expect(getLayout(db, "r1").stageMode).toBe("request");
+    await expect(setStageMode(deps, { id: "u1", email: "u1@example.test" }, "nope", "open")).rejects.toThrow(/nope/);
   });
 });

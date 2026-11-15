@@ -8,6 +8,7 @@ import m0002 from "../../migrations/0002_auth.sql" with { type: "text" };
 import m0003 from "../../migrations/0003_admin.sql" with { type: "text" };
 import m0004 from "../../migrations/0004_room_access.sql" with { type: "text" };
 import m0005 from "../../migrations/0005_room_password.sql" with { type: "text" };
+import m0006 from "../../migrations/0006_stage_mode.sql" with { type: "text" };
 
 export type Migration = { name: string; sql: string };
 
@@ -18,6 +19,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { name: "0003_admin.sql", sql: m0003 },
   { name: "0004_room_access.sql", sql: m0004 },
   { name: "0005_room_password.sql", sql: m0005 },
+  { name: "0006_stage_mode.sql", sql: m0006 },
 ];
 
 /** Membuka koneksi SQLite (FK aktif, WAL untuk file) tanpa menjalankan migrasi. */

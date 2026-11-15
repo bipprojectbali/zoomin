@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { RoomRole, RoomStatus, RoomSummary, RoomVisibility, SessionUser } from "../shared/api.types";
+import type { RoomRole, RoomStatus, RoomSummary, RoomVisibility, SessionUser, StageMode } from "../shared/api.types";
 import { hasRole } from "./auth.guard";
 
 /**
@@ -7,7 +7,7 @@ import { hasRole } from "./auth.guard";
  * Hash password sengaja tidak dipilih: hanya flag `has_password` (W7, hash tidak pernah keluar dari room.join/updateRoom).
  */
 export const ROOM_COLUMNS =
-  "r.id, r.title, m.role, r.created_at, r.visibility, (r.password_hash IS NOT NULL) AS has_password, r.disabled_at, r.expires_at";
+  "r.id, r.title, m.role, r.created_at, r.visibility, (r.password_hash IS NOT NULL) AS has_password, r.disabled_at, r.expires_at, r.stage_mode";
 
 /** Nilai kolom rooms.visibility di DB; "password" API = 'public' + password_hash (W1). */
 export type DbVisibility = Exclude<RoomVisibility, "password">;
@@ -23,6 +23,7 @@ export type RoomRow = {
   has_password: number | boolean;
   disabled_at: number | null;
   expires_at: number | null;
+  stage_mode: StageMode;
 };
 
 /** Satu-satunya turunan tipe room API dari DB (W1): public + password_hash = "password". */
@@ -51,6 +52,7 @@ export function toRoomSummary(row: RoomRow, user: Pick<SessionUser, "role">, now
     status: roomStatus(row, now),
     expiresAt: row.expires_at,
     canManage: row.role === "host" || hasRole(user, "admin"),
+    stageMode: row.stage_mode,
   };
 }
 
@@ -75,3 +77,7 @@ export function canManageRoom(db: Database, user: Pick<SessionUser, "id" | "role
     .get(roomId, user.id);
   return row?.role === "host";
 }
+
+/** S3: boleh mengubah panggung bersama (PUT layout): pengelola selalu; mode open → juga participant; viewer tidak pernah. */
+export const canEditStage = (room: Pick<RoomSummary, "canManage" | "role" | "stageMode">): boolean =>
+  room.canManage || (room.stageMode === "open" && room.role === "participant");

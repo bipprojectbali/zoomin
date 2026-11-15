@@ -4,7 +4,9 @@ import type { ApiDeps } from "./api.deps";
 import { apiError } from "./api.error";
 import { authGuard } from "./auth.guard";
 import { getRoomAccess } from "./room.access";
+import { setStageMode } from "./layout.service";
 import { deleteRoom, isValidExpiry, updateRoom } from "./room.service";
+import { stageModeSchema } from "./stage.mode.route";
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_FORBIDDEN = 403;
@@ -43,7 +45,7 @@ export function roomsManageRoutes(deps: ApiDeps) {
         if (body.expiresAt !== undefined && !isValidExpiry(body.expiresAt)) {
           return status(HTTP_BAD_REQUEST, apiError("invalid_input", "expiresAt out of range", "/expiresAt"));
         }
-        const { password, ...rest } = body;
+        const { password, stageMode, ...rest } = body;
         if (password !== undefined && (body.visibility ?? access.room.visibility) !== "password") {
           return status(HTTP_BAD_REQUEST, apiError("invalid_input", "password only applies to a password room", "/password"));
         }
@@ -51,6 +53,8 @@ export function roomsManageRoutes(deps: ApiDeps) {
         const passwordHash = password === undefined ? undefined : await Bun.password.hash(password);
         const result = await updateRoom(deps, user, roomId, { ...rest, title }, passwordHash);
         if (result === "password_missing") return status(HTTP_BAD_REQUEST, passwordMissing());
+        // S1: mode stage lewat setStageMode (audit + siaran envelope), sesudah field lain.
+        if (result === "ok" && stageMode !== undefined) await setStageMode(deps, user, roomId, stageMode);
         const room = getRoomAccess(deps.db, user, roomId);
         if (!room) return status(HTTP_NOT_FOUND, apiError("room_not_found", "room not found")); // dihapus bersamaan
         return room;
@@ -64,6 +68,7 @@ export function roomsManageRoutes(deps: ApiDeps) {
           password: t.Optional(passwordSchema),
           enabled: t.Optional(t.Boolean()),
           expiresAt: t.Optional(t.Nullable(t.Integer())),
+          stageMode: t.Optional(stageModeSchema),
         }),
       },
     )

@@ -12,6 +12,8 @@ import { roomJoinRoutes } from "./room.join.route";
 import { roomMembersRoutes } from "./room.members.route";
 import { createRoomPasswordLimiter } from "./room.password";
 import { roomsRoutes } from "./rooms.route";
+import { stageModeRoutes } from "./stage.mode.route";
+import { stageRequestsRoutes } from "./stage.requests.route";
 import { tokenRoutes } from "./token.route";
 import { usersSearchRoutes } from "./users.search.route";
 
@@ -61,6 +63,8 @@ export function createApi(deps: ApiDeps) {
     .use(usersSearchRoutes(deps))
     .use(tokenRoutes(deps))
     .use(layoutRoutes(deps))
+    .use(stageModeRoutes(deps))
+    .use(stageRequestsRoutes(deps))
     .use(adminRoutes(deps))
     .use(devRoutes(deps));
   return deps.config.testAuth ? app.use(testLoginRoutes(deps)) : app;

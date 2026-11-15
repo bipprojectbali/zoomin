@@ -7,6 +7,7 @@ import { getRoomAccess } from "./room.access";
 import { checkInviteEmail, memberBodySchema } from "./room.members.route";
 import { isValidExpiry } from "./room.service";
 import { passwordMissing, passwordSchema, roomsManageRoutes, TITLE_MAX_LENGTH, visibilitySchema } from "./rooms.manage.route";
+import { stageModeSchema } from "./stage.mode.route";
 import { createRoom, InvalidCursorError, listRoomsForUser, RoomExistsError, ROOMS_PAGE_MAX } from "./rooms.repository";
 
 const HTTP_BAD_REQUEST = 400;
@@ -84,6 +85,7 @@ export function roomsRoutes(deps: ApiDeps) {
           password: t.Optional(passwordSchema),
           expiresAt: t.Optional(t.Nullable(t.Integer())),
           members: t.Optional(t.Array(memberBodySchema, { maxItems: CREATE_ROOM_MAX_MEMBERS })),
+          stageMode: t.Optional(stageModeSchema),
         }),
       },
     );

@@ -4,9 +4,9 @@ import { createTestDeps, createTestUser } from "../../test/auth.helpers";
 import type { LayoutState } from "../shared/layout.model";
 import { createApi } from "./api";
 
-type Alias = "admin" | "ra" | "p" | "out";
+type Alias = "admin" | "ra" | "p" | "v" | "out";
 
-/** admin = admin global (bukan member); ra = host room; p = participant; out = bukan member. */
+/** admin = admin global (bukan member); ra = host room; p = participant; v = viewer; out = bukan member. */
 async function setup() {
   const deps = createTestDeps();
   const { db } = deps;
@@ -14,10 +14,15 @@ async function setup() {
     admin: await createTestUser(deps, { email: "admin@example.test", role: "admin" }),
     ra: await createTestUser(deps, { email: "ra@example.test" }),
     p: await createTestUser(deps, { email: "p@example.test" }),
+    v: await createTestUser(deps, { email: "v@example.test" }),
     out: await createTestUser(deps, { email: "out@example.test" }),
   };
   db.run("INSERT INTO rooms (id, title, created_by, created_at) VALUES ('r1', 'R1', ?, 1)", [users.admin.user.id]);
-  db.run("INSERT INTO room_members (room_id, user_id, role) VALUES ('r1', ?, 'host'), ('r1', ?, 'participant')", [users.ra.user.id, users.p.user.id]);
+  db.run("INSERT INTO room_members (room_id, user_id, role) VALUES ('r1', ?, 'host'), ('r1', ?, 'participant'), ('r1', ?, 'viewer')", [
+    users.ra.user.id,
+    users.p.user.id,
+    users.v.user.id,
+  ]);
   // test-only: roomService palsu; publish metadata cukup dicatat.
   const published: string[] = [];
   const roomService = {
@@ -35,7 +40,7 @@ async function setup() {
       }),
     );
   };
-  return { call, published, users };
+  return { call, published, users, db };
 }
 
 const layout: LayoutState = {
@@ -64,13 +69,30 @@ describe("layout.route", () => {
     expect((await call("GET", "out")).status).toBe(403);
     const res = await call("PUT", "p", "r1", { baseVersion: 0, layout });
     expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "stage_locked" });
+  });
+
+  test("S3 matriks izin PUT: mode × peran", async () => {
+    const { call, db } = await setup();
+    const allowed: Record<string, Alias[]> = { host: ["ra", "admin"], request: ["ra", "admin"], open: ["ra", "admin", "p"] };
+    let version = 0;
+    for (const mode of ["host", "request", "open"] as const) {
+      db.run("UPDATE rooms SET stage_mode = ? WHERE id = 'r1'", [mode]);
+      for (const who of ["ra", "admin", "p", "v"] as const) {
+        const res = await call("PUT", who, "r1", { baseVersion: version, layout });
+        const ok = allowed[mode]!.includes(who);
+        expect({ mode, who, status: res.status }).toEqual({ mode, who, status: ok ? 200 : 403 });
+        if (ok) version++;
+        else expect(await res.json()).toMatchObject({ code: "stage_locked" });
+      }
+    }
   });
 
   test("participant boleh GET layout", async () => {
     const { call } = await setup();
     const res = await call("GET", "p");
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ version: 0, layout: null });
+    expect(await res.json()).toEqual({ version: 0, layout: null, stageMode: "host" });
   });
 
   test("400 layout invalid dengan path field", async () => {

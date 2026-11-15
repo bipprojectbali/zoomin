@@ -1,5 +1,5 @@
 import { type Database, SQLiteError } from "bun:sqlite";
-import type { AddRoomMemberBody, Page, RoomRole, RoomSummary, RoomVisibility, SessionUser } from "../shared/api.types";
+import type { AddRoomMemberBody, Page, RoomRole, RoomSummary, RoomVisibility, SessionUser, StageMode } from "../shared/api.types";
 import { recordAudit } from "./audit.repository";
 import { addRoomMember } from "./room.members.repository";
 import { dbVisibility, ROOM_COLUMNS, type RoomRow, toRoomSummary } from "./room.access";
@@ -88,18 +88,20 @@ export function createRoom(
     passwordHash?: string;
     expiresAt?: number | null;
     members?: AddRoomMemberBody[];
+    stageMode?: StageMode;
   },
 ): RoomSummary {
   const createdAt = Date.now();
   const visibility = input.visibility ?? "public";
   const expiresAt = input.expiresAt ?? null;
+  const stageMode = input.stageMode ?? "host";
   const passwordHash = visibility === "password" ? input.passwordHash : undefined;
   if (visibility === "password" && !passwordHash) throw new Error(`createRoom: room ${input.id} is a password room without a hash`);
   try {
     db.transaction(() => {
       db.query(
-        "INSERT INTO rooms (id, title, created_by, created_at, visibility, password_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      ).run(input.id, input.title, input.createdBy, createdAt, dbVisibility(visibility), passwordHash ?? null, expiresAt);
+        "INSERT INTO rooms (id, title, created_by, created_at, visibility, password_hash, expires_at, stage_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      ).run(input.id, input.title, input.createdBy, createdAt, dbVisibility(visibility), passwordHash ?? null, expiresAt, stageMode);
       db.query("INSERT INTO room_members (room_id, user_id, role) VALUES (?, ?, 'host')").run(input.id, input.createdBy);
       if (input.actorEmail !== undefined) {
         recordAudit(db, {
@@ -108,7 +110,7 @@ export function createRoom(
           action: "room.create",
           targetType: "room",
           targetId: input.id,
-          detail: { title: input.title, visibility, expiresAt, members: input.members?.length ?? 0 },
+          detail: { title: input.title, visibility, expiresAt, stageMode, members: input.members?.length ?? 0 },
         });
       }
       const by = { id: input.createdBy, email: input.actorEmail ?? "" };
@@ -129,6 +131,7 @@ export function createRoom(
     has_password: passwordHash !== undefined,
     disabled_at: null,
     expires_at: expiresAt,
+    stage_mode: stageMode,
   };
   return toRoomSummary(row, { role: "user" }, createdAt);
 }
