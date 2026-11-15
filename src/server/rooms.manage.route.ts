@@ -4,9 +4,10 @@ import type { ApiDeps } from "./api.deps";
 import { apiError } from "./api.error";
 import { authGuard } from "./auth.guard";
 import { getRoomAccess } from "./room.access";
-import { setStageMode } from "./layout.service";
+import { publishRoomStage } from "./layout.service";
 import { deleteRoom, isValidExpiry, updateRoom } from "./room.service";
 import { stageModeSchema } from "./stage.mode.route";
+import type { StageRequestStore } from "./stage.requests.store";
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_FORBIDDEN = 403;
@@ -24,7 +25,7 @@ export const passwordMissing = () => apiError("invalid_input", "password is requ
 const params = t.Object({ roomId: t.String({ pattern: SAFE_ID_PATTERN }) });
 
 /** PATCH/DELETE /rooms/:roomId: hanya pengelola room (R3, host room atau admin+); audit di room.service.ts. */
-export function roomsManageRoutes(deps: ApiDeps) {
+export function roomsManageRoutes(deps: ApiDeps, stageRequests: StageRequestStore) {
   // 404 bila room tidak ada, 403 bila bukan pengelola; selain itu room (pemanggil = pengelola).
   const deny = (user: Parameters<typeof getRoomAccess>[1], roomId: string) => {
     const room = getRoomAccess(deps.db, user, roomId);
@@ -45,7 +46,7 @@ export function roomsManageRoutes(deps: ApiDeps) {
         if (body.expiresAt !== undefined && !isValidExpiry(body.expiresAt)) {
           return status(HTTP_BAD_REQUEST, apiError("invalid_input", "expiresAt out of range", "/expiresAt"));
         }
-        const { password, stageMode, ...rest } = body;
+        const { password, ...rest } = body;
         if (password !== undefined && (body.visibility ?? access.room.visibility) !== "password") {
           return status(HTTP_BAD_REQUEST, apiError("invalid_input", "password only applies to a password room", "/password"));
         }
@@ -53,8 +54,11 @@ export function roomsManageRoutes(deps: ApiDeps) {
         const passwordHash = password === undefined ? undefined : await Bun.password.hash(password);
         const result = await updateRoom(deps, user, roomId, { ...rest, title }, passwordHash);
         if (result === "password_missing") return status(HTTP_BAD_REQUEST, passwordMissing());
-        // S1: mode stage lewat setStageMode (audit + siaran envelope), sesudah field lain.
-        if (result === "ok" && stageMode !== undefined) await setStageMode(deps, user, roomId, stageMode);
+        // S1: stageMode sudah ditulis atomik di updateRoom; siaran envelope + batal request pending setelah commit.
+        if (result === "ok" && body.stageMode !== undefined) {
+          if (body.stageMode !== "request") stageRequests.cancelAll(roomId);
+          await publishRoomStage(deps, roomId);
+        }
         const room = getRoomAccess(deps.db, user, roomId);
         if (!room) return status(HTTP_NOT_FOUND, apiError("room_not_found", "room not found")); // dihapus bersamaan
         return room;

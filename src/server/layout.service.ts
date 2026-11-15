@@ -101,24 +101,30 @@ export async function putLayout(deps: LayoutDeps, input: PutLayoutInput): Promis
 }
 
 /**
- * Set mode stage (S1) + audit `room.stage_mode` {from,to} bila berubah, lalu siarkan envelope. Layout tidak diubah.
- * Otorisasi (canManageRoom) di route. Melempar RoomNotFoundError bila room tidak ada.
+ * Tulis mode stage (S1) + audit `room.stage_mode` {from,to} bila berubah; sinkron agar bisa ikut transaksi pemanggil
+ * (PATCH rooms). Tidak menyiarkan: pemanggil memanggil publishRoomStage setelah commit. true bila berubah.
+ * Melempar RoomNotFoundError bila room tidak ada.
  */
+export function writeStageMode(db: Database, actor: Pick<SessionUser, "id" | "email">, roomId: string, mode: StageMode): boolean {
+  const from = readRow(db, roomId).stage_mode;
+  if (from === mode) return false;
+  db.query("UPDATE rooms SET stage_mode = ? WHERE id = ?").run(mode, roomId);
+  recordAudit(db, { actorId: actor.id, actorEmail: actor.email, action: "room.stage_mode", targetType: "room", targetId: roomId, detail: { from, to: mode } });
+  return true;
+}
+
+/** Siarkan envelope terkini (mode + layout) dari SQLite; room LiveKit belum ada → warn. */
+export const publishRoomStage = (deps: LayoutDeps, roomId: string) => publishEnvelope(deps, roomId, "publishRoomStage");
+
+/** writeStageMode dalam transaksi sendiri lalu siarkan bila berubah. Layout tidak diubah. Otorisasi di route. */
 export async function setStageMode(
   deps: LayoutDeps,
   actor: Pick<SessionUser, "id" | "email">,
   roomId: string,
   mode: StageMode,
 ): Promise<void> {
-  const { db } = deps;
-  const changed = db.transaction(() => {
-    const from = readRow(db, roomId).stage_mode;
-    if (from === mode) return false;
-    db.query("UPDATE rooms SET stage_mode = ? WHERE id = ?").run(mode, roomId);
-    recordAudit(db, { actorId: actor.id, actorEmail: actor.email, action: "room.stage_mode", targetType: "room", targetId: roomId, detail: { from, to: mode } });
-    return true;
-  })();
-  if (changed) await publishEnvelope(deps, roomId, "setStageMode");
+  const changed = deps.db.transaction(() => writeStageMode(deps.db, actor, roomId, mode))();
+  if (changed) await publishRoomStage(deps, roomId);
 }
 
 /** Pastikan room LiveKit ada dengan metadata = envelope terkini di SQLite (dipanggil sebelum terbit token). */

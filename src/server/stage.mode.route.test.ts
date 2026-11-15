@@ -86,3 +86,23 @@ describe("stageMode di POST /api/rooms dan PATCH /api/rooms/:roomId", () => {
     expect((await call("PATCH", "/rooms/r1", member.cookie, { stageMode: "host" })).status).toBe(403);
   });
 });
+
+describe("PATCH /api/rooms/:roomId atomik dengan stageMode", () => {
+  test("langkah sesudahnya gagal → stageMode, judul, dan audit tidak tersimpan; tidak ada siaran", async () => {
+    // test-only: trigger memaksa UPDATE expires_at gagal setelah stage_mode & title ditulis di transaksi yang sama.
+    deps.db.run("CREATE TRIGGER fail_expiry BEFORE UPDATE OF expires_at ON rooms BEGIN SELECT RAISE(ABORT, 'boom'); END");
+    const before = listAudit(deps.db, { limit: 100 }).items.length;
+    const res = await call("PATCH", "/rooms/r1", host.cookie, { title: "New", stageMode: "open", expiresAt: Date.now() + 60_000 });
+    expect(res.status).toBe(500);
+    expect(deps.db.query("SELECT title, stage_mode FROM rooms WHERE id = 'r1'").get()).toEqual({ title: "R1", stage_mode: "host" });
+    expect(listAudit(deps.db, { limit: 100 }).items).toHaveLength(before);
+    expect(published).toEqual([]);
+  });
+
+  test("sukses → semua field + audit tersimpan, envelope disiarkan sekali setelah commit", async () => {
+    const res = await call("PATCH", "/rooms/r1", host.cookie, { title: "New", stageMode: "request" });
+    expect(await res.json()).toMatchObject({ title: "New", stageMode: "request" });
+    expect(modeAudit()).toEqual([{ from: "host", to: "request" }]);
+    expect(published.map((md) => parseRoomStage(md).stageMode)).toEqual(["request"]);
+  });
+});

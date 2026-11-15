@@ -13,7 +13,9 @@ import { roomMembersRoutes } from "./room.members.route";
 import { createRoomPasswordLimiter } from "./room.password";
 import { roomsRoutes } from "./rooms.route";
 import { stageModeRoutes } from "./stage.mode.route";
+import { notifyStage } from "./stage.notify";
 import { stageRequestsRoutes } from "./stage.requests.route";
+import { createStageRequestStore } from "./stage.requests.store";
 import { tokenRoutes } from "./token.route";
 import { usersSearchRoutes } from "./users.search.route";
 
@@ -31,6 +33,8 @@ const BLOCKED_AUTH_PREFIX = "/api/auth/admin/";
 export function createApi(deps: ApiDeps) {
   // Satu limiter percobaan password room untuk join + accept undangan (W6: batas yang sama, bukan 2× lipat).
   const passwords = createRoomPasswordLimiter();
+  // Satu store request stage untuk route request, PUT stage-mode, dan PATCH rooms (pembatalan saat mode berubah).
+  const stageRequests = createStageRequestStore({ onResolved: (request) => void notifyStage(deps, { type: "request.resolved", request }) });
   const app = new Elysia({ prefix: "/api" })
     // Elysia default 422 untuk VALIDATION; kontrak API memakai 400 + code + path field yang gagal.
     // NOT_FOUND/PARSE juga dibungkus supaya semua error /api punya `code`.
@@ -57,14 +61,14 @@ export function createApi(deps: ApiDeps) {
     )
     .use(meRoutes(deps))
     .use(inviteRoutes(deps, passwords))
-    .use(roomsRoutes(deps))
+    .use(roomsRoutes(deps, stageRequests))
     .use(roomJoinRoutes(deps, passwords))
     .use(roomMembersRoutes(deps))
     .use(usersSearchRoutes(deps))
     .use(tokenRoutes(deps))
     .use(layoutRoutes(deps))
-    .use(stageModeRoutes(deps))
-    .use(stageRequestsRoutes(deps))
+    .use(stageModeRoutes(deps, stageRequests))
+    .use(stageRequestsRoutes(deps, stageRequests))
     .use(adminRoutes(deps))
     .use(devRoutes(deps));
   return deps.config.testAuth ? app.use(testLoginRoutes(deps)) : app;

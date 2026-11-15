@@ -8,7 +8,7 @@ import { recordAudit } from "./audit.repository";
 import { createRateLimiter } from "./auth.ratelimit";
 import { getRoomAccess } from "./room.access";
 import { notifyStage } from "./stage.notify";
-import { createStageRequestStore } from "./stage.requests.store";
+import type { StageRequestStore } from "./stage.requests.store";
 
 /** S4: maks request stage per `userId:roomId` per jendela. */
 export const STAGE_REQUESTS_MAX = 5;
@@ -26,8 +26,7 @@ const requestParams = t.Object({ roomId: t.String({ pattern: SAFE_ID_PATTERN }),
 const notFound = () => apiError("stage_request_not_found", "stage request not found or expired");
 
 /** Request stage (S4/S5): participant meminta layarnya tampil, pengelola approve/deny; event lewat data channel. */
-export function stageRequestsRoutes(deps: ApiDeps) {
-  const store = createStageRequestStore({ onResolved: (request) => void notifyStage(deps, { type: "request.resolved", request }) });
+export function stageRequestsRoutes(deps: ApiDeps, store: StageRequestStore) {
   const limiter = createRateLimiter(STAGE_REQUESTS_MAX, STAGE_REQUESTS_WINDOW_MS);
 
   // 404 bila room tidak ada; selain itu room + role efektif (admin+ global non-member → host).

@@ -8,6 +8,7 @@ import { checkInviteEmail, memberBodySchema } from "./room.members.route";
 import { isValidExpiry } from "./room.service";
 import { passwordMissing, passwordSchema, roomsManageRoutes, TITLE_MAX_LENGTH, visibilitySchema } from "./rooms.manage.route";
 import { stageModeSchema } from "./stage.mode.route";
+import type { StageRequestStore } from "./stage.requests.store";
 import { createRoom, InvalidCursorError, listRoomsForUser, RoomExistsError, ROOMS_PAGE_MAX } from "./rooms.repository";
 
 const HTTP_BAD_REQUEST = 400;
@@ -16,10 +17,10 @@ const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 
 /** Plugin route GET/POST /rooms, GET /rooms/:roomId, + PATCH/DELETE (rooms.manage.route.ts). Kontrak: src/shared/api.types.ts. */
-export function roomsRoutes(deps: ApiDeps) {
+export function roomsRoutes(deps: ApiDeps, stageRequests: StageRequestStore) {
   return new Elysia({ name: "rooms" })
     .use(authGuard(deps))
-    .use(roomsManageRoutes(deps))
+    .use(roomsManageRoutes(deps, stageRequests))
     .get(
       "/rooms",
       ({ user, query, status }) => {

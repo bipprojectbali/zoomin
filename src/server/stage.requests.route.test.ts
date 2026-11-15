@@ -28,6 +28,7 @@ beforeEach(async () => {
     async sendData(room: string, data: Uint8Array, kind: DataPacket_Kind, opts: { topic?: string }) {
       sent.push({ room, event: JSON.parse(new TextDecoder().decode(data)) as StageEvent, kind, topic: opts.topic });
     },
+    async updateRoomMetadata() {},
   } as unknown as RoomServiceClient;
   app = createApi(deps);
   admin = await createTestUser(deps, { email: "admin@example.test", role: "admin" });
@@ -154,5 +155,31 @@ describe("GET / approve / deny / DELETE", () => {
       throw new Error("room not found");
     }) as RoomServiceClient["sendData"];
     expect((await create(p)).status).toBe(200);
+  });
+});
+
+describe("mode keluar dari request membatalkan pending", () => {
+  const resolvedEvents = () => sent.filter((s) => s.event.type === "request.resolved").map((s) => [s.event.request.id, s.event.request.status]);
+
+  test("PUT stage-mode request→request tidak membatalkan; →open membatalkan semua + event canceled", async () => {
+    const a = (await (await create(p)).json()) as StageRequest;
+    const b = (await (await create(p2)).json()) as StageRequest;
+    expect((await call("PUT", "/stage-mode", host, { mode: "request" })).status).toBe(200);
+    expect(await pendingIds()).toEqual([a.id, b.id]);
+    expect((await call("PUT", "/stage-mode", host, { mode: "open" })).status).toBe(200);
+    expect(await pendingIds()).toEqual([]);
+    expect(resolvedEvents()).toEqual([
+      [a.id, "canceled"],
+      [b.id, "canceled"],
+    ]);
+  });
+
+  test("PATCH /rooms stageMode host membatalkan pending; PATCH tanpa stageMode tidak", async () => {
+    const a = (await (await create(p)).json()) as StageRequest;
+    expect((await call("PATCH", "", host, { title: "Renamed" })).status).toBe(200);
+    expect(await pendingIds()).toEqual([a.id]);
+    expect((await call("PATCH", "", host, { stageMode: "host" })).status).toBe(200);
+    expect(await pendingIds()).toEqual([]);
+    expect(resolvedEvents()).toEqual([[a.id, "canceled"]]);
   });
 });

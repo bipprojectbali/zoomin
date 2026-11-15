@@ -1,6 +1,7 @@
 import { ROOM_EXPIRY_MAX_DAYS, type AuditAction, type SessionUser, type UpdateRoomBody } from "../shared/api.types";
 import type { ApiDeps } from "./api.deps";
 import { recordAudit } from "./audit.repository";
+import { writeStageMode } from "./layout.service";
 import { type DbVisibility, dbVisibility, roomVisibility } from "./room.access";
 
 const MS_PER_DAY = 86_400_000;
@@ -32,6 +33,7 @@ export type UpdateRoomResult = "ok" | "not_found" | "password_missing";
  * satu entri audit (R10) dalam satu transaksi. Menonaktifkan room → putuskan peserta LiveKit (R6).
  * `passwordHash` (Bun.password, dihitung route) = set/ganti password; pindah ke public/private menghapus hash (W7).
  * Audit `room.password` hanya membawa `{ action }`, tidak pernah password/hash.
+ * `stageMode` ditulis di transaksi yang sama (writeStageMode); siaran metadata + pembatalan request oleh route setelah commit.
  */
 export async function updateRoom(
   deps: Pick<ApiDeps, "db" | "roomService">,
@@ -80,6 +82,7 @@ export async function updateRoom(
       audit("room.deactivate", {});
       off = true;
     }
+    if (body.stageMode !== undefined) writeStageMode(db, actor, roomId, body.stageMode);
     if (body.expiresAt !== undefined && body.expiresAt !== cur.expires_at) {
       set("expires_at", body.expiresAt);
       audit("room.expiry", { from: cur.expires_at, to: body.expiresAt });

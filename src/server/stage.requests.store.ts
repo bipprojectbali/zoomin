@@ -57,6 +57,12 @@ export function createStageRequestStore(opts: { onResolved: (r: StageRequest) =>
       if (room.size === 0) rooms.delete(roomId);
       return done;
     },
+    /** Batalkan semua pending di room (mode keluar dari `request`); tiap request → onResolved canceled. */
+    cancelAll(roomId: string): void {
+      const room = live(roomId);
+      for (const r of room.values()) resolve(room, r, "canceled");
+      rooms.delete(roomId);
+    },
   };
 }
 
