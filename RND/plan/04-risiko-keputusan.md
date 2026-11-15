@@ -88,6 +88,25 @@ di dokumen itu (bukan risiko R1–R18 di atas).
 | 06-R10 | Semua aksi baru diaudit (`room.update`, `room.visibility`, `room.activate`, `room.deactivate`, `room.expiry`, `room.member.*`); email target boleh di detail audit, tidak di console log. |
 | 06-R11 | `AdminRoomSummary.active` → `live` agar tidak bentrok dengan status room (breaking kecil di API admin). |
 
+## Keputusan stage control (2026-11-15, disetujui user)
+
+Spec lengkap, migrasi `0006_stage_mode`, dan kontrak tipe: `11-stage-control.md` (nomor merujuk S1–S12 di sana).
+
+| # | Keputusan |
+|---|---|
+| 11-S1 | `rooms.stage_mode` `host` (default) / `request` / `open`; diubah pengelola (`canManageRoom`) via `PUT .../stage-mode` atau PATCH room; ganti mode tidak mengubah layout. Audit `room.stage_mode`. |
+| 11-S2 | Metadata room LiveKit = envelope `{ stageMode, layout }` (`stage.model.ts`); JSON lama berbentuk `LayoutState` dibaca sebagai mode `host`. SQLite sumber kebenaran, selalu dipublikasikan ulang dari DB. |
+| 11-S3 | Izin `PUT /layout` di server lewat `canEditStage`: pengelola selalu, `open` juga `participant`, `viewer` tidak pernah → 403 `stage_locked`. CAS versi tetap. |
+| 11-S4 | Request (mode `request`) hanya untuk track screen milik pemanggil; satu pending per user per room, 5/menit, TTL 60 s. **Risiko diterima:** store in-memory → request hilang saat restart; dampak kecil karena umurnya ≤60 s dan klien membaca ulang lewat `GET`. Audit hanya approve/deny. |
+| 11-S5 | Event realtime `sendData` reliable topic `zoomin.stage` (`stage.notify.ts`). **Risiko diterima:** dikirim ke semua peserta tanpa filter identity; isi tidak sensitif (siapa minta tampil), UI hanya menampilkan ke pengelola + pemohon. Gagal kirim = warn. |
+| 11-S6 | Approve diterapkan klien pengelola (`sharedEffectiveLayout` → `PUT /layout` CAS, konflik → reload + ulang sekali → `POST approve`); server tidak menghitung layout karena layout otomatis hanya diketahui klien. |
+| 11-S7 | UI pemilih "Stage control" (room, Pengaturan › Umum, form Buat room), badge mode untuk semua, aksi tile "Request to show"/"Request full stage", toast + antrean untuk pengelola. |
+| 11-S8 / S8a | Template `custom-grid`: `grid { cols, rows, cells }` (1–7, ≤ `LAYOUT_MAX_SLOTS`), sel boleh kosong hanya di custom-grid, tanpa `panelSizes` (ponytail). Operasi hanya di `src/shared/layout.grid.ts`; taruh ke sel terisi = tukar. |
+| 11-S9 | Teks UI English di `*.labels.ts`, kode error baru (`stage_locked`, `stage_mode_mismatch`, `stage_request_not_found`) di `ApiErrorCode` + `error.message.ts`. |
+| 11-S10 | Panggung bersama = konten (screen-share); kamera di strip orang. Kamera boleh di-spotlight ke panggung secara eksplisit; layout lama yang memuat kamera tetap valid. |
+| 11-S11 | Menu View per orang (Auto/Gallery/Speaker/Content only + strip Right/Bottom/Hidden), `localStorage` `zoomin.view` dalam try/catch; tidak memengaruhi orang lain. |
+| 11-S12 | Follow host (lokal, default on). Off = tata panggung sendiri tanpa PUT. **Risiko diterima:** edit lokal penonton bisa membuat mereka melihat layout berbeda dari host; dimitigasi chip "Viewing your own layout" + tanda "Host layout changed". |
+
 ## Keputusan terbuka untuk user
 
 Urut dari yang paling memblokir.

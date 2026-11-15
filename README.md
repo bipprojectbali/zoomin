@@ -216,7 +216,10 @@ devices. The app session cookie is not forwarded to LiveKit, and the token (`acc
    microphone on the pre-join screen before entering. Name and photo come from the profile.
 4. Participants turn on camera/microphone and press "Add screen" repeatedly to share several screens.
 5. The host picks a template, swaps slots (drag and drop) and resizes panels. Every viewer, including late joiners,
-   sees the same layout.
+   sees the same layout. **Stage control** (per room): Host only (default), Request (participants ask to show their
+   screen, the host approves) or Open (participants edit too). The **Custom grid** template has empty drop cells and
+   +/− rows/columns. The stage holds content (screens); cameras sit in a people strip. Each person's **View** menu
+   (Auto/Gallery/Speaker/Content only, strip Right/Bottom/Hidden) and **Follow host** toggle are local.
 
 Viewers only watch: they get no camera/microphone/screen buttons, and the server rejects publishing from a viewer
 token.
@@ -275,9 +278,9 @@ src/cli/      binary CLI (serve, migrate, check, healthcheck, user, env, docs)
 src/server/   Elysia API, auth (Better Auth + Google, roles, invites), admin/dev, rooms, LiveKit tokens, layout
 src/shared/   API contract, layout model, track naming convention (screen-<n>)
 src/web/      React SPA: pages/, landing/, app/, lobby/, prejoin/, room/ (media + multi-screen), stage/ (layout + host
-              editing), settings/ (profile), admin/, dev/
+              editing), stage-control/ (stage modes, requests), settings/ (profile), admin/, dev/
 scripts/      production SPA build + single binary
-migrations/   SQLite migrations
+migrations/   SQLite migrations (0001–0006; 0006 = rooms.stage_mode)
 test/         integration tests against LiveKit dev + production smoke test
 e2e/          Playwright browser tests
 deploy/       production deployment artifacts

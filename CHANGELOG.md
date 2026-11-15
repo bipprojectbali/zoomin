@@ -6,6 +6,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/). Versions fol
 
 ### Added
 
+- **Stage control** per room: **Host only** (default), **Request**, or **Open**. Hosts pick it when creating a room,
+  in Room settings › General, or from the Stage control menu inside the room; everyone sees the current mode as a
+  badge. Changing the mode does not change what is on stage.
+- **Stage requests** (Request mode): a participant can ask to show one of their own screens or take the full stage
+  from the screen's tile menu, and cancel it. Hosts get a toast with Approve/Deny plus a request queue; approving puts
+  the screen on stage for everyone. Requests expire after 60 seconds and the requester is told the outcome.
+- **Open** mode: participants (not viewers) can arrange the shared stage with the same tools as the host.
+- **Custom grid** layout template: pick rows and columns (up to 7 each), leave cells empty ("Drop a screen here"),
+  drag screens into cells, and add/remove rows and columns.
+- **People strip**: the stage now shows content (shared screens), and cameras appear in a separate strip with a
+  speaking indicator. A host can still put a camera on stage with "Spotlight on stage". With nothing shared, Auto view
+  shows a camera gallery.
+- **View** menu (per person, remembered in the browser): Auto, Gallery, Speaker, or Content only, plus strip position
+  Right / Bottom / Hidden.
+- **Follow host** (on by default): turn it off to arrange the stage just for yourself; a chip shows "Viewing your own
+  layout" (and "Host layout changed" when the host changes it) and brings you back in one click.
 - **Docker image + GHCR**: pushes to `main` (and `v*` tags) run the tests and then publish
   `ghcr.io/bipprojectbali/zoomin` (`latest`, `sha-<commit>`, version). Deploy it as a Portainer stack from
   `compose.yml` (Traefik, `zoomin.wibudev.com`, SQLite data in a volume); roll back by changing `ZOOMIN_TAG`. Guide in
@@ -72,6 +88,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/). Versions fol
 
 ### Changed
 
+- Cameras moved off the shared stage into the people strip; older shared layouts that include cameras still show
+  them on stage.
+- Viewers and participants can rearrange their own local view in every stage mode without affecting others.
+- Layout changes from someone who may not edit the stage are rejected with 403 `stage_locked` (enforced on the server,
+  not only hidden in the UI).
+- The LiveKit room metadata is now an envelope `{ stageMode, layout }`. Older metadata holding a bare layout is still
+  read (treated as Host only mode).
 - UI and README are now English only.
 - The invite picker is now a searchable multi-select dropdown with a checkbox per account; manually typed emails stay
   saved as options. Account search works without a query (lists all accounts sorted by name) and returns up to 50

@@ -12,7 +12,8 @@ domain email, health), landing publik `/` (lobby di `/app`), room public/private
 tertunda bagi email tanpa akun), aktif/nonaktif + kadaluarsa room, dialog Pengaturan room, undangan per peran room
 (`host`/`participant`/`viewer`), pre-join, daftar peserta, toast, banner koneksi, rate limit, build produksi, single
 binary + CLI (`zoomin user` darurat), proxy signaling opsional `/livekit`. Spec auth: `RND/plan/05-auth-roles.md`;
-spec akses room: `RND/plan/06-room-access.md`.
+spec akses room: `RND/plan/06-room-access.md`; spec stage control (mode Host only/Request/Open, request+approve,
+custom grid, strip orang, menu View, Follow host): `RND/plan/11-stage-control.md`.
 
 Status: app terbukti jalan lewat Cloudflare Tunnel + LiveKit 1.13.11 di VPS (stack Portainer
 `deploy/livekit-compose.yml`). Versi rilis = `version` di `package.json` + `CHANGELOG.md`.
@@ -32,14 +33,18 @@ Status: app terbukti jalan lewat Cloudflare Tunnel + LiveKit 1.13.11 di VPS (sta
 
 ```
 src/server/   API Elysia: auth.better (Better Auth), auth.guard (sesi → peran), auth.me/invite/test route, admin.*, dev.*,
-              audit.*, settings.*, rooms, token, layout, livekit.proxy, static.serve, config, db
-src/shared/   kontrak API (api.types.ts), model layout, room id, konvensi nama track (screen-<n>)
-src/web/      SPA: pages/, landing/, app/ (header, guard), lobby/, prejoin/, room/, stage/ (layout), settings/,
-              admin/, dev/, components/ui/; auth.client.ts (klien Better Auth)
+              audit.*, settings.*, rooms, token, layout, stage.* (mode, requests, notify), livekit.proxy, static.serve,
+              config, db
+src/shared/   kontrak API (api.types.ts, stage.types.ts), model layout + layout.grid, stage.model (envelope),
+              room id, konvensi nama track (screen-<n>)
+src/web/      SPA: pages/, landing/, app/ (header, guard), lobby/, prejoin/, room/, stage/ (layout, strip orang, View),
+              stage-control/ (mode stage, request/approve), settings/, admin/, dev/, components/ui/;
+              auth.client.ts (klien Better Auth)
 src/cli/      CLI single binary (args, help, docs, check, run); entrypoint tetap src/server/main.ts
 scripts/      build.web.ts (SPA → dist/web), build.binary.ts (→ bin/)
 migrations/   SQL bernomor: 0001_init, 0002_auth (tabel Better Auth + peran room host), 0003_admin (audit_log, app_settings),
-              0004_room_access (visibility, disabled_at, expires_at, room_invitations), 0005_room_password (password_hash)
+              0004_room_access (visibility, disabled_at, expires_at, room_invitations),
+              0005_room_password (password_hash), 0006_stage_mode (rooms.stage_mode)
 test/         integrasi dengan LiveKit dev + smoke produksi
 e2e/          Playwright (temuan bug di e2e/BUGS.md)
 deploy/       artefak produksi (systemd/Caddy, stack Portainer LiveKit)
@@ -88,6 +93,14 @@ LiveKit dev lokal: `RND/spike/.bin/livekit-server --dev` (atau Docker `livekit/l
   A5. Aksi admin lewat `/api/admin/*` / `/api/dev/*` yang memanggil `auth.api.*` dari server.
 - **Pengelola room** (host room ATAU admin/super_admin global) dicek HANYA lewat `canManageRoom` di
   `src/server/room.access.ts` (juga `roomStatus`/`getRoomAccess`); jangan tulis cek host manual di route.
+- **Izin edit panggung** (S3, `RND/plan/11-stage-control.md`) HANYA lewat `canEditStage` di `room.access.ts`:
+  pengelola selalu; mode `open` juga `participant`; `viewer` tidak pernah. Ditolak → 403 `stage_locked` di server.
+- **Metadata room LiveKit = envelope** `{ stageMode, layout }` lewat `parseRoomStage`/`serializeRoomStage`
+  (`src/shared/stage.model.ts`); jangan pernah menulis `LayoutState` mentah ke metadata. SQLite sumber kebenaran.
+- **Stage request** disimpan in-memory (`stage.requests.store.ts`, ponytail: hilang saat restart, TTL 60 s); event
+  realtime topic `zoomin.stage` hanya lewat `stage.notify.ts`. Approve diterapkan klien pengelola (hitung dari
+  `sharedEffectiveLayout`, `PUT /layout` CAS, lalu `POST approve`); server tidak menghitung layout.
+- **Edit custom grid** (sel kosong, +/− baris/kolom) hanya lewat fungsi murni `src/shared/layout.grid.ts`.
 - **Enforcer room** (`room.enforcer.ts`, tiap 60 s) hanya menutup room LiveKit yang ADA di DB dan berstatus non-active;
   room yang tak dikenal DB dibiarkan (LiveKit bisa dipakai bersama instance lain, E2E-04). Token yang sudah terbit
   bisa bergabung ulang ≤60 s sebelum ditendang lagi (ponytail, R6 di `06-room-access.md`).
@@ -107,7 +120,7 @@ LiveKit dev lokal: `RND/spike/.bin/livekit-server --dev` (atau Docker `livekit/l
   diaudit isinya, atau dikembalikan API (`RoomSummary` hanya `visibility: "password"`, `ROOM_COLUMNS` memilih flag
   `has_password`). Tipe API turunan satu fungsi `roomVisibility` (`room.access.ts`). Percobaan join/accept dibatasi
   per `userId:roomId` (`room.password.ts`).
-- **Migrasi**: file SQL bernomor baru di `migrations/` (berikutnya `0006_<nama>.sql`), lalu tambahkan import + entri di
+- **Migrasi**: file SQL bernomor baru di `migrations/` (berikutnya `0007_<nama>.sql`), lalu tambahkan import + entri di
   `MIGRATIONS` (`src/server/db.ts`); `db.test.ts` gagal bila daftar tak sinkron. Migrasi hanya maju, idempotent.
 - **Secret**: jangan membaca, mencetak, atau commit `.env` (hanya `.env.example`). `zoomin check` menampilkan
   secret sebagai "set"/"empty". Variabel baru → tambahkan ke `.env.example` + `src/server/config.ts`
