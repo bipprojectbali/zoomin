@@ -35,8 +35,9 @@ export function TileView({ trackRef, track, slotIndex, adminItems = [], drag, ba
   drag?: TileDrag;
   badge?: string;
 }) {
-  const { who, expanded, setExpanded } = useStage();
+  const { who, expanded, setExpanded, tileActions } = useStage();
   const { person, participant } = who(trackRef.identity);
+  const extraItems = tileActions?.(trackRef, person.isLocal) ?? [];
   const title = tileTitle(person, trackRef.trackName);
   const key = keyOf(trackRef);
   const isCamera = track ? track.source === Track.Source.Camera : parseTrackName(trackRef.trackName)?.kind === "camera";
@@ -117,7 +118,7 @@ export function TileView({ trackRef, track, slotIndex, adminItems = [], drag, ba
             <GripVertical className="size-3.5" />
           </button>
         )}
-        <TileMenu title={title} groups={[adminItems, localItems]} />
+        <TileMenu title={title} groups={[adminItems, extraItems, localItems]} />
       </div>
       {drag?.isDropTarget && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border-4 border-dashed border-primary bg-primary/20 text-sm font-medium text-white">

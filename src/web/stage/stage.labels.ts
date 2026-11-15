@@ -1,8 +1,9 @@
 /** Label UI stage (terpusat agar mudah diganti/i18n). */
 import type { LayoutTemplate } from "../../shared/layout.model";
+import type { StageView, StripPosition } from "./view.prefs";
 
 export const STAGE_LABELS = {
-  templates: { "side-by-side": "Side by side", grid: "Grid", focus: "Focus" } satisfies Record<LayoutTemplate, string>,
+  templates: { "side-by-side": "Side by side", grid: "Grid", focus: "Focus", "custom-grid": "Custom grid" } satisfies Record<LayoutTemplate, string>,
   toolbar: "Layout template",
   camera: "Camera",
   screen: (n: number) => `Screen ${n}`,
@@ -18,6 +19,24 @@ export const STAGE_LABELS = {
   dragHandle: (title: string) => `Drag to move ${title}`,
   dropHere: "Drop here",
   focusForAll: "Focus for everyone",
+  focusForMe: "Focus for me",
+  spotlight: "Spotlight on stage",
+  dropScreen: "Drop a screen here",
+  emptyCell: "Empty cell",
+  gridToolbar: "Custom grid",
+  addRow: "Add row",
+  addColumn: "Add column",
+  removeRow: "Remove last row",
+  removeColumn: "Remove last column",
+  people: "People",
+  view: "View",
+  views: { auto: "Auto", gallery: "Gallery", speaker: "Speaker", content: "Content only" } satisfies Record<StageView, string>,
+  stripPosition: "Strip position",
+  strips: { right: "Right", bottom: "Bottom", hidden: "Hidden" } satisfies Record<StripPosition, string>,
+  ownLayout: "Viewing your own layout",
+  hostLayoutChanged: "Host layout changed",
+  followHost: "Follow host",
+  noPeople: "No one here yet",
   focused: "Focused",
   moveLeft: "Move left",
   moveRight: "Move right",

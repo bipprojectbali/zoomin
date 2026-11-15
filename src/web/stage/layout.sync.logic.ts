@@ -1,6 +1,8 @@
 /** Logika murni sinkronisasi layout (tanpa React/SDK) agar bisa dites. */
 import type { LayoutResponse } from "../../shared/api.types";
-import { parseLayout, type LayoutState } from "../../shared/layout.model";
+import type { LayoutState } from "../../shared/layout.model";
+import { parseRoomStage } from "../../shared/stage.model";
+import type { StageMode } from "../../shared/stage.types";
 import { ApiRequestError } from "../api.client";
 
 const HTTP_CONFLICT = 409;
@@ -18,13 +20,19 @@ export function pickNewer(current: LayoutState | null, incoming: LayoutState | n
 /** baseVersion untuk PUT: version state yang dipegang, 0 bila belum ada layout. */
 export const baseVersionOf = (current: LayoutState | null): number => current?.version ?? 0;
 
-/** Baca layout dari room.metadata; kosong → null tanpa error, invalid → null + pesan error. */
-export function layoutFromMetadata(metadata: string | undefined): { layout: LayoutState | null; error: Error | null } {
-  if (!metadata) return { layout: null, error: null };
+/**
+ * Baca envelope room.metadata (S2; metadata lama = LayoutState → mode host). Kosong → layout null, mode host
+ * tanpa error; invalid → layout & mode null (pertahankan state) + pesan error.
+ */
+export function stageFromMetadata(metadata: string | undefined): {
+  layout: LayoutState | null;
+  stageMode: StageMode | null;
+  error: Error | null;
+} {
   try {
-    return { layout: parseLayout(metadata), error: null };
+    return { ...parseRoomStage(metadata), error: null };
   } catch (e) {
-    return { layout: null, error: new Error("layoutFromMetadata: room.metadata is not a valid layout", { cause: e }) };
+    return { layout: null, stageMode: null, error: new Error("stageFromMetadata: room.metadata is not a valid stage envelope", { cause: e }) };
   }
 }
 

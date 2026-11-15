@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { LayoutState } from "../../shared/layout.model";
 import { ApiRequestError } from "../api.client";
-import { baseVersionOf, isConflict, layoutFromMetadata, layoutFromResponse, pickNewer } from "./layout.sync.logic";
+import { baseVersionOf, isConflict, layoutFromResponse, stageFromMetadata, pickNewer } from "./layout.sync.logic";
 
 // test-only
 const state = (version: number, template: LayoutState["template"] = "grid"): LayoutState => ({
@@ -41,28 +41,39 @@ describe("baseVersionOf", () => {
   });
 });
 
-describe("layoutFromMetadata", () => {
-  test("metadata kosong → null tanpa error", () => {
-    expect(layoutFromMetadata("")).toEqual({ layout: null, error: null });
-    expect(layoutFromMetadata(undefined)).toEqual({ layout: null, error: null });
+describe("stageFromMetadata", () => {
+  test("metadata kosong → layout null, mode host, tanpa error", () => {
+    expect(stageFromMetadata("")).toEqual({ layout: null, stageMode: "host", error: null });
+    expect(stageFromMetadata(undefined)).toEqual({ layout: null, stageMode: "host", error: null });
   });
-  test("JSON valid di-parse", () => {
-    const r = layoutFromMetadata(JSON.stringify(state(4)));
+  test("envelope di-parse: mode berubah walau layout null", () => {
+    const r = stageFromMetadata(JSON.stringify({ stageMode: "open", layout: null }));
+    expect(r).toEqual({ layout: null, stageMode: "open", error: null });
+    const withLayout = stageFromMetadata(JSON.stringify({ stageMode: "request", layout: state(4) }));
+    expect(withLayout.stageMode).toBe("request");
+    expect(withLayout.layout?.version).toBe(4);
+  });
+  test("metadata lama (LayoutState mentah) → mode host", () => {
+    const r = stageFromMetadata(JSON.stringify(state(4)));
     expect(r.error).toBeNull();
+    expect(r.stageMode).toBe("host");
     expect(r.layout?.version).toBe(4);
   });
-  test("invalid → null + error ber-cause", () => {
-    const r = layoutFromMetadata(JSON.stringify({ ...state(1), template: "carousel" }));
-    expect(r.layout).toBeNull();
-    expect(r.error?.message).toContain("layoutFromMetadata");
-    expect(r.error?.cause).toBeInstanceOf(Error);
+  test("invalid → layout & mode null + error ber-cause", () => {
+    for (const bad of [JSON.stringify({ ...state(1), template: "carousel" }), JSON.stringify({ stageMode: "x", layout: null })]) {
+      const r = stageFromMetadata(bad);
+      expect(r.layout).toBeNull();
+      expect(r.stageMode).toBeNull();
+      expect(r.error?.message).toContain("stageFromMetadata");
+      expect(r.error?.cause).toBeInstanceOf(Error);
+    }
   });
 });
 
 describe("layoutFromResponse & isConflict", () => {
   test("version server menimpa version di dalam layout", () => {
-    expect(layoutFromResponse({ version: 9, layout: state(1) })?.version).toBe(9);
-    expect(layoutFromResponse({ version: 0, layout: null })).toBeNull();
+    expect(layoutFromResponse({ version: 9, layout: state(1), stageMode: "host" })?.version).toBe(9);
+    expect(layoutFromResponse({ version: 0, layout: null, stageMode: "host" })).toBeNull();
   });
   test("hanya ApiRequestError 409 yang konflik", () => {
     expect(isConflict(new ApiRequestError(409, { error: "conflict" }, "PUT x"))).toBe(true);

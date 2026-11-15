@@ -1,4 +1,4 @@
-/** Render template layout: side-by-side & focus (resizable), grid (CSS grid responsif). */
+/** Render template layout: side-by-side & focus (resizable), grid (CSS grid responsif), custom-grid. */
 import type { TrackReference } from "@livekit/components-react";
 import type { CSSProperties } from "react";
 import type { LayoutState } from "../../shared/layout.model";
@@ -6,6 +6,7 @@ import { useStage } from "./stage.context";
 import { STAGE_LABELS } from "./stage.labels";
 import { focusMainIndex, keyOf, SIDE_BY_SIDE_MAX, type ExtraItem, type ResolvedSlot } from "./stage.resolve";
 import { tileTitle } from "./stage.tile.logic";
+import { CustomGridView } from "./CustomGridView";
 import { PanelGroup, Strip, stripItem } from "./StagePanels";
 import { ExtraTile, SlotTile } from "./StageTile";
 
@@ -16,20 +17,23 @@ const FOCUS_DEFAULT = [75, 25];
 const GRID_TILE_MIN = "10rem"; // 360px → 2 kolom; layar lebar dibatasi --cols
 const GRID_ROW_MIN = "8rem"; // banyak baris di mobile → scroll vertikal, bukan tile gepeng
 
-const Empty = ({ text }: { text: string }) => (
+export const Empty = ({ text }: { text: string }) => (
   <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{text}</div>
 );
 const Note = ({ text }: { text: string }) => <p className="shrink-0 px-2 text-xs text-muted-foreground">{text}</p>;
 
-/** Grid responsif: maks --cols kolom (≈√n), tiap kolom ≥ GRID_TILE_MIN sehingga layar sempit turun ke 1–2 kolom. */
-function Grid({ slots }: { slots: Slots }) {
-  const cols = Math.ceil(Math.sqrt(slots.length));
-  const style: CSSProperties = {
+/** Style grid responsif: maks ≈√n kolom, tiap kolom ≥ GRID_TILE_MIN sehingga layar sempit turun ke 1–2 kolom. */
+export function gridStyle(n: number): CSSProperties {
+  const cols = Math.ceil(Math.sqrt(n));
+  return {
     gridTemplateColumns: `repeat(auto-fit, minmax(max(min(100%, ${GRID_TILE_MIN}), calc((100% - ${cols - 1} * 0.5rem) / ${cols})), 1fr))`,
     gridAutoRows: `minmax(${GRID_ROW_MIN}, 1fr)`,
   };
+}
+
+function Grid({ slots }: { slots: Slots }) {
   return (
-    <div style={style} className="grid h-full gap-2 overflow-y-auto p-1">
+    <div style={gridStyle(slots.length)} className="grid h-full gap-2 overflow-y-auto p-1">
       {slots.map((s) => (
         <div key={s.index} className="min-h-0">
           <SlotTile item={s} />
@@ -78,6 +82,7 @@ function FocusView({ layout, slots }: { layout: LayoutState; slots: Slots }) {
 export function TemplateView({ layout, slots }: { layout: LayoutState; slots: Slots }) {
   const { who, actions } = useStage();
   const n = slots.length;
+  if (layout.template === "custom-grid" && layout.grid) return <CustomGridView layout={layout} slots={slots} />;
   if (n === 0) return <Empty text={STAGE_LABELS.empty} />;
   const titleOf = (s: ResolvedSlot<TrackReference>) => tileTitle(who(s.slot.trackRef.identity).person, s.slot.trackRef.trackName);
   switch (layout.template) {
@@ -105,11 +110,12 @@ export function TemplateView({ layout, slots }: { layout: LayoutState; slots: Sl
     case "focus":
       return <FocusView layout={layout} slots={slots} />;
     case "grid":
+    case "custom-grid": // tanpa grid = tidak valid (parseLayout menolak); render sebagai grid biasa
       return <Grid slots={slots} />;
   }
 }
 
-/** Track/avatar yang tidak ada di layout (mis. kamera saat ada layar), strip kecil scroll horizontal. */
+/** Screen-share yang tidak ada di layout, strip kecil scroll horizontal (editor menyeretnya ke panggung). */
 export function OthersStrip({ extras }: { extras: ExtraItem<TrackReference>[] }) {
   return (
     <section aria-label={STAGE_LABELS.others} data-testid="stage-extras" className="h-24 shrink-0 border-t sm:h-28">

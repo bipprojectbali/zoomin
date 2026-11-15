@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { LAYOUT_MAX_SLOTS, LayoutValidationError, parseLayout, serializeLayout, type LayoutState } from "../../shared/layout.model";
-import { placeTrack, removeSlot } from "./stage.edit";
+import { canRemoveLast, cellOfSlot, placeTrack, removeSlot } from "./stage.edit";
 
 // test-only
 const ref = (identity: string, trackName = "camera") => ({ identity, trackName });
@@ -76,5 +76,53 @@ describe("removeSlot", () => {
     expect(() => removeSlot(layout(2), 2, "a")).toThrow(LayoutValidationError);
     expect(() => removeSlot(layout(2), -1, "a")).toThrow(LayoutValidationError);
     expect(() => removeSlot(layout(2), 0.5, "a")).toThrow(LayoutValidationError);
+  });
+});
+
+describe("custom-grid lewat layout.grid (S8)", () => {
+  const grid = (cells: (string | null)[], cols: number): LayoutState => {
+    const refs = cells.map((c) => (c ? ref(c) : null));
+    return {
+      version: 2,
+      template: "custom-grid",
+      slots: refs.flatMap((r) => (r ? [{ trackRef: r }] : [])),
+      grid: { cols, rows: cells.length / cols, cells: refs.map((trackRef) => ({ trackRef })) },
+      updatedBy: "admin",
+      updatedAt: 1,
+    };
+  };
+  const cells = (s: LayoutState) => s.grid!.cells.map((c) => c.trackRef?.identity ?? null);
+  const valid = (s: LayoutState) => expect(() => parseLayout(serializeLayout(s))).not.toThrow();
+
+  test("tambah (index null) → sel kosong pertama; penuh → tambah baris", () => {
+    const next = placeTrack(grid(["a", null, "b", null], 2), null, ref("x"), "h");
+    expect(cells(next)).toEqual(["a", "x", "b", null]);
+    valid(next);
+    const grown = placeTrack(grid(["a", "b"], 2), null, ref("x"), "h");
+    expect(grown.grid!.rows).toBe(2);
+    expect(cells(grown)).toEqual(["a", "b", "x", null]);
+    valid(grown);
+  });
+  test("ganti slot index = sel slot itu; track yang sudah ada → state sama", () => {
+    const base = grid([null, "a", "b", null], 2);
+    expect(cells(placeTrack(base, 1, ref("x"), "h"))).toEqual([null, "a", "x", null]);
+    expect(placeTrack(base, null, ref("a"), "h")).toBe(base);
+  });
+  test("removeSlot mengosongkan sel (grid tetap)", () => {
+    const next = removeSlot(grid(["a", null, "b", "c"], 2), 1, "h");
+    expect(cells(next)).toEqual(["a", null, null, "c"]);
+    expect(next.slots.map((s) => s.trackRef.identity)).toEqual(["a", "c"]);
+    valid(next);
+  });
+  test("canRemoveLast: hanya bila baris/kolom terakhir kosong dan >1", () => {
+    const g = grid(["a", null, "b", null], 2);
+    expect(canRemoveLast(g, "column")).toBe(true);
+    expect(canRemoveLast(g, "row")).toBe(false);
+    expect(canRemoveLast(grid([null], 1), "row")).toBe(false);
+    expect(canRemoveLast(layout(2), "row")).toBe(false);
+  });
+  test("cellOfSlot di luar grid ditolak", () => {
+    expect(cellOfSlot(grid([null, "a"], 2), 0)).toBe(1);
+    expect(() => cellOfSlot(grid([null, "a"], 2), 1)).toThrow(LayoutValidationError);
   });
 });
