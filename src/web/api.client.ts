@@ -13,6 +13,7 @@ import type {
   CreateInviteBody,
   CreateInviteResponse,
   CreateRoomBody,
+  CreateStageRequestBody,
   InvitePreview,
   GlobalRole,
   JoinRoomResponse,
@@ -26,6 +27,8 @@ import type {
   RoomMemberItem,
   RoomSummary,
   SetRoleBody,
+  StageMode,
+  StageRequest,
   SystemHealth,
   TokenResponse,
   UpdateRoomBody,
@@ -222,3 +225,26 @@ export const getLayout = (roomId: string) => request<LayoutResponse>("GET", `${r
 /** PUT /api/rooms/:roomId/layout (409 → ApiRequestError dengan body.currentVersion). */
 export const putLayout = (roomId: string, body: PutLayoutBody) =>
   request<PutLayoutResponse>("PUT", `${roomPath(roomId)}/layout`, body);
+
+/** PUT /api/rooms/:roomId/stage-mode (pengelola): layout tidak berubah, mode disiarkan di room metadata. */
+export const setStageMode = (roomId: string, mode: StageMode) =>
+  request<RoomSummary>("PUT", `${roomPath(roomId)}/stage-mode`, { mode });
+
+/** POST /api/rooms/:roomId/stage-requests (participant, mode request; 409 stage_mode_mismatch, 429). */
+export const createStageRequest = (roomId: string, body: CreateStageRequestBody) =>
+  request<StageRequest>("POST", `${roomPath(roomId)}/stage-requests`, body);
+
+/** GET /api/rooms/:roomId/stage-requests (pengelola): pending saja. */
+export const listStageRequests = (roomId: string) =>
+  request<{ items: StageRequest[] }>("GET", `${roomPath(roomId)}/stage-requests`);
+
+const stageRequestPath = (roomId: string, id: string) => `${roomPath(roomId)}/stage-requests/${encodeURIComponent(id)}`;
+
+/** POST .../stage-requests/:id/approve (pengelola; layout diterapkan klien lebih dulu, S6). */
+export const approveStageRequest = (roomId: string, id: string) => request<void>("POST", `${stageRequestPath(roomId, id)}/approve`);
+
+/** POST .../stage-requests/:id/deny (pengelola). */
+export const denyStageRequest = (roomId: string, id: string) => request<void>("POST", `${stageRequestPath(roomId, id)}/deny`);
+
+/** DELETE .../stage-requests/:id (pemilik). */
+export const cancelStageRequest = (roomId: string, id: string) => request<void>("DELETE", stageRequestPath(roomId, id));

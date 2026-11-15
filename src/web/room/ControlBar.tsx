@@ -1,4 +1,4 @@
-/** Control bar bawah tinggi tetap (UX-02): Mic · Kamera | Layar | Peserta · Undang | Keluar; mobile: overflow "Lainnya" (UX-20). */
+/** Control bar bawah tinggi tetap (UX-02): Mic · Kamera | Layar | View | Peserta · Undang | Keluar; mobile: overflow "Lainnya" (UX-20). */
 import type { Room } from "livekit-client";
 import type { RoomSummary } from "../../shared/api.types";
 import { Ellipsis, PhoneOff, UserPlus, Users } from "lucide-react";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ViewMenu } from "@/stage/ViewMenu";
 import { ControlTooltip } from "./ControlTooltip";
 import { InviteDialog } from "./InviteDialog";
 import { MediaControls } from "./MediaControls";
@@ -53,6 +54,11 @@ export function ControlBar(p: ControlBarProps) {
           <ScreenControls room={p.room} disabled={disabled} />
         </>
       )}
+
+      {/* View lokal per orang (S11), semua ukuran layar. <sm: ikon saja (teks font-size 0; aria-label tetap) agar bar tidak meluap. */}
+      <div className="contents max-sm:[&_button]:gap-0 max-sm:[&_button]:px-2.5 max-sm:[&_button]:text-[0px]">
+        <ViewMenu />
+      </div>
 
       <div className="hidden items-center gap-2 sm:flex sm:gap-3">
         <ControlTooltip label={participantsLabel}>

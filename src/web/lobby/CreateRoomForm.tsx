@@ -13,9 +13,11 @@ import { errorMessage } from "@/error.message";
 import { InvitePicker, type InvitePickerHandle } from "@/invite-picker/InvitePicker";
 import { PasswordField } from "@/room-password/PasswordField";
 import { PasswordOnceDialog } from "@/room-password/PasswordOnceDialog";
+import { STAGE_CONTROL_TEXT } from "@/stage-control/stage-control.labels";
+import { StageModeSelect } from "@/stage-control/StageModeSelect";
 import { validInvites, type InviteEntry } from "@/invite-picker/invite.parse";
 import { INVITE_PICKER_TEXT } from "@/invite-picker/invite-picker.labels";
-import { SAFE_ID_PATTERN, type RoomSummary, type RoomVisibility } from "../../shared/api.types";
+import { SAFE_ID_PATTERN, type RoomSummary, type RoomVisibility, type StageMode } from "../../shared/api.types";
 import { slugifyRoomId } from "../../shared/room.id";
 import { effectiveRoomId, withStableSuffix } from "./lobby.format";
 import { LOBBY_TEXT } from "./lobby.labels";
@@ -35,6 +37,7 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
   const [visibility, setVisibility] = useState<RoomVisibility>("public");
   const [expiryPreset, setExpiryPreset] = useState<ExpiryPreset>("none");
   const [expiryDate, setExpiryDate] = useState("");
+  const [stageMode, setStageMode] = useState<StageMode>("host");
   const [invites, setInvites] = useState<InviteEntry[]>([]);
   const [password, setPassword] = useState("");
   // W2: password hanya bisa dilihat sekali, tepat setelah room dibuat.
@@ -61,7 +64,7 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
       // Picker hanya tampil untuk Private; undangan yang tersisa saat beralih ke Public tidak dikirim.
       const members = visibility === "private" ? validInvites(picker.current?.flush() ?? invites) : [];
       const withPassword = visibility === "password" ? { password } : {};
-      const room = await createRoom({ id, title: title.trim(), visibility, expiresAt, ...withPassword, ...(members.length ? { members } : {}) });
+      const room = await createRoom({ id, title: title.trim(), visibility, expiresAt, stageMode, ...withPassword, ...(members.length ? { members } : {}) });
       onCreated(room);
       toast.success(TEXT.created(room.title));
       if (visibility === "password") setCreatedPassword(password);
@@ -72,6 +75,7 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
       setVisibility("public");
       setExpiryPreset("none");
       setExpiryDate("");
+      setStageMode("host");
       setInvites([]);
     } catch (err) {
       console.error("lobby: buat room gagal", err);
@@ -170,6 +174,10 @@ export function CreateRoomForm({ onCreated }: { onCreated: (room: RoomSummary) =
               onChange={(e) => setExpiryDate(e.target.value)}
             />
           )}
+          <Label htmlFor="create-room-stage-mode" className="mt-2">
+            {STAGE_CONTROL_TEXT.title}
+          </Label>
+          <StageModeSelect id="create-room-stage-mode" testId="create-room-stage-mode" value={stageMode} onChange={setStageMode} disabled={busy} />
         </div>
       </details>
       {error && (

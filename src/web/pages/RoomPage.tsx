@@ -1,26 +1,16 @@
-import { RoomAudioRenderer, RoomContext, useAudioPlayback } from "@livekit/components-react";
-import type { Room } from "livekit-client";
-import { VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ApiRequestError, getRoom, getRoomToken, joinRoomWithPassword } from "@/api.client";
 import { takeFirstJoinChoices } from "@/prejoin/media.preferences";
 import { PreJoin } from "@/prejoin/PreJoin";
 import { PasswordGate } from "@/room-password/PasswordGate";
 import type { PreJoinChoices } from "@/prejoin/prejoin.types";
-import { ConnectionBanner } from "@/room/ConnectionBanner";
-import { ControlBar } from "@/room/ControlBar";
-import { ParticipantsPanel, useParticipantCount } from "@/room/ParticipantsPanel";
-import { canPublishFor, controlsEnabled, logJoinFailure, useRoomConnection, type ConnectionError, type ConnectionStatus } from "@/room/room.connection";
+import { ConnectedRoom } from "@/room/ConnectedRoom";
+import { canPublishFor, logJoinFailure, useRoomConnection, type ConnectionError } from "@/room/room.connection";
 import { ROOM_LABELS } from "@/room/room.labels";
-import { useRoomToasts } from "@/room/room.toasts";
 import { RoomStatusScreen } from "@/room/RoomStatusScreen";
 import { ROLE_LABEL } from "@/role.label";
 import { hasRole, RequireSession, useSession } from "@/session.context";
-import { useLayoutSync } from "@/stage/layout.sync";
-import { Stage } from "@/stage/Stage";
 import type { RoomRole, RoomSummary } from "../../shared/api.types";
 
 /**
@@ -139,79 +129,6 @@ function RoomView({ roomId }: { roomId: string }) {
         {ROOM_LABELS.status[status]}
       </span>
       {body}
-    </div>
-  );
-}
-
-function ConnectedRoom({ room, roomId, title, role, status, summary, onSummaryChanged, onLeave, onRoomDeleted }: {
-  room: Room;
-  roomId: string;
-  title: string;
-  role: RoomRole | null;
-  status: ConnectionStatus;
-  summary: RoomSummary | null;
-  onSummaryChanged: (room: RoomSummary) => void;
-  onLeave: () => void;
-  onRoomDeleted: () => void;
-}) {
-  const { layout, commit, error } = useLayoutSync(room, roomId);
-  const [participantsOpen, setParticipantsOpen] = useState(false);
-  const participantCount = useParticipantCount(room);
-  useRoomToasts(room, room.localParticipant.identity);
-  const enabled = controlsEnabled(status);
-
-  return (
-    <RoomContext.Provider value={room}>
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 sm:px-4">
-        <h1 className="min-w-0 flex-1 truncate font-semibold">{title}</h1>
-        {role && <Badge variant="outline">{ROLE_LABEL[role]}</Badge>}
-      </header>
-      <ConnectionBanner room={room} status={status} />
-      <main className="relative min-h-0 flex-1 overflow-hidden">
-        <AudioBlockedBanner room={room} />
-        {error && (
-          <p className="absolute inset-x-0 top-0 z-10 bg-destructive/10 px-4 py-1 text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        )}
-        <Stage room={room} layout={layout} editable={role === "host" && enabled} onCommit={(next) => void commit(next)} />
-      </main>
-      <ControlBar
-        room={room}
-        roomId={roomId}
-        enabled={enabled}
-        canPublish={canPublishFor(role)}
-        canInvite={role === "host"}
-        summary={summary}
-        onSummaryChanged={onSummaryChanged}
-        onRoomDeleted={onRoomDeleted}
-        participantCount={participantCount}
-        onOpenParticipants={() => setParticipantsOpen(true)}
-        onLeave={onLeave}
-      />
-      <ParticipantsPanel room={room} open={participantsOpen} onOpenChange={setParticipantsOpen} />
-      <RoomAudioRenderer room={room} />
-    </RoomContext.Provider>
-  );
-}
-
-/** Autoplay diblokir (UX-10): ajakan mencolok di atas stage; klik = gesture yang membuka audio. */
-function AudioBlockedBanner({ room }: { room: Room }) {
-  const { canPlayAudio, startAudio } = useAudioPlayback(room);
-  if (canPlayAudio) return null;
-  return (
-    <div className="absolute inset-x-0 top-3 z-20 flex justify-center px-3">
-      <Button
-        type="button"
-        size="lg"
-        className="rounded-full shadow-lg"
-        // Masih diblokir walau sudah diklik = kebijakan browser, bukan bug → warn; banner tetap tampil.
-        onClick={() => startAudio().catch((err: unknown) => console.warn("room: startAudio ditolak", err))}
-        data-testid="start-audio"
-      >
-        <VolumeX />
-        {ROOM_LABELS.audioBlocked} · {ROOM_LABELS.audioStart}
-      </Button>
     </div>
   );
 }

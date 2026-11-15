@@ -4,9 +4,11 @@ import { AUDIT_ACTION_LABEL, AUDIT_ACTIONS } from "./dev.labels";
 describe("AUDIT_ACTION_LABEL", () => {
   it("every action has a unique, non-empty label", () => {
     const labels = AUDIT_ACTIONS.map((a) => AUDIT_ACTION_LABEL[a]);
-    expect(AUDIT_ACTIONS).toHaveLength(17);
+    expect(AUDIT_ACTIONS).toHaveLength(19);
     expect(labels.every((l) => l.trim().length > 0)).toBe(true);
     expect(new Set(labels).size).toBe(labels.length);
     expect(AUDIT_ACTION_LABEL["user.role"]).toBe("Change role");
+    expect(AUDIT_ACTIONS).toContain("room.stage_mode");
+    expect(AUDIT_ACTIONS).toContain("room.stage_request");
   });
 });

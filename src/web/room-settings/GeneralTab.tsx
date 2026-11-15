@@ -16,7 +16,9 @@ import { Label } from "@/components/ui/label";
 import { PasswordField } from "@/room-password/PasswordField";
 import { PasswordOnceDialog } from "@/room-password/PasswordOnceDialog";
 import { ROOM_PASSWORD_TEXT } from "@/room-password/room-password.labels";
-import type { RoomSummary, RoomVisibility, UpdateRoomBody } from "../../shared/api.types";
+import { STAGE_CONTROL_TEXT } from "@/stage-control/stage-control.labels";
+import { StageModeSelect } from "@/stage-control/StageModeSelect";
+import type { RoomSummary, RoomVisibility, StageMode, UpdateRoomBody } from "../../shared/api.types";
 import { ROOM_SETTINGS_TEXT as TEXT } from "./room-settings.labels";
 import { useRoomPatch } from "./useRoomPatch";
 import { VisibilityToggle } from "./VisibilityToggle";
@@ -42,6 +44,7 @@ export function GeneralTab({ room, onChanged }: { room: RoomSummary; onChanged: 
   const [title, setTitle] = useState(room.title);
   const [visibility, setVisibility] = useState<RoomVisibility>(room.visibility);
   const [password, setPassword] = useState("");
+  const [stageMode, setStageMode] = useState<StageMode>(room.stageMode);
   // Room sudah password: kolom baru muncul setelah "Ganti password" (password lama tak bisa dilihat, W2).
   const [changing, setChanging] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -54,6 +57,7 @@ export function GeneralTab({ room, onChanged }: { room: RoomSummary; onChanged: 
     ...(title.trim() !== room.title ? { title: title.trim() } : {}),
     ...(visibility !== room.visibility || sendPassword ? { visibility } : {}),
     ...(sendPassword ? { password } : {}),
+    ...(stageMode !== room.stageMode ? { stageMode } : {}),
   };
   const dirty = Object.keys(body).length > 0;
   const confirm = confirmText(room.visibility, body.visibility);
@@ -106,6 +110,10 @@ export function GeneralTab({ room, onChanged }: { room: RoomSummary; onChanged: 
           {changing ? ROOM_PASSWORD_TEXT.cancelChange : ROOM_PASSWORD_TEXT.change}
         </Button>
       )}
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="room-settings-stage-mode">{STAGE_CONTROL_TEXT.title}</Label>
+        <StageModeSelect id="room-settings-stage-mode" testId="room-settings-stage-mode" value={stageMode} onChange={setStageMode} disabled={busy} />
+      </div>
       {showPassword && <PasswordField id="room-settings-password" value={password} onChange={setPassword} disabled={busy} autoFocus={changing} />}
       <Button type="submit" className="self-end" disabled={busy || !dirty || !title.trim()} data-testid="room-settings-save">
         {busy && <Loader2 className="animate-spin" aria-hidden="true" />}
