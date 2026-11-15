@@ -54,7 +54,7 @@ test("multi share: peserta tambah 2 layar, penonton melihat 2 tile; stop satu ti
   await expectVideoFlowing(screen1);
 });
 
-test("viewer: tidak ada tombol kamera, mikrofon, layar, atau toolbar layout", async ({ host, roomId, joinAs }) => {
+test("viewer: tidak ada tombol kamera, mikrofon, layar, atau undang; toolbar template tetap ada (lokal)", async ({ host, roomId, joinAs }) => {
   await openRoom(host, roomId);
   const viewer = await joinAs("viewer", "Penonton Pasif");
   await expect(viewer.locator("header").getByText("Viewer", { exact: true })).toBeVisible();
@@ -62,9 +62,11 @@ test("viewer: tidak ada tombol kamera, mikrofon, layar, atau toolbar layout", as
   await expect(host.getByTestId("add-screen")).toBeVisible();
   await expect(host.getByTestId("layout-toolbar")).toBeVisible();
   await expect(viewer.getByTestId("leave-room")).toBeVisible();
-  for (const id of ["toggle-mic", "toggle-camera", "add-screen", "layout-toolbar", "open-invite"]) {
+  for (const id of ["toggle-mic", "toggle-camera", "add-screen", "open-invite"]) {
     await expect(viewer.getByTestId(id)).toHaveCount(0);
   }
+  // S12: toolbar template viewer hanya mengubah tampilannya sendiri (diuji di stage-control.follow.spec.ts).
+  await expect(viewer.getByTestId("layout-toolbar")).toBeVisible();
 });
 
 test("toast: peserta lain bergabung → host melihat notifikasi nama", async ({ host, roomId, joinAs }) => {

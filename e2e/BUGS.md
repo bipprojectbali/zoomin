@@ -85,6 +85,20 @@ begitu bug diperbaiki test itu jadi "unexpectedly passed" → hapus `test.fail()
   (room terhapus sudah ditutup `deleteRoom` saat dihapus), atau beri prefix/namespace nama room per instance; plus
   opsi env untuk mematikan enforcer di server e2e prod (`playwright.config.ts` `BASE_ENV`).
 
+## E2E-05 — View "Gallery" menampilkan panggung kosong (tile kamera selebar 0 px)
+
+- **Test:** `e2e/stage-view.spec.ts` › "view: Gallery menampilkan kamera semua orang (E2E-05)" (`test.fail()`).
+- **Dampak:** tinggi untuk fitur S11. Memilih View → Gallery (desktop) mengosongkan area panggung: tile kamera ada di
+  DOM (`people-gallery` › `stage-tile`) tapi tidak terlihat; Playwright: `toBeVisible` → "hidden".
+- **Langkah reproduksi:** host + participant berkamera di room → host klik `view-menu` → "Gallery".
+- **Ekspektasi:** semua kamera/avatar tiled memenuhi panggung. **Aktual:** panggung putih kosong.
+- **Dugaan akar:** `PeopleGrid` (`src/web/stage/StageScenes.tsx`) berkelas `grid h-full …` tanpa `flex-1`/`w-full`, dirender
+  langsung sebagai anak `div.flex.flex-row` di `Stage.tsx`. Sebagai flex item lebarnya mengikuti konten; kolom grid
+  `minmax(…%, 1fr)` dan tile `w-full` tidak punya lebar intrinsik → lebar 0. `SpeakerView` tidak terdampak karena
+  pembungkusnya `flex-1`. Arah perbaikan: tambah `min-w-0 flex-1` (atau `w-full`) di root `PeopleGrid`.
+- **Bukti:** jalankan test tanpa `test.fail()` → `people-gallery` boundingBox width = 8 px (hanya padding `p-1`); screenshot
+  `e2e/.artifacts/results/stage-view-view-Gallery-*/test-failed-1.png`.
+
 ## Catatan (bukan bug app, tidak di-`test.fail`)
 
 - **Bentrok `data-testid="stage"`** (sudah beres): panel Fokus kini ber-id `focus-main`/`focus-strip`, jadi
