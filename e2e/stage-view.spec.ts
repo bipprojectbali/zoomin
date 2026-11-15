@@ -59,9 +59,7 @@ test("view: Gallery/Speaker/Content only hanya mengubah tampilan sendiri; strip 
   await expect(host.getByTestId("people-strip")).toHaveCount(0);
 });
 
-// BUG(e2e): E2E-05 — Gallery merender tile selebar 0 px (panggung kosong). Hapus test.fail() setelah diperbaiki.
 test("view: Gallery menampilkan kamera semua orang (E2E-05)", async ({ host, hostId, roomId, joinAs }) => {
-  test.fail();
   const guest = await joinAs("participant", "Kamera Gallery", { camera: true });
   const id = await identityOf(guest);
   await openRoom(host, roomId);

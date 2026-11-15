@@ -34,11 +34,11 @@ export function PeopleStrip({ items, position }: { items: Items; position: Exclu
   );
 }
 
-/** Gallery: semua kamera/avatar tiled. */
+/** Gallery: semua kamera/avatar tiled. Root `flex-1` karena dirender langsung di baris flex Stage (E2E-05). */
 export function PeopleGrid({ items }: { items: Items }) {
-  if (items.length === 0) return <Empty text={STAGE_LABELS.noPeople} />;
+  if (items.length === 0) return <div className="min-w-0 flex-1"><Empty text={STAGE_LABELS.noPeople} /></div>;
   return (
-    <div data-testid="people-gallery" style={gridStyle(items.length)} className="grid h-full gap-2 overflow-y-auto p-1">
+    <div data-testid="people-gallery" style={gridStyle(items.length)} className="grid min-h-0 min-w-0 flex-1 gap-2 overflow-y-auto p-1">
       {items.map((x) => (
         <div key={keyOf(x.ref)} className="min-h-0">
           <ExtraTile item={x} />
